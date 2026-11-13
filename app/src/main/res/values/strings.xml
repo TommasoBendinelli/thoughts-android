@@ -1320,7 +1320,6 @@
     <string name="home_render_phase_resolving_links">Resolving links</string>
     <string name="home_render_phase_publishing">Publishing</string>
     <string name="home_render_phase_validating">Validating</string>
-    <string name="home_render_phase_codex_repair">Fixing with Codex</string>
     <string name="home_render_status_current_work">Current work: %1$s</string>
     <string name="home_render_status_waiting">Waiting for the server</string>
     <string name="home_render_status_sync_progress">Update from the server %1$d/%2$d</string>
@@ -1341,7 +1340,6 @@
     <string name="home_render_status_finished">Finished: %1$s</string>
     <string name="home_render_status_verified">Verified on phone: %1$s</string>
     <string name="home_render_status_retry">Retry Sync</string>
-    <string name="home_render_status_fix_with_codex">Fix with Codex</string>
     <string name="home_render_error_title">Error %1$d of %2$d</string>
     <string name="home_render_error_pdf">PDF: %1$s</string>
     <string name="home_render_error_source">Source: %1$s</string>
@@ -1357,8 +1355,6 @@
     <string name="pdf_build_log_missing">This error has no verified server build log.</string>
     <string name="pdf_build_log_missing_local">This build log was not saved on this phone.</string>
     <string name="pdf_build_log_empty">The server build log is empty.</string>
-    <string name="home_render_status_codex_queued">Codex repair queued on the server.</string>
-    <string name="home_render_status_codex_already_queued">That Codex repair is already queued.</string>
     <string name="comment_anchor_status_healthy_title">Source comments linked</string>
     <string name="comment_anchor_status_healthy_message">All %1$d comments in this document are anchored to the source.</string>
     <string name="comment_anchor_status_pending_title">Source linking pending</string>

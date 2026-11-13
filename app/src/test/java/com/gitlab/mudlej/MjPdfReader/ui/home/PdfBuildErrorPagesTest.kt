@@ -170,6 +170,35 @@ class PdfBuildErrorPagesTest {
     }
 
     @Test
+    fun failedBuildKeepsItsErrorLogAndRetryTarget() {
+        val pages = pdfBuildErrorPages(
+            PhoneRenderStatusSnapshot(
+                listOf(
+                    PhoneRenderJobStatus(
+                        requestId = "request",
+                        target = "TraceBench.pdf",
+                        stage = PhoneRenderStage.FAILED,
+                        message = "Renderer exited",
+                        failedDocuments = listOf(
+                            failure("TraceBench.pdf", "source.tex", "LaTeX failed")
+                        ),
+                        logReference = "server-object:log",
+                        buildId = "build-id",
+                    )
+                )
+            )
+        )
+
+        val page = pages.single()
+        assertEquals("TraceBench.pdf", page.pdfFilename)
+        assertEquals("source.tex", page.source)
+        assertEquals("LaTeX failed", page.message)
+        assertEquals("server-object:log", page.logReference)
+        assertEquals("build-id", page.buildId)
+        assertEquals("TraceBench.pdf", page.actionTarget)
+    }
+
+    @Test
     fun statusRetainsBuildIdWhenItsReceiptDoesNotContainALogReference() {
         val pages = pdfBuildErrorPages(
             PhoneRenderStatusSnapshot(

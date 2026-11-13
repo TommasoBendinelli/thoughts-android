@@ -5036,9 +5036,6 @@ class FedoraRepository(
                 else -> null
             } ?: return@forEach
             if (targetPdfFilename != null && target != targetPdfFilename) return@forEach
-            val repairMode = request.string("repair_mode")
-                .takeIf { it == PhoneRenderQueue.REPAIR_CODEX }
-                ?: PhoneRenderQueue.REPAIR_NONE
             val receipt = File(receiptRoot, "$requestId.json")
             if (receipt.isTerminalRenderReceipt()) {
                 val payload = runCatching {
@@ -5097,7 +5094,6 @@ class FedoraRepository(
                         requestId,
                         request.get("source_frontier")?.asLong,
                         request.string("input_snapshot_sha256").ifBlank { null },
-                        repairMode,
                     )
                 }
                 created.also {
@@ -5343,6 +5339,7 @@ class FedoraRepository(
             addProperty("request_id", request.string("request_id"))
             addProperty("build_id", build.id)
             addProperty("target", build.target)
+            // Kept so saved diagnostics can tell what kind of work an old build did.
             addProperty("repair_mode", build.repairMode)
             addProperty("status", status)
             addProperty("server_status", build.status)

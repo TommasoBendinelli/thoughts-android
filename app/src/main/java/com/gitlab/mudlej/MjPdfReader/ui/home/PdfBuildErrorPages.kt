@@ -17,7 +17,6 @@ internal data class PdfBuildErrorPage(
     val logReference: String,
     val buildId: String,
     val fallbackTarget: String?,
-    val allowsCodexFix: Boolean,
 ) {
     val actionTarget: String?
         get() = pdfFilename ?: fallbackTarget
@@ -76,13 +75,11 @@ internal fun pdfBuildErrorPages(
     report: PdfBuildErrorReport,
 ): List<PdfBuildErrorPage> {
     val fallbackTarget = normalizedActionTarget(report.target)
-    val allowsCodexFix = report.failedDocuments.isNotEmpty() || report.status == "failed"
     val pages = report.failedDocuments.mapNotNull { failure ->
         failure.toErrorPage(
             report.logReference,
             report.buildId,
             fallbackTarget,
-            allowsCodexFix,
         )
     }
     return if (pages.isNotEmpty()) {
@@ -96,7 +93,6 @@ internal fun pdfBuildErrorPages(
                 logReference = report.logReference,
                 buildId = report.buildId,
                 fallbackTarget = fallbackTarget,
-                allowsCodexFix = allowsCodexFix,
             )
         )
     }
@@ -109,7 +105,6 @@ private fun errorPagesForStatus(status: PhoneRenderJobStatus): List<PdfBuildErro
             status.logReference,
             status.buildId,
             fallbackTarget,
-            canFixWithCodex(status),
         )
     }
     if (attributed.isNotEmpty()) {
@@ -123,7 +118,6 @@ private fun errorPagesForStatus(status: PhoneRenderJobStatus): List<PdfBuildErro
             logReference = status.logReference,
             buildId = status.buildId,
             fallbackTarget = fallbackTarget,
-            allowsCodexFix = canFixWithCodex(status),
         )
     )
 }
@@ -132,7 +126,6 @@ private fun PhoneRenderFailure.toErrorPage(
     logReference: String,
     buildId: String,
     fallbackTarget: String?,
-    allowsCodexFix: Boolean,
 ): PdfBuildErrorPage? {
     val filename = pdfFilename.takeIf(::isSafeErrorPdfFilename) ?: return null
     return PdfBuildErrorPage(
@@ -142,7 +135,6 @@ private fun PhoneRenderFailure.toErrorPage(
         logReference = logReference,
         buildId = buildId,
         fallbackTarget = fallbackTarget,
-        allowsCodexFix = allowsCodexFix,
     )
 }
 

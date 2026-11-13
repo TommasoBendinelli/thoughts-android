@@ -110,19 +110,112 @@ class PhoneRenderQueueTest {
     }
 
     @Test
-    fun codexRepairIsExplicitAndDoesNotDedupeAgainstNormalRetry() {
-        val normal = queue.enqueueAll()
-        val repair = queue.enqueueCodexRepair(PhoneRenderQueue.ACTION_ALL)
-        val duplicateRepair = queue.enqueueCodexRepair(PhoneRenderQueue.ACTION_ALL)
+    fun requestsCarryNoRepairMode() {
+        val pdf = File(pdfs, "template.pdf").apply { writeText("pdf") }
 
-        assertFalse(repair.alreadyPending)
-        assertTrue(duplicateRepair.alreadyPending)
-        assertEquals(repair.requestId, duplicateRepair.requestId)
-        assertTrue(normal.requestId != repair.requestId)
-        val payload = JsonParser.parseString(
-            File(requests, "${repair.requestId}.json").readText()
-        ).asJsonObject
-        assertEquals(PhoneRenderQueue.REPAIR_CODEX, payload["repair_mode"].asString)
+        val ids = listOf(
+            queue.enqueueAll().requestId,
+            queue.enqueuePdf(pdf).requestId,
+        )
+
+        ids.forEach { id ->
+            val payload = JsonParser.parseString(File(requests, "$id.json").readText()).asJsonObject
+            assertFalse(payload.has("repair_mode"))
+        }
+    }
+
+    @Test
+    fun pendingRequestSavedWithAnOldRepairModeCountsAsTheSameBuild() {
+        val oldId = "5f0c2f2e-0a0b-4c1d-8e2f-3a4b5c6d7e8f"
+        requests.mkdirs()
+        File(requests, "$oldId.json").writeText(
+            """
+            {
+              "schema_version": 7,
+              "request_id": "$oldId",
+              "created_at": "2026-11-01T08:00:00Z",
+              "action": "all",
+              "repair_mode": "codex",
+              "required_comments": [],
+              "comment_records": []
+            }
+            """.trimIndent()
+        )
+
+        val retry = queue.enqueueAll()
+
+        assertTrue(retry.alreadyPending)
+        assertEquals(oldId, retry.requestId)
+        assertEquals(1, requests.listFiles().orEmpty().size)
+    }
+
+    @Test
+    fun failedReceiptWithAnOldRepairModeStillReportsItsError() {
+        val pdf = File(pdfs, "template.pdf").apply { writeText("pdf") }
+        val request = queue.enqueuePdf(pdf)
+        receipts.mkdirs()
+        listOf("codex", "review_cards", "none").forEach { mode ->
+            File(receipts, "${request.requestId}.json").writeText(
+                """
+                {
+                  "schema_version": 7,
+                  "request_id": "${request.requestId}",
+                  "build_id": "build-id",
+                  "target": "template.pdf",
+                  "repair_mode": "$mode",
+                  "status": "failure",
+                  "exit_code": 1,
+                  "completed_at": "2026-11-01T08:05:00Z",
+                  "message": "LaTeX failed",
+                  "log_reference": "server-object:log",
+                  "failed_documents": [
+                    {"pdf_filename": "template.pdf", "source": "main.tex", "message": "Undefined control sequence."}
+                  ]
+                }
+                """.trimIndent()
+            )
+
+            val status = queue.loadStatusSnapshot().statusForPdf("template.pdf")
+            assertEquals(mode, PhoneRenderStage.FAILED, status?.stage)
+            assertEquals(mode, "LaTeX failed", status?.message)
+            assertEquals(mode, "Undefined control sequence.", status?.failedDocuments?.single()?.message)
+            assertEquals(mode, "server-object:log", status?.logReference)
+            assertEquals(mode, "build-id", status?.buildId)
+        }
+    }
+
+    @Test
+    fun runningReceiptInARemovedProgressPhaseStaysActiveWithoutProgress() {
+        val pdf = File(pdfs, "template.pdf").apply { writeText("pdf") }
+        val request = queue.enqueuePdf(pdf)
+        receipts.mkdirs()
+        File(receipts, "${request.requestId}.json").writeText(
+            """
+            {
+              "schema_version": 7,
+              "request_id": "${request.requestId}",
+              "target": "template.pdf",
+              "repair_mode": "codex",
+              "status": "running",
+              "exit_code": -1,
+              "started_at": "2026-11-01T08:00:00Z",
+              "message": "Working on template.pdf.",
+              "progress": {
+                "phase": "codex_repair",
+                "completed": 0,
+                "total": 1,
+                "unit": "steps",
+                "detail": "",
+                "updated_at": "2026-11-01T08:00:05Z"
+              }
+            }
+            """.trimIndent()
+        )
+
+        val status = queue.loadStatusSnapshot().statusForPdf("template.pdf")
+        assertEquals(PhoneRenderStage.REBUILDING, status?.stage)
+        assertEquals(null, status?.progress)
+        assertTrue(queue.hasPendingPdf(pdf))
     }
 
     @Test

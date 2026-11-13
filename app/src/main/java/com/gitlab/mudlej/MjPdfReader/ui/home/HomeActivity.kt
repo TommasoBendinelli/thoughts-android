@@ -2724,10 +2724,6 @@ class HomeActivity : AppCompatActivity(), HomeItemFunctions {
         }
     }
 
-    private fun fixRenderStatusWithCodex(status: PhoneRenderJobStatus) {
-        fixRenderTargetWithCodex(status.target)
-    }
-
     private fun showLocalLogsForStatus(status: PhoneRenderJobStatus) {
         lifecycleScope.launch {
             val record = withContext(Dispatchers.IO) {
@@ -2767,8 +2763,6 @@ class HomeActivity : AppCompatActivity(), HomeItemFunctions {
                 if (hasLog || navigation.total > 1) View.VISIBLE else View.GONE
             val canAct = canActOnPdfBuildError(page)
             errorBinding.errorRetry.visibility = if (canAct) View.VISIBLE else View.GONE
-            errorBinding.errorFixWithCodex.visibility =
-                if (page.allowsCodexFix && canAct) View.VISIBLE else View.GONE
             errorBinding.errorActions.visibility =
                 if (canAct) View.VISIBLE else View.GONE
         }
@@ -2803,14 +2797,6 @@ class HomeActivity : AppCompatActivity(), HomeItemFunctions {
                 if (canActOnPdfBuildError(page)) {
                     dialog.dismiss()
                     retryPdfBuildError(page)
-                }
-            }
-            errorBinding.errorFixWithCodex.setOnClickListener {
-                val page = pages[pageIndex]
-                val target = page.actionTarget
-                if (target != null && canActOnPdfBuildError(page)) {
-                    dialog.dismiss()
-                    fixRenderTargetWithCodex(target)
                 }
             }
             renderPage()
@@ -2864,32 +2850,6 @@ class HomeActivity : AppCompatActivity(), HomeItemFunctions {
             requestManualSync()
         } else {
             requestPdfSync(target)
-        }
-    }
-
-    private fun fixRenderTargetWithCodex(target: String) {
-        Log.i(TAG, "Queueing Codex render repair for $target")
-        lifecycleScope.launch {
-            val result = runCatching {
-                withContext(Dispatchers.IO) {
-                    phoneRenderQueue.enqueueCodexRepair(target)
-                }
-            }
-            result.onSuccess { queued ->
-                Log.i(
-                    TAG,
-                    "Codex render repair ${queued.requestId} queued; " +
-                        "alreadyPending=${queued.alreadyPending}",
-                )
-                dispatchQueuedRenderRequest(target)
-            }.onFailure { error ->
-                Log.e(TAG, "Unable to queue Codex render repair for $target", error)
-                Toast.makeText(
-                    this@HomeActivity,
-                    R.string.home_rebuild_queue_failed,
-                    Toast.LENGTH_LONG,
-                ).show()
-            }
         }
     }
 
@@ -3030,10 +2990,6 @@ private data class PendingDocumentSyncCounts(
     var blocked: Boolean = false,
     val failures: MutableList<String> = mutableListOf(),
 )
-
-internal fun canFixWithCodex(status: PhoneRenderJobStatus): Boolean =
-    !status.isActive &&
-        status.stage in setOf(PhoneRenderStage.PARTIAL, PhoneRenderStage.FAILED)
 
 internal fun completedReceiptsContainNoChanges(
     receipts: Collection<PhoneRenderReceipt>,

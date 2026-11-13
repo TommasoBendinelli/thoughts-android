@@ -73,41 +73,6 @@ class HomeRenderStatusBannerTest {
     }
 
     @Test
-    fun codexFixCoversCompletedRendererFailuresWithOrWithoutDocumentDetails() {
-        val failure = PhoneRenderFailure("Benchmark.pdf", "source.tex", "LaTeX failed")
-        assertTrue(
-            canFixWithCodex(
-                PhoneRenderJobStatus(
-                    requestId = "partial",
-                    target = PhoneRenderQueue.ACTION_ALL,
-                    stage = PhoneRenderStage.PARTIAL,
-                    failedDocuments = listOf(failure),
-                )
-            )
-        )
-        assertTrue(
-            canFixWithCodex(
-                PhoneRenderJobStatus(
-                    requestId = "renderer",
-                    target = "process.pdf",
-                    stage = PhoneRenderStage.FAILED,
-                    message = "renderer exited with 1",
-                )
-            )
-        )
-        assertFalse(
-            canFixWithCodex(
-                PhoneRenderJobStatus(
-                    requestId = "running",
-                    target = PhoneRenderQueue.ACTION_ALL,
-                    stage = PhoneRenderStage.REBUILDING,
-                    failedDocuments = listOf(failure),
-                )
-            )
-        )
-    }
-
-    @Test
     fun noChangeCompletionUsesTransientFeedbackWithoutRefreshingLibrary() {
         val receipts = listOf(receipt(changesDetected = false))
 

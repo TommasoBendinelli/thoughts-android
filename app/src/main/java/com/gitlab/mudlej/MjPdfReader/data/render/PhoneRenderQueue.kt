@@ -39,7 +39,6 @@ data class PhoneRenderReceipt(
     val changesDetected: Boolean? = null,
     val failedDocuments: List<PhoneRenderFailure> = emptyList(),
     val logReference: String = "",
-    val repairMode: String = PhoneRenderQueue.REPAIR_NONE,
     val buildId: String = "",
 ) {
     val succeeded: Boolean
@@ -141,7 +140,6 @@ data class PhoneRenderJobStatus(
     val failedDocuments: List<PhoneRenderFailure> = emptyList(),
     val logReference: String = "",
     val buildId: String = "",
-    val repairMode: String = PhoneRenderQueue.REPAIR_NONE,
     val conditionalCheck: Boolean = false,
 ) {
     val affectsAll: Boolean
@@ -370,7 +368,6 @@ private data class PhoneRenderRequestSnapshot(
     val action: String,
     val target: String,
     val createdAtEpochMillis: Long,
-    val repairMode: String,
 )
 
 class PhoneRenderQueue(
@@ -411,7 +408,6 @@ class PhoneRenderQueue(
             commentRecords,
             sourceFrontier,
             inputSnapshotSha256,
-            REPAIR_NONE,
         )
     }
 
@@ -422,7 +418,6 @@ class PhoneRenderQueue(
         emptyList(),
         null,
         null,
-        REPAIR_NONE,
     )
 
     fun enqueueCheckAll(): RenderEnqueueResult = enqueue(
@@ -432,18 +427,7 @@ class PhoneRenderQueue(
         emptyList(),
         null,
         null,
-        REPAIR_NONE,
     )
-
-    fun enqueueCodexRepair(target: String): RenderEnqueueResult {
-        return if (target == ACTION_ALL) {
-            enqueue(ACTION_ALL, null, emptyList(), emptyList(), null, null, REPAIR_CODEX)
-        } else {
-            val file = File(canonicalPdfDirectory, target)
-            require(canRequestPdf(file)) { "PDF is not a canonical docs-clean-pdfs entry" }
-            enqueue(ACTION_PDF, target, emptyList(), emptyList(), null, null, REPAIR_CODEX)
-        }
-    }
 
     fun hasPendingPdf(file: File): Boolean {
         if (!canRequestPdf(file)) {
@@ -628,7 +612,6 @@ class PhoneRenderQueue(
                         failedDocuments = receipt?.failedDocuments.orEmpty(),
                         logReference = receipt?.logReference.orEmpty(),
                         buildId = receipt?.buildId.orEmpty(),
-                        repairMode = receipt?.repairMode ?: request?.repairMode ?: REPAIR_NONE,
                         conditionalCheck = request?.action == ACTION_CHECK_ALL,
                     ),
                     visible,
@@ -849,7 +832,6 @@ class PhoneRenderQueue(
         commentRecords: Collection<CommentDeliveryRecord>,
         sourceFrontier: Long?,
         inputSnapshotSha256: String?,
-        repairMode: String,
     ): RenderEnqueueResult {
         requestDirectory.mkdirs()
         val normalizedRequirements = normalizeRequirements(requiredComments)
@@ -878,7 +860,6 @@ class PhoneRenderQueue(
             normalizedRequirements,
             sourceFrontier,
             inputSnapshotSha256,
-            repairMode,
         )?.let {
             return RenderEnqueueResult(it, alreadyPending = true)
         }
@@ -889,7 +870,6 @@ class PhoneRenderQueue(
             addProperty("request_id", requestId)
             addProperty("created_at", Instant.now().toString())
             addProperty("action", action)
-            addProperty("repair_mode", repairMode)
             if (pdfFilename != null) {
                 addProperty("pdf_filename", pdfFilename)
             }
@@ -933,7 +913,6 @@ class PhoneRenderQueue(
         requiredComments: List<CommentAnchorRequirement>,
         sourceFrontier: Long? = null,
         inputSnapshotSha256: String? = null,
-        repairMode: String = REPAIR_NONE,
     ): String? {
         return requestFiles().firstNotNullOfOrNull { requestFile ->
             if (receiptIsTerminal(File(receiptDirectory, requestFile.name))) {
@@ -952,8 +931,6 @@ class PhoneRenderQueue(
                 payload.get("source_frontier")?.asLong == sourceFrontier
             val sameInputSnapshot = inputSnapshotSha256 == null ||
                 payload.string("input_snapshot_sha256") == inputSnapshotSha256
-            val sameRepairMode = payload.string("repair_mode").orEmpty()
-                .ifBlank { REPAIR_NONE } == repairMode
             val pendingRequirements = payload.get("required_comments")
                 ?.takeIf { it.isJsonArray }
                 ?.asJsonArray
@@ -972,7 +949,7 @@ class PhoneRenderQueue(
                 }
             payload.string("request_id").takeIf {
                 sameAction && samePdf && sameSourceFrontier && sameInputSnapshot &&
-                    sameRepairMode && coversRequirements
+                    coversRequirements
             }
         }
     }
@@ -1097,7 +1074,6 @@ class PhoneRenderQueue(
                 changesDetected = payload.boolean("changes_detected"),
                 failedDocuments = failedDocuments,
                 logReference = payload.string("log_reference").orEmpty(),
-                repairMode = payload.string("repair_mode").orEmpty().ifBlank { REPAIR_NONE },
                 buildId = payload.string("build_id").orEmpty(),
             )
         }.getOrNull()
@@ -1120,7 +1096,6 @@ class PhoneRenderQueue(
                 action,
                 target,
                 payload.instantMillis("created_at").takeIf { it > 0 } ?: file.lastModified(),
-                payload.string("repair_mode").orEmpty().ifBlank { REPAIR_NONE },
             )
         }
     }
@@ -1194,8 +1169,6 @@ class PhoneRenderQueue(
         const val ACTION_PDF = "pdf"
         const val ACTION_ALL = "all"
         const val ACTION_CHECK_ALL = "check_all"
-        const val REPAIR_NONE = "none"
-        const val REPAIR_CODEX = "codex"
         private const val JSON_EXTENSION = "json"
         private const val PDF_EXTENSION = ".pdf"
         private const val MATCH_CACHE_LIMIT = 256
@@ -1310,7 +1283,6 @@ private val SUPPORTED_PROGRESS_PHASES = setOf(
     "resolving_links",
     "publishing",
     "validating",
-    "codex_repair",
 )
 
 private val SUPPORTED_PROGRESS_UNITS = setOf("steps", "files", "projects", "pdfs")
