@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Written for Thoughts. License is GPLv3. -->
+<resources>
+    <string name="review_action_correct">Correct</string>
+    <string name="review_action_error">Wrong</string>
+    <string name="review_action_never">Never</string>
+    <string name="review_action_custom">Custom…</string>
+    <string name="review_action_suggested">%1$s · Suggested</string>
+    <string name="review_action_change_timing">Change %1$s timing</string>
+    <string name="review_action_next">Next</string>
+    <item name="reviewTimingNext" type="id" />
+    <string name="review_action_end">End review</string>
+    <string name="review_action_hide">Hide review</string>
+    <string name="review_action_show">Show review</string>
+    <string name="review_action_focus">Focus</string>
+    <string name="review_action_hide_for">Hide for</string>
+    <string name="review_action_minutes_short">%1$s min</string>
+    <string name="review_action_hours_short">%1$s h</string>
+</resources>

@@ -1,0 +1,9 @@
+<!-- Written for Thoughts. License is GPLv3. -->
+<resources>
+    <string name="selection_add_review">Add review</string>
+    <string name="manual_review_add_area">Add another area</string>
+    <string name="manual_review_next_area">Area %1$d kept. Select the next area, then tap Add review.</string>
+    <string name="manual_review_areas_selected">%1$d areas selected. Add more, or write the question for this card.</string>
+    <string name="manual_review_area_position">Area %1$d of %2$d · page %3$d</string>
+    <string name="selection_review_instructions">The selected text will be the answer. Write the question for this card.</string>
+</resources>

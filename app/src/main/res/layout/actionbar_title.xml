@@ -1,0 +1,82 @@
+<!-- Written by Mudlej. License is GPLv3. -->
+<androidx.appcompat.widget.LinearLayoutCompat
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:orientation="horizontal"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:gravity="center">
+
+    <!-- Next to Home: the Agent notes list in one tap. -->
+    <ImageButton
+        android:id="@+id/actionbarAgentNotes"
+        android:layout_width="48dp"
+        android:layout_height="48dp"
+        android:layout_marginEnd="4dp"
+        android:background="?attr/selectableItemBackgroundBorderless"
+        android:contentDescription="@string/agent_notes"
+        android:src="@drawable/ic_agent_note_outline"
+        app:tint="?attr/colorOnSurface" />
+
+    <LinearLayout
+        android:id="@+id/reviewToolbarActions"
+        android:layout_width="wrap_content"
+        android:layout_height="match_parent"
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        android:visibility="gone">
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/reviewVisibilityButton"
+            style="@style/Widget.Material3.Button.TonalButton"
+            android:layout_width="wrap_content"
+            android:layout_height="48dp"
+            android:minWidth="0dp"
+            android:paddingHorizontal="6dp"
+            android:maxLines="1"
+            android:text="@string/review_action_hide"
+            android:textAllCaps="false"
+            android:textSize="12sp"
+            android:textColor="?attr/colorOnPrimaryContainer"
+            android:backgroundTint="?attr/colorPrimaryContainer"
+            app:backgroundTint="?attr/colorPrimaryContainer"
+            app:strokeWidth="0dp"
+            app:autoSizeTextType="uniform"
+            app:autoSizeMinTextSize="10sp"
+            app:autoSizeMaxTextSize="12sp"
+            app:autoSizeStepGranularity="1sp"
+            app:cornerRadius="24dp" />
+
+
+    </LinearLayout>
+
+    <TextView
+        android:id="@+id/actionbarPageNumber"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginVertical="4dp"
+        android:layout_marginEnd="6dp"
+        android:textSize="18sp"
+        android:textColor="?attr/colorOnSurface"
+        android:text="@string/page_number"
+        android:maxLines="1"
+        android:ellipsize="end"
+        android:visibility="gone" />
+
+    <TextView
+        android:id="@+id/actionbarTitle"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_marginVertical="4dp"
+        android:layout_weight="1"
+        android:textSize="18sp"
+        android:textColor="?attr/colorOnSurface"
+        android:text="@string/mj_app_name"
+        android:textDirection="firstStrong"
+        android:textAlignment="textStart"
+        android:maxLines="1"
+        android:ellipsize="end"
+        android:visibility="gone" />
+
+</androidx.appcompat.widget.LinearLayoutCompat>

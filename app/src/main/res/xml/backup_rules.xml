@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Written for Thoughts. License is GPLv3. -->
+<full-backup-content>
+    <exclude domain="file" path="verified-source-pdfs/" />
+    <!-- The Read aloud OpenRouter key: Keystore-sealed, useless on another device, never copied. -->
+    <exclude domain="sharedpref" path="read_aloud_voice.xml" />
+    <!-- "Receive agent notes on this phone" belongs to this phone. -->
+    <exclude domain="sharedpref" path="agent_notes_device.xml" />
+</full-backup-content>

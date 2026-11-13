@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Written for Thoughts. License is GPLv3. -->
+<resources>
+    <item name="reviewCardBrowserSearch" type="id" />
+    <item name="manualReviewLinkAtNextSyncButton" type="id" />
+</resources>

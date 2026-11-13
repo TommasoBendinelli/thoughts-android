@@ -1,0 +1,130 @@
+import java.nio.charset.StandardCharsets
+import java.security.MessageDigest
+
+apply plugin: 'com.android.library'
+
+def supportedNativeAbis = ['arm64-v8a', 'armeabi-v7a', 'x86', 'x86_64']
+def requiredNativeLibraries = [
+        'libc++_shared.so',
+        'libjniPdfium.so',
+        'libmodft2.so',
+        'libmodpdfium.so',
+        'libmodpng.so',
+]
+def requiredPdfiumExtensions = [
+        'MJPDFAnnot_SetReplyTo',
+        'MJPDFAnnot_SetIconName',
+]
+def requiredNativeLibraryFiles = supportedNativeAbis.collectMany { abi ->
+    requiredNativeLibraries.collect { libraryName ->
+        file("src/main/libs/${abi}/${libraryName}")
+    }
+}
+def nativeBridgeInputs = [
+        file('src/main/jni/Android.mk'),
+        file('src/main/jni/Application.mk'),
+        file('src/main/jni/src/mainJNILib.cpp'),
+        file('src/main/jni/src/sourceSync.cpp'),
+]
+nativeBridgeInputs.addAll(fileTree('src/main/jni/synctex').files.sort { it.name })
+def nativeBridgeStamp = file('src/main/libs/.jni-bridge.sha256')
+def nativeBridgeFingerprint = {
+    def digest = MessageDigest.getInstance('SHA-256')
+    nativeBridgeInputs.each { input ->
+        digest.update(rootProject.relativePath(input).getBytes(StandardCharsets.UTF_8))
+        digest.update((byte) 0)
+        digest.update(input.bytes)
+        digest.update((byte) 0)
+    }
+    digest.digest().collect { String.format('%02x', it & 0xff) }.join()
+}
+
+def verifyNativeLibraries = tasks.register('verifyNativeLibraries') {
+    group = 'verification'
+    description = 'Fails when the native PDFium runtime needed by packaged APKs is incomplete.'
+    inputs.files(requiredNativeLibraryFiles + nativeBridgeInputs + [nativeBridgeStamp])
+
+    doLast {
+        def missingFiles = requiredNativeLibraryFiles.findAll {
+            !it.isFile() || it.length() == 0
+        }
+        if (!missingFiles.isEmpty()) {
+            def formattedPaths = missingFiles.collect {
+                " - ${project.relativePath(it)}"
+            }.join('\n')
+            throw new GradleException(
+                    "Missing required MJ PDF native libraries:\n${formattedPaths}\n" +
+                    "Run: python3 build_dependencies/bootstrap_release_libs.py"
+            )
+        }
+        def incompatiblePdfiumFiles = supportedNativeAbis.collect { abi ->
+            file("src/main/libs/${abi}/libmodpdfium.so")
+        }.findAll { library ->
+            def contents = new String(library.bytes, StandardCharsets.ISO_8859_1)
+            !requiredPdfiumExtensions.every(contents::contains)
+        }
+        if (!incompatiblePdfiumFiles.isEmpty()) {
+            def formattedPaths = incompatiblePdfiumFiles.collect {
+                " - ${project.relativePath(it)}"
+            }.join('\n')
+            throw new GradleException(
+                    "The packaged PDFium libraries do not support standard comment replies:\n" +
+                    "${formattedPaths}\n" +
+                    "Missing one or more exported extensions: ${requiredPdfiumExtensions.join(', ')}\n" +
+                    "Run: (cd build_dependencies && PYTHONPATH=.. python3 pdfium_source.py)"
+            )
+        }
+        def expectedFingerprint = nativeBridgeFingerprint()
+        def actualFingerprint = nativeBridgeStamp.isFile()
+                ? nativeBridgeStamp.getText('UTF-8').trim()
+                : ''
+        if (actualFingerprint != expectedFingerprint) {
+            throw new GradleException(
+                    "The packaged JNI bridge is missing or stale.\n" +
+                    "Run: python3 build_dependencies/bootstrap_release_libs.py"
+            )
+        }
+    }
+}
+
+android {
+    compileSdkVersion 36
+
+    defaultConfig {
+        minSdkVersion 23
+        targetSdkVersion 36
+        testInstrumentationRunner 'androidx.test.runner.AndroidJUnitRunner'
+    }
+    buildTypes {
+        release {
+            minifyEnabled false
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+        }
+    }
+
+    sourceSets{
+        main {
+            jniLibs.srcDir 'src/main/libs'
+        }
+    }
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_1_8
+        targetCompatibility JavaVersion.VERSION_1_8
+    }
+    namespace = 'com.shockwave.pdfium'
+}
+
+repositories {
+    google()
+    mavenCentral()
+}
+
+dependencies {
+    implementation fileTree(dir: 'libs', include: ['*.jar'])
+    androidTestImplementation 'androidx.test:runner:1.6.2'
+    androidTestImplementation 'androidx.test.ext:junit:1.2.1'
+}
+
+tasks.named('preBuild').configure {
+    dependsOn verifyNativeLibraries
+}

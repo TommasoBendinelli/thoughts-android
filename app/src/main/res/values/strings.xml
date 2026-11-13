@@ -1,0 +1,2028 @@
+<!-- Written by Mudlej. License is GPLv3. -->
+<resources xmlns:tools="http://schemas.android.com/tools">
+    <string name="review_content_changed" translatable="false">Content changed</string>
+    <string name="review_content_changed_reason" translatable="false">The passage changed, was removed, or is no longer unique. The original answer and review history are preserved.</string>
+
+    <string name="review_none_due" translatable="false">No review cards are due</string>
+    <string name="review_missing_pdf" translatable="false">The PDF for this review card is unavailable</string>
+    <string name="review_stale_geometry" translatable="false">This review card is unavailable for the installed PDF version</string>
+    <string name="review_reveal" translatable="false">Reveal</string>
+    <string name="review_hard" translatable="false">Hard</string>
+    <string name="review_good" translatable="false">Good</string>
+    <string name="review_easy" translatable="false">Easy</string>
+    <string name="review_again" translatable="false">Again</string>
+    <string name="review_delete" translatable="false">Delete</string>
+    <string name="review_today" translatable="false">Today</string>
+    <string name="review_loading" translatable="false">Loading review cards…</string>
+    <string name="review_refreshing" translatable="false">Updating review cards…</string>
+    <string name="review_load_failed" translatable="false">Couldn’t load review cards.</string>
+    <string name="review_refresh_failed_showing_previous" translatable="false">Couldn’t refresh review cards. Showing the previous results.</string>
+    <string name="review_count_pending" translatable="false">—</string>
+    <string name="review_new" translatable="false">New</string>
+    <string name="review_learning" translatable="false">Learning</string>
+    <string name="review_review" translatable="false">Review</string>
+    <string name="review_start" translatable="false">Start Review</string>
+    <string name="review_pdf_decks" translatable="false">PDF decks</string>
+    <string name="review_all_pdfs" translatable="false">All PDFs</string>
+    <string name="review_study_pdf" translatable="false">Study this PDF</string>
+    <string name="review_search_hint" translatable="false">Search PDF decks</string>
+    <string name="review_counts" translatable="false">%1$d new · %2$d review</string>
+    <string name="review_no_active_title" translatable="false">No active review cards</string>
+    <string name="review_no_active_message" translatable="false">Generate cards here or create them from PDF Review. Generated cards are added directly to your reviews.</string>
+    <string name="review_none_due_title" translatable="false">You’re caught up</string>
+    <string name="review_none_due_message" translatable="false">No review cards are currently due.</string>
+    <string name="review_none_due_for_pdf" translatable="false">No cards from this PDF are currently due.</string>
+    <string name="review_repairing_title" translatable="false">Some review cards are unavailable</string>
+    <string name="review_repairing_message" translatable="false">These cards do not match the PDF version installed on this phone.</string>
+    <string name="review_attention_title" translatable="false">Some review cards are unavailable</string>
+    <string name="review_attention_message" translatable="false">These cards cannot be shown safely with the PDF version installed on this phone.</string>
+    <string name="review_next_due" translatable="false">Next card %1$s</string>
+    <string name="review_session_complete" translatable="false">Review complete</string>
+    <string name="review_previous" translatable="false">Previous</string>
+    <string name="review_done" translatable="false">Done</string>
+    <string name="review_previous_unavailable" translatable="false">The previous review card is no longer available.</string>
+    <string name="review_rating_with_interval" translatable="false">%1$s\n%2$s</string>
+    <string name="review_browse_cards" translatable="false">Browse cards</string>
+    <string name="review_mental_model" translatable="false">Mental Model</string>
+    <string name="review_export_qa_pdf" translatable="false">Export Q&amp;A as PDF</string>
+    <string name="review_qa_export_title" translatable="false">Export questions and answers</string>
+    <string name="review_qa_export_append_source" translatable="false">Append the source PDF</string>
+    <string name="review_qa_export_append_source_summary" translatable="false">The original PDF pages will follow the question-and-answer pages.</string>
+    <string name="review_qa_export_action" translatable="false">Export PDF</string>
+    <string name="review_qa_exporting" translatable="false">Creating the Q&amp;A PDF…</string>
+    <string name="review_qa_export_complete" translatable="false">Exported %1$d question-and-answer pairs.</string>
+    <string name="review_qa_export_failed" translatable="false">Could not export the Q&amp;A PDF: %1$s</string>
+    <string name="review_qa_export_no_cards" translatable="false">No active cards are available for this PDF.</string>
+    <string name="review_qa_export_source_unavailable" translatable="false">The current source PDF is unavailable.</string>
+    <string name="review_qa_export_library_unavailable" translatable="false">The current Library PDF index is unavailable.</string>
+    <string name="review_qa_export_document_subtitle" translatable="false">Questions and answers · %1$d cards</string>
+    <string name="review_qa_export_question_number" translatable="false">Question %1$d</string>
+    <string name="review_qa_export_answer" translatable="false">Answer</string>
+    <string name="review_qa_export_source_page" translatable="false">Source page %1$d</string>
+    <string name="review_qa_export_answer_unavailable" translatable="false">The answer text could not be extracted from source page %1$d.</string>
+    <string name="review_candidate_approve" translatable="false">Approve card</string>
+    <string name="review_candidate_reject" translatable="false">Reject candidate</string>
+    <string name="review_candidate_approved" translatable="false">Candidate approved locally</string>
+    <string name="review_candidate_rejected" translatable="false">Candidate rejected locally</string>
+    <string name="review_card_browser_title" translatable="false">Card browser</string>
+    <string name="review_card_browser_deck_title" translatable="false">Cards in %1$s</string>
+    <string name="review_card_browser_search_hint" translatable="false">Search question, project, document, page, source or card ID</string>
+    <string name="review_card_browser_filter" translatable="false">Filter: %1$s</string>
+    <string name="review_card_browser_all_projects" translatable="false">All projects</string>
+    <string name="review_card_browser_shown" translatable="false">%1$d of %2$d cards shown</string>
+    <string name="review_card_browser_loading" translatable="false">Loading cards…</string>
+    <string name="review_card_browser_empty" translatable="false">No review cards</string>
+    <string name="review_card_browser_no_matches" translatable="false">No cards match this search and filter.</string>
+    <string name="review_card_browser_load_failed" translatable="false">Cards could not be loaded.</string>
+    <string name="review_card_browser_load_failed_detail" translatable="false">Cards could not be loaded: %1$s</string>
+    <string name="review_card_browser_retry" translatable="false">Retry</string>
+    <string name="review_card_browser_filter_title" translatable="false">Filter cards</string>
+    <string name="review_card_browser_filter_action" translatable="false">Filter cards</string>
+    <string name="review_card_browser_select" translatable="false">Select</string>
+    <string name="review_card_browser_shown_filtered" translatable="false">%1$d of %2$d cards shown · %3$s</string>
+    <string name="review_card_browser_export_action" translatable="false">Export cards</string>
+    <string name="review_card_browser_exporting" translatable="false">Exporting %1$d cards…</string>
+    <string name="review_card_browser_export_complete" translatable="false">Exported %1$d cards.</string>
+    <string name="review_card_browser_export_failed" translatable="false">Could not export cards: %1$s</string>
+    <string name="review_card_browser_export_empty" translatable="false">No cards to export.</string>
+    <string name="review_card_browser_answer" translatable="false">Answer</string>
+    <string name="review_card_browser_tags" translatable="false">Tags</string>
+    <string name="review_card_browser_card_id" translatable="false">Card ID</string>
+    <string name="review_card_browser_question" translatable="false">Question</string>
+    <string name="review_card_browser_repetitions" translatable="false">Card Status</string>
+    <string name="review_card_browser_page" translatable="false">Page</string>
+    <string name="review_card_browser_due" translatable="false">Due</string>
+    <string name="review_card_browser_deck" translatable="false">Project</string>
+    <string name="review_card_browser_pending" translatable="false">Pending sync</string>
+    <string name="review_card_browser_row_description" translatable="false">Question: %1$s. Due: %2$s. Project: %3$s. Review State: %4$s. Page: %5$s. Document: %6$s. Card Status: %7$s. %8$s</string>
+    <string name="review_card_browser_state" translatable="false">Review State</string>
+    <string name="review_card_browser_shown_count" translatable="false">%1$d shown</string>
+    <string name="review_card_browser_all" translatable="false">All cards</string>
+    <string name="review_card_browser_active" translatable="false">Active</string>
+    <string name="review_card_browser_due_now" translatable="false">Due</string>
+    <string name="review_card_browser_future" translatable="false">Future</string>
+    <string name="review_card_browser_repairing" translatable="false">Location updating</string>
+    <string name="review_card_browser_needs_attention" translatable="false">Location repair failed</string>
+    <string name="review_card_browser_stale" translatable="false">Location needs updating</string>
+    <string name="review_card_browser_excluded" translatable="false">Excluded</string>
+    <string name="review_card_browser_deleted" translatable="false">Deleted</string>
+    <string name="review_card_browser_candidate" translatable="false">Candidate</string>
+    <string name="review_card_browser_rejected" translatable="false">Rejected</string>
+    <string name="review_card_browser_sort_due" translatable="false">Due</string>
+    <string name="review_card_browser_sort_question" translatable="false">Question</string>
+    <string name="review_card_browser_sort_deck" translatable="false">Project</string>
+    <string name="review_card_browser_sort_page" translatable="false">Page</string>
+    <string name="review_card_browser_sort_updated" translatable="false">Updated</string>
+    <string name="review_card_browser_sort_interval" translatable="false">Interval</string>
+    <string name="review_card_browser_sort_reps" translatable="false">Reviews</string>
+    <string name="review_card_browser_sort_lapses" translatable="false">Lapses</string>
+    <string name="review_card_browser_new_due" translatable="false">New</string>
+    <string name="review_card_browser_learning_due" translatable="false">Learning</string>
+    <string name="review_card_browser_no_due" translatable="false">—</string>
+    <string name="review_card_details_title" translatable="false">Card details</string>
+    <string name="review_card_details_open_pdf" translatable="false">Open in PDF</string>
+    <string name="review_card_details_review" translatable="false">Review Card</string>
+    <string name="review_card_details_edit_question" translatable="false">Edit question</string>
+    <string name="review_card_check_source_edits">Check source edits</string>
+    <string name="review_card_details_show_history">Show history</string>
+    <string name="review_card_details_hide_history">Hide history</string>
+    <string name="review_card_details_delete_menu">Delete card</string>
+    <string name="review_card_details_restore" translatable="false">Restore</string>
+    <string name="review_card_details_question" translatable="false">Question</string>
+    <string name="review_card_details_card_id_label">Card ID</string>
+    <string name="review_card_details_schedule" translatable="false">Schedule</string>
+    <string name="review_card_details_project" translatable="false">Project</string>
+    <string name="review_card_details_document" translatable="false">Document</string>
+    <string name="review_card_details_pdf_placement">PDF placement</string>
+    <string name="review_card_details_pdf_pages">Answer on pages %1$s in the current PDF</string>
+    <string name="review_card_details_pdf_placement_failed">PDF placement failed</string>
+    <string name="review_card_details_history" translatable="false">History</string>
+    <string name="review_card_details_source" translatable="false">Source</string>
+    <string name="review_card_details_technical" translatable="false">Technical details</string>
+    <string name="review_card_details_due" translatable="false">Due: %1$s</string>
+    <string name="review_card_details_interval" translatable="false">Interval: %1$s</string>
+    <string name="review_card_details_deck_page" translatable="false">%1$s · page %2$d</string>
+    <string name="review_card_details_reviews_lapses" translatable="false">Reviews: %1$d · lapses: %2$d</string>
+    <string name="review_card_details_last_rating" translatable="false">Last rating: %1$s</string>
+    <string name="review_card_details_last_reviewed" translatable="false">Last reviewed: %1$s</string>
+    <string name="review_card_details_created" translatable="false">Created: %1$s</string>
+    <string name="review_card_details_updated" translatable="false">Updated: %1$s</string>
+    <string name="review_card_details_approved" translatable="false">Approved: %1$s</string>
+    <string name="review_card_details_revision" translatable="false">Revision: %1$d</string>
+    <string name="review_card_details_card_id" translatable="false">Card ID: %1$s</string>
+    <string name="review_card_details_pdf_hash" translatable="false">PDF SHA-256: %1$s</string>
+    <string name="review_card_details_page_visual_hash" translatable="false">Page visual SHA-256: %1$s</string>
+    <string name="review_card_details_region" translatable="false">Normalized region: %1$s</string>
+    <string name="review_card_details_origin" translatable="false">Origin: %1$s</string>
+    <string name="review_card_details_reanchor" translatable="false">Anchor: %1$s</string>
+    <string name="review_card_details_reanchor_reason" translatable="false">Anchor detail: %1$s</string>
+    <string name="review_card_details_event_history" translatable="false">Event history</string>
+    <string name="review_card_details_source_path" translatable="false">%1$s</string>
+    <string name="review_card_details_none" translatable="false">Not available</string>
+    <string name="review_card_details_unavailable" translatable="false">This card is not currently available for review.</string>
+    <string name="review_card_details_pdf_unavailable" translatable="false">The current PDF is unavailable.</string>
+    <string name="review_card_edit_title" translatable="false">Edit question</string>
+    <string name="review_card_edit_hint" translatable="false">Question</string>
+    <string name="review_card_edit_save" translatable="false">Save</string>
+    <string name="review_card_edit_empty" translatable="false">Enter a question.</string>
+    <string name="review_card_edit_too_long" translatable="false">Questions can contain at most 500 characters.</string>
+    <string name="review_card_edit_saved" translatable="false">Question saved locally</string>
+    <string name="review_card_edit_placement">Edit placement</string>
+    <string name="review_card_placement_range">%1$s · lines %2$d–%3$d</string>
+    <string name="review_card_placement_no_source">This card has no editable source placement.</string>
+    <string name="review_card_placement_source_unavailable">The source file is unavailable on this device. Sync to download it, then try again.</string>
+    <string name="review_card_placement_choose_file">Choose a source file.</string>
+    <string name="review_card_delete_title" translatable="false">Delete this card?</string>
+    <string name="review_card_delete_message" translatable="false">Permanently delete this card? It cannot be restored. Its source markers will be removed on the next Sync; the enclosed text will be kept. Retire card instead keeps its history and can be undone.</string>
+    <string name="review_card_deleted" translatable="false">Card deleted locally</string>
+    <string name="review_card_restored" translatable="false">Card restored locally</string>
+    <string name="review_card_action_failed" translatable="false">Could not save the card change: %1$s</string>
+    <string name="manual_review_add_card" translatable="false">Add review card</string>
+    <string name="manual_review_region_instructions" translatable="false">Drag the green region over the complete answer, then write the question.</string>
+    <string name="manual_review_question_hint" translatable="false">Question</string>
+    <string name="manual_review_first_due" translatable="false">First review due</string>
+    <string-array name="manual_review_first_due_choices" translatable="false">
+        <item>Now</item>
+        <item>Tomorrow</item>
+        <item>In 2 days</item>
+        <item>In 1 week</item>
+        <item>In 30 days</item>
+        <item>Custom…</item>
+    </string-array>
+    <string name="manual_review_choose_custom_due" translatable="false">Choose date and time</string>
+    <string name="manual_review_custom_due_invalid" translatable="false">Choose a future date and time for the first review.</string>
+    <string name="manual_review_add" translatable="false">Add</string>
+    <string name="manual_review_unavailable" translatable="false">Review cards can be added only to the current verified Library PDF.</string>
+    <string name="manual_review_select_region" translatable="false">Could not place a review region here.</string>
+    <string name="manual_review_question_required" translatable="false">Write the question for this card.</string>
+    <string name="manual_review_pdf_changed" translatable="false">The PDF changed while the card was being created. Reopen it and try again.</string>
+    <string name="manual_review_queued" translatable="false">Review card created locally.</string>
+    <string name="manual_review_failed" translatable="false">Could not create the review card: %1$s</string>
+    <plurals name="review_cards_due" translatable="false">
+        <item quantity="one">%1$d card due</item>
+        <item quantity="other">%1$d cards due</item>
+    </plurals>
+    <plurals name="review_active_cards" translatable="false">
+        <item quantity="one">%1$d card in this deck</item>
+        <item quantity="other">%1$d cards in this deck</item>
+    </plurals>
+    <plurals name="review_cards_repairing" translatable="false">
+        <item quantity="one">%1$d card is unavailable for the installed PDF version</item>
+        <item quantity="other">%1$d cards are unavailable for the installed PDF version</item>
+    </plurals>
+    <plurals name="review_cards_need_attention" translatable="false">
+        <item quantity="one">%1$d card is unavailable</item>
+        <item quantity="other">%1$d cards are unavailable</item>
+    </plurals>
+    <plurals name="review_interval_minutes" translatable="false">
+        <item quantity="one">%1$d min</item>
+        <item quantity="other">%1$d min</item>
+    </plurals>
+    <plurals name="review_interval_days" translatable="false">
+        <item quantity="one">%1$d day</item>
+        <item quantity="other">%1$d days</item>
+    </plurals>
+    <string name="mj_app_name" translatable="false">Thoughts</string>
+    <string name="open_document_tabs">Open PDF tabs</string>
+    <string name="close_document_tab_named">Close %1$s</string>
+    <string name="update_from_fedora">Sync</string>
+    <string name="sync">Sync</string>
+    <string name="fedora_update_complete">Updated from the server</string>
+    <string name="fedora_update_retrying">The server is unavailable; the update will retry automatically</string>
+    <string name="fedora_update_not_configured">Configure the private Thoughts server first</string>
+    <string name="pick_file">Pick File</string>
+    <string name="toast_pick_file_error">Unable to pick file! Check your file manager on your phone.</string>
+    <string name="toast_http_code_error">Remote server responded with an error.</string>
+    <string name="toast_generic_download_error">We couldn\'t download this file for some reason.</string>
+    <string name="toast_ssl_error">Secure connection failed.</string>
+    <string name="saved_to_download">File saved to Download folder.</string>
+    <string name="save_to_download_failed">Couldn\'t save file to Download folder.</string>
+    <string name="action_about">About</string>
+    <string name="intro">Replay Intro</string>
+    <string name="myLicense">License</string>
+
+    <string name="intro_welcome_title">Welcome to Thoughts</string>
+    <string name="intro_welcome_foss">Free and open source.</string>
+    <string name="intro_made_with_love" translatable="false">Made with love</string>
+    <string name="intro_skip">Skip</string>
+    <string name="intro_back" translatable="false">Back</string>
+    <string name="intro_next">Next</string>
+    <string name="intro_get_started">Get started</string>
+    <string name="intro_page_indicator" translatable="false">Page %1$d of %2$d</string>
+    <string name="privacy">Privacy Policy</string>
+
+    <string name="whats_new_title">What\'s New</string>
+
+    <string name="features_title">App Features</string>
+
+    <string name="features_topic_home">Home and Library</string>
+    <string name="features_topic_home_subtitle">Tabs, statuses, scanning, search and stats</string>
+    <string name="features_home_tabs_title">Four tabs</string>
+    <string name="features_home_tabs_body">Diary, To-dos, Library and Review. Swipe between them; the app remembers the tab you were on.</string>
+    <string name="features_home_continue_title">Diary</string>
+    <string name="features_home_continue_body">Type a thought at the top of the Diary tab and press Enter. It is saved with the exact date and time and appears under Today; tap an entry to change its text, long-press it to delete it.</string>
+    <string name="features_home_statuses_title">Reading statuses</string>
+    <string name="features_home_statuses_body">Give any book a status: To Read, Reading, On Hold, Completed or Abandoned.\nFilter the Library with the status chips at the top.</string>
+    <string name="features_home_selection_title">Bulk selection</string>
+    <string name="features_home_selection_body">Long press a book to start selecting, then change the status of many books at once.</string>
+    <string name="features_home_favorites_title">Favorites</string>
+    <string name="features_home_favorites_body">Mark books as favorites and filter for them with the Favorites chip.</string>
+    <string name="features_home_views_title">Grid and list</string>
+    <string name="features_home_views_body">Switch between a cover grid and a list.\nChange the grid size and the sort order from the menu button in the top bar.</string>
+    <string name="features_home_options_title">Book options</string>
+    <string name="features_home_options_body">The three dots button on every book offers:\nProperties and reading progress.\nReading status and favorite.\nHiding it from the library.\nRenaming the file on disk.\nDeleting it from the device.</string>
+    <string name="features_home_review_title" translatable="false">PDF Review</string>
+    <string name="features_home_review_body" translatable="false">Review approved cards created in Thoughts on your desktop.\nStart across the whole library or study one PDF deck.\nReveal the masked source passage, then choose Hard, Good, Easy, Again, or Delete.</string>
+    <string name="features_home_search_title">Search everything</string>
+    <string name="features_home_search_body">The home search covers your whole device.\nLibrary matches are listed first, PDFs you never opened after them.</string>
+    <string name="features_home_hidden_title">Hidden books</string>
+    <string name="features_home_hidden_body">Hide a book to remove it from the library without touching the file.\nHidden books remain listed in the Reading History screen.</string>
+    <string name="features_home_stats_title">Stats</string>
+    <string name="features_home_stats_body">Open Stats from the home menu. It shows:\nFocused app usage time.\nPages read and favorites.\nA count for every reading status.</string>
+    <string name="features_home_disable_title">Skip the home screen</string>
+    <string name="features_home_disable_body">Prefer the old behavior? Disable Home Library in the Advanced settings makes the app open the system file picker directly on launch.</string>
+
+    <string name="features_topic_reading">Reading</string>
+    <string name="features_topic_reading_subtitle">Modes, scrolling, auto scroll and fullscreen</string>
+    <string name="features_reading_modes_title">Reading modes</string>
+    <string name="features_reading_modes_body">Scroll vertically or page horizontally with Horizontal Scrolling.\nRight to left documents are detected and read right to left.\nThe Reading Direction action overrides the direction per document.</string>
+    <string name="features_reading_dual_page_title">Dual Page Mode</string>
+    <string name="features_reading_dual_page_body">Show pages side by side like a book spread while scrolling vertically.\nFirst Page Alone keeps the cover on its own.\nThe Dual Page Mode quick action flips it without losing your position.</string>
+    <string name="features_reading_snap_title">Page Snap and Page Fling</string>
+    <string name="features_reading_snap_body">Page Snap aligns the view to the nearest page after scrolling.\nPage Fling turns exactly one page per quick swipe.</string>
+    <string name="features_reading_browser_title">Browser-Like Scrolling</string>
+    <string name="features_reading_browser_body">Scroll vertically without sideways drift; the view only moves sideways on a clearly horizontal swipe.</string>
+    <string name="features_reading_auto_scroll_title">Auto scroll</string>
+    <string name="features_reading_auto_scroll_body">Hands free reading with adjustable speed, the same real speed on every device.\nPauses while you touch the page.\nEach document remembers its own speed.</string>
+    <string name="features_reading_dark_title">PDF Pages Theme</string>
+    <string name="features_reading_dark_body">Render the pages themselves in dark mode, always or following the system.\nThe Toggle PDF Theme action switches instantly while reading.</string>
+    <string name="features_reading_margins_title">Hide margins</string>
+    <string name="features_reading_margins_body">Crop the empty margins of every page for a bigger text area.\nThe file is not modified.\nAlways Hide Page Margins applies it to every document.</string>
+    <string name="features_reading_text_mode_title">Text Mode</string>
+    <string name="features_reading_text_mode_body">Extracts the text and reflows it into clean paragraphs with detected headings.\nFont size, colors, line length and paragraph joining are configurable.\nOpen in Text Mode by Default makes it the standard view.</string>
+    <string name="features_reading_fullscreen_title">Fullscreen</string>
+    <string name="features_reading_fullscreen_body">Distraction free, edge to edge reading with an overlay of quick buttons including a brightness slider and Zoom Lock.\nOpen in Fullscreen switches to it automatically.</string>
+    <string name="features_reading_info_card_title">Scrolling Info Card</string>
+    <string name="features_reading_info_card_body">A small card with the time, page number and reading percentage shows while scrolling and in fullscreen.\nChoose exactly what it displays in the settings.</string>
+    <string name="features_reading_goto_title">Go To Page</string>
+    <string name="features_reading_goto_body">Tap the scroll handle to jump to any page.\nThe handle can also show the page count, and the toolbar the page number.</string>
+    <string name="features_reading_page_turn_title">Page turning</string>
+    <string name="features_reading_page_turn_body">The volume buttons turn pages.\nThe back and forward buttons of a connected mouse work too.</string>
+    <string name="features_reading_screen_on_title">Keep Screen On</string>
+    <string name="features_reading_screen_on_body">Prevent the screen from sleeping while reading.</string>
+    <string name="features_reading_first_page_title">Always Open at First Page</string>
+    <string name="features_reading_first_page_body">Start every PDF from page 1 while your reading position is still saved in the background.</string>
+    <string name="features_reading_online_title">Online PDFs</string>
+    <string name="features_reading_online_body">Open a PDF straight from a URL with the Online PDF action.</string>
+    <string name="features_reading_quality_title">Rendering quality</string>
+    <string name="features_reading_quality_body">High Quality Rendering, Smooth Edges and Maximum Zoom are adjustable for sharper pages or lighter memory use.</string>
+
+    <string name="features_topic_annotation">Highlights and Annotation</string>
+    <string name="features_topic_annotation_subtitle">Selection, highlights, notes, signature and forms</string>
+    <string name="features_annotation_select_title">Select text</string>
+    <string name="features_annotation_select_body">Long press any word to select it, then drag the handles.\nA card offers Copy and Search web.\nSelection can be turned off in the settings.</string>
+    <string name="features_annotation_highlight_title">Highlight</string>
+    <string name="features_annotation_highlight_body">Pick a color from the strip to turn the selection into a real PDF highlight annotation that other readers show too.\nThe six colors of the strip are yours to choose in the Highlighting settings.</string>
+    <string name="features_annotation_notes_title">Notes</string>
+    <string name="features_annotation_notes_body">Attach a note to any highlight. Tap the highlight later to read or edit it.</string>
+    <string name="features_annotation_edit_title">Edit highlights</string>
+    <string name="features_annotation_edit_body">Tap an existing highlight to select it instantly, change its color, edit its note or remove it.</string>
+    <string name="features_annotation_lists_title">My Highlights and My Notes</string>
+    <string name="features_annotation_lists_body">Two pages list every highlight and note in the document with its chapter:\nSearch them or filter by color.\nSort by date or position.\nExport them as a text file.\nTap one to jump to its page.</string>
+    <string name="features_annotation_detect_title">Detect Existing Highlights</string>
+    <string name="features_annotation_detect_body">Selecting text that exactly matches a highlight already in the file shows its actions instead of creating a duplicate.</string>
+    <string name="features_annotation_signature_title">Sign documents</string>
+    <string name="features_annotation_signature_body">Draw your signature once with Add Signature, then place, move and resize it on any page.\nStored as sharp vector strokes and remembered for the next document.\nBlack, blue, red and green ink.</string>
+    <string name="features_annotation_forms_title">Fill forms</string>
+    <string name="features_annotation_forms_body">Tap text fields and checkboxes in PDF forms to fill them in.</string>
+    <string name="features_annotation_saving_title">Saving</string>
+    <string name="features_annotation_saving_body">Save your changes into the file itself or as a new copy.\nThe app writes directly to the file whenever it can and only asks you to locate it when it truly cannot.</string>
+    <string name="features_annotation_recovery_title">Crash recovery</string>
+    <string name="features_annotation_recovery_body">Unsaved highlights are journaled continuously.\nIf the app is killed, restore or discard them the next time the document opens.</string>
+
+    <string name="features_topic_navigation">Navigation and Search</string>
+    <string name="features_topic_navigation_subtitle">Contents, bookmarks, history, links and search</string>
+    <string name="features_navigation_toc_title">Table of contents</string>
+    <string name="features_navigation_toc_body">Browse the outline with expand and collapse all.\nThe path to the chapter you are reading is highlighted, and the locate button scrolls straight to it.\nExpansion and scroll position are kept while you read.</string>
+    <string name="features_navigation_bookmarks_title">Bookmarks</string>
+    <string name="features_navigation_bookmarks_body">Bookmark any page with the star.\nRename them and reorder them freely.\nEach shows the chapter it belongs to.\nDeleting asks for confirmation.</string>
+    <string name="features_navigation_history_title">Navigation history</string>
+    <string name="features_navigation_history_body">Every jump is recorded; go back and forward like in a browser.\nThe Navigation History page shows the full trail in both directions.</string>
+    <string name="features_navigation_links_title">Links</string>
+    <string name="features_navigation_links_body">Links inside the PDF work, and after following one a button returns you to the exact spot you came from.\nLinks in the File lists every link in the document.</string>
+    <string name="features_navigation_search_title">Search inside the PDF</string>
+    <string name="features_navigation_search_body">Results stream in while the document is scanned and show their surrounding text.\nOpening a match centers and zooms it, and a button returns you to the results where you left them.\nAccented letters can be matched to plain ones.</string>
+
+    <string name="features_topic_tools">Tools</string>
+    <string name="features_topic_tools_subtitle">Screenshot, print, share, extract and more</string>
+    <string name="features_tools_screenshot_title">Screenshot</string>
+    <string name="features_tools_screenshot_body">Save the current view as an image with the Screenshot action.</string>
+    <string name="features_tools_print_title">Print</string>
+    <string name="features_tools_print_body">Print the PDF through Android printing, including downloaded files.</string>
+    <string name="features_tools_share_title">Share</string>
+    <string name="features_tools_share_body">Send the file to any app with Share File.</string>
+    <string name="features_tools_extract_title">Page Text</string>
+    <string name="features_tools_extract_body">Page Text shows the full text of the current page for selecting and copying.</string>
+    <string name="features_tools_metadata_title">File Properties</string>
+    <string name="features_tools_metadata_body">Title, author, page count and size, page dimensions, embedded fonts, and creation and modification dates.</string>
+    <string name="features_tools_reload_title">Reload PDF</string>
+    <string name="features_tools_reload_body">Re-opens the file in place, useful when another app has changed it.</string>
+    <string name="features_tools_rotate_title">Rotate</string>
+    <string name="features_tools_rotate_body">Lock or rotate the screen orientation from the reader.\nDefault to Landscape always reads sideways.</string>
+    <string name="features_tools_open_title">Open another PDF</string>
+    <string name="features_tools_open_body">Open a different file or an online URL without leaving the reader.</string>
+    <string name="features_tools_password_title">Protected PDFs</string>
+    <string name="features_tools_password_body">Password protected files ask for the password once.\nYou can let the app remember it.</string>
+
+    <string name="features_topic_privacy">Privacy and Data</string>
+    <string name="features_topic_privacy_subtitle">Local data and saved passwords</string>
+    <string name="features_privacy_local_title">Private by default</string>
+    <string name="features_privacy_local_body">No ads, telemetry, or accounts.\nPDFs and comments stay in your storage.</string>
+    <string name="features_privacy_passwords_title">Saved passwords</string>
+    <string name="features_privacy_passwords_body">Let the app remember the password of a protected PDF so it opens directly next time.</string>
+
+    <string name="features_topic_custom">Customization</string>
+    <string name="features_topic_custom_subtitle">Themes, buttons and per document memory</string>
+    <string name="features_custom_colors_title">Themes and dynamic colors</string>
+    <string name="features_custom_colors_body">Light, dark or follow the system, with dynamic colors taken from your device on Android 12 and newer.</string>
+    <string name="features_custom_toolbar_title">Toolbar buttons</string>
+    <string name="features_custom_toolbar_body">Pick the two actions that sit in the reader toolbar with Primary and Secondary Toolbar Button.\nAny available reader action can go there.</string>
+    <string name="features_custom_shortcut_title">Shortcut bar</string>
+    <string name="features_custom_shortcut_body">An optional second bar under the toolbar.\nChoose and order its actions with Shortcut Bar Actions.</string>
+    <string name="features_custom_fullscreen_title">Fullscreen Buttons</string>
+    <string name="features_custom_fullscreen_body">Choose which buttons the fullscreen overlay shows.\nHide their labels if you prefer icons only.</string>
+    <string name="features_custom_per_document_title">Per document memory</string>
+    <string name="features_custom_per_document_body">Remembered separately for every document:\nReading position and zoom.\nReading direction and hidden margins.\nAuto scroll speed.\nText Mode options.</string>
+    <string name="features_custom_languages_title">Languages</string>
+    <string name="features_custom_languages_body">The interface is available in 15 languages.</string>
+    <string name="done">DONE</string>
+    <string name="results">All Results</string>
+    <string name="ok">OK</string>
+
+    <string name="libs">Open Source Libraries</string>
+    <string name="code">Source Code</string>
+
+    <string name="share">Share</string>
+    <string name="share_file">Share</string>
+    <string name="share_link_option">Share the link</string>
+    <string name="share_pdf_option">Share the PDF file</string>
+    <string name="share_pdf_only_option">PDF only</string>
+    <string name="share_pdf_with_citing_prompt_option">Add citing prompt</string>
+    <string name="share_pdf_with_comments_option">PDF + comments (JSON)</string>
+    <string name="share_pages_title">Pages to share</string>
+    <string name="share_project_document">Document within project</string>
+    <string name="share_documents_loading">Loading project documents…</string>
+    <string name="share_documents_unavailable">Document boundaries are unavailable for this PDF version.</string>
+    <string name="share_document_pages">%1$s · pages %2$d–%3$d</string>
+    <string name="share_all_pages">All pages</string>
+    <string name="share_page_range">Page range</string>
+    <string name="share_from_page">From page</string>
+    <string name="share_to_page">To page</string>
+    <string name="share_page_required">Enter a valid page number.</string>
+    <string name="share_page_out_of_bounds">Use a page from 1 to %1$d.</string>
+    <string name="share_page_order_invalid">The first page must not be after the last page.</string>
+    <string name="share_text_no_link">The shared text has no link to open</string>
+    <string name="print_file">Print</string>
+    <string name="print_cannot_print">Couldn\'t prepare this PDF for printing.</string>
+    <string name="print_failed">Couldn\'t print this PDF.</string>
+    <string name="share_failed">Couldn\'t share the file.</string>
+    <string name="full_screen">Full Screen</string>
+    <string name="none">None</string>
+    <string name="app_info">App Info</string>
+    <string name="author_info">Author Info</string>
+
+    <string name="file_metadata">File Properties</string>
+    <string name="app_settings">App Settings</string>
+    <string name="quality">High Quality Rendering</string>
+    <string name="quality_summary">Render pages with higher color fidelity using ARGB_8888 instead of RGB_565. May be slower and use more memory.</string>
+    <string name="settings">Settings</string>
+    <string name="settings_search_hint">Search settings</string>
+    <string name="settings_search_no_results">No matching settings</string>
+    <string name="settings_appearance">Appearance</string>
+    <string name="settings_appearance_summary">Theme, page rendering, margins and highlight colors</string>
+    <string name="settings_reading">Reading</string>
+    <string name="settings_reading_summary">Screen, volume buttons, text selection, search and Read aloud voice</string>
+    <string name="customize_controls">Customize Controls</string>
+    <string name="customize_controls_summary">Toolbar, shortcut bar and fullscreen buttons</string>
+    <string name="settings_text">Text and Search</string>
+    <string name="settings_text_summary">Text Mode, selection, copying, and in-document search</string>
+    <string name="settings_highlighting">Highlighting</string>
+    <string name="settings_highlighting_summary">Highlight colors and detection behavior</string>
+    <string name="highlight_colors">Highlight Colors</string>
+    <string name="highlight_colors_summary">Pick the 6 colors shown in the highlight strip.</string>
+    <string name="highlight_colors_max_toast">You can pick %1$d colors. Unselect one first.</string>
+    <string name="add_note">Add note</string>
+    <string name="view_note">View note</string>
+    <string name="note">Note</string>
+    <string name="note_hint">Write your note</string>
+    <string name="save">Save</string>
+    <string name="edit">Edit</string>
+    <string name="note_failed">Couldn\'t save the note</string>
+    <string name="add_comment">Add comment</string>
+    <string name="edit_tex_source">Edit source (.tex)</string>
+    <string name="open_tex_source">Open source (.tex)</string>
+    <string name="source_editor_resolving">Fetching this source from the server…</string>
+    <string name="source_editor_fetch_failed">Couldn’t fetch this source from the Thoughts server; the request is saved, so check the connection and reopen the editor.</string>
+    <string name="source_editor_verification_failed">The server returned source content that failed verification; nothing was opened, and the saved request can be retried.</string>
+    <string name="source_editor_cached_status">Showing the cached source while the server checks for updates.</string>
+    <string name="source_editor_offline_status">Offline source ready. Save keeps edits on this phone until you Sync.</string>
+    <string name="source_editor_ready">Source ready.</string>
+    <string name="source_editor_newer_server_preserved">A newer server source is available. Your phone draft is preserved.</string>
+    <string name="source_editor_resolution_failed">Couldn’t resolve this selection to an editable source.</string>
+    <string name="source_editor_unavailable">Source editing is available only for a source-linked canonical PDF after its identity is verified.</string>
+    <string name="source_editor_queue_failed">Couldn’t queue the source request.</string>
+    <string name="source_editor_save_draft">Save</string>
+    <string name="source_editor_publish">Save</string>
+    <string name="source_editor_draft_saved">Saved locally · Sync needed</string>
+    <string name="source_editor_publish_queued">Saved on this phone. Use Sync to send the change to the server.</string>
+    <string name="source_editor_saved">Source synced to the server; the PDF update was queued automatically.</string>
+    <string name="source_editor_save_failed">Couldn’t save the source edit.</string>
+    <string name="source_editor_stale">The canonical server source changed after this draft was opened.</string>
+    <string name="source_editor_conflict">The phone and server copies of this source changed the same text. Open Resolve TeX conflict from Pending Changes.</string>
+    <string name="source_conflict_loading">Loading and verifying every preserved version from the server…</string>
+    <string name="source_conflict_load_failed">Couldn’t load the preserved TeX conflict: %1$s</string>
+    <string name="source_conflict_tab_resolve">Resolve</string>
+    <string name="source_conflict_tab_fedora">Server version</string>
+    <string name="source_conflict_tab_phone">Phone version</string>
+    <string name="source_conflict_tab_resolve_description">Choose which version to keep for each conflict, or edit the text, then Save.</string>
+    <string name="source_conflict_tab_fedora_description">Read-only: the whole file as the server has it (%1$s). Copy from it if you need to; make changes in Resolve.</string>
+    <string name="source_conflict_tab_phone_description">Read-only: the whole file as you edited it on this phone (%1$s). Copy from it if you need to; make changes in Resolve.</string>
+    <string name="source_conflict_on_fedora">On the server</string>
+    <string name="source_conflict_on_phone">On this phone</string>
+    <string name="source_conflict_saved_at">Saved %1$s</string>
+    <string name="source_conflict_saved_at_inline">saved %1$s</string>
+    <string name="source_conflict_time_not_recorded">Save time not recorded</string>
+    <string name="source_conflict_time_not_recorded_inline">save time not recorded</string>
+    <string name="source_conflict_side_empty">(No lines here: this version removes the passage.)</string>
+    <string name="source_conflict_previous">Previous conflict</string>
+    <string name="source_conflict_next">Next conflict</string>
+    <string name="source_conflict_position">Conflict %1$d of %2$d</string>
+    <string name="source_conflict_location">Starts at line %1$d</string>
+    <plurals name="source_conflict_progress">
+        <item quantity="one">%1$d of %2$d conflict resolved</item>
+        <item quantity="other">%1$d of %2$d conflicts resolved</item>
+    </plurals>
+    <string name="source_conflict_keep_fedora">Keep server version</string>
+    <string name="source_conflict_keep_phone">Keep phone version</string>
+    <string name="source_conflict_keep_both">Keep both</string>
+    <string name="source_conflict_keep_both_hint">Keep both puts the server’s lines first, then this phone’s. Edit manually lets you write the final text of this conflict yourself.</string>
+    <string name="source_conflict_edit_manually">Edit manually</string>
+    <string name="source_conflict_manual_title">Final text of this conflict</string>
+    <string name="source_conflict_manual_explanation">Starts from this phone’s version. What you write here replaces both versions.</string>
+    <string name="source_conflict_manual_hint">TeX</string>
+    <string name="source_conflict_manual_apply">Use this text</string>
+    <string name="source_conflict_kept_fedora">Kept the server version of conflict %1$d.</string>
+    <string name="source_conflict_kept_phone">Kept the phone version of conflict %1$d.</string>
+    <string name="source_conflict_kept_both">Kept both versions of conflict %1$d.</string>
+    <string name="source_conflict_kept_manual">Used your text for conflict %1$d.</string>
+    <string name="source_conflict_undo">Undo</string>
+    <string name="source_conflict_all_resolved">All conflicts resolved. Check the text, then tap Save resolution.</string>
+    <string name="source_conflict_all_resolved_short">All conflicts resolved.</string>
+    <string name="source_conflict_done_title">All conflicts resolved</string>
+    <string name="source_conflict_done_message">The final text is below, and you can still edit it. Tap Save resolution to keep it.</string>
+    <string name="source_conflict_show_raw">Show raw text</string>
+    <string name="source_conflict_show_raw_hint">The whole file with its conflict markers (&lt;&lt;&lt;&lt;&lt;&lt;&lt; server, =======, &gt;&gt;&gt;&gt;&gt;&gt;&gt; phone). You can edit it directly.</string>
+    <string name="source_conflict_malformed_explanation">This conflict’s markers are incomplete, so its two versions can’t be told apart and the buttons can’t resolve it. Tap Edit manually to fix it in the raw text: keep the lines you want and delete every marker line.</string>
+    <string name="source_conflict_editor_description">TeX conflict editor with conflict markers. Server lines have a red background and phone lines have a green background.</string>
+    <string name="source_conflict_editor_at_position">TeX conflict editor, conflict %1$d of %2$d. Server lines have a red background and phone lines have a green background.</string>
+    <string name="source_conflict_editor_resolved_description">Resolved TeX text. No conflict markers remain.</string>
+    <string name="source_conflict_fedora_description">Read-only server TeX version.</string>
+    <string name="source_conflict_phone_description">Read-only phone TeX version.</string>
+    <string name="source_conflict_markers_remaining">Resolve every conflict marker before saving.</string>
+    <string name="source_editor_proposal_markers_broken">This edit breaks an AI proposal (its markers, arguments or metadata). Restore it, or accept or reject the proposal first.</string>
+    <string name="source_conflict_malformed">This conflict has incomplete markers. Edit it manually before saving.</string>
+    <string name="source_conflict_save_resolution">Save resolution</string>
+    <string name="source_conflict_save_ready">All conflicts resolved. Save keeps this version on the phone; the next Sync sends it to the server.</string>
+    <string name="source_conflict_save_loading">Loading both versions…</string>
+    <string name="source_conflict_save_saving">Saving…</string>
+    <string name="source_conflict_save_other_version">You’re looking at a read-only version. Go back to Resolve to save.</string>
+    <string name="source_conflict_save_malformed">Fix the incomplete conflict markers first.</string>
+    <plurals name="source_conflict_save_unresolved">
+        <item quantity="one">Resolve %1$d remaining conflict first.</item>
+        <item quantity="other">Resolve %1$d remaining conflicts first.</item>
+    </plurals>
+    <string name="source_conflict_save_saved">Saved on this phone. Sync to send it to the server.</string>
+    <string name="source_conflict_save_unchanged">Nothing to save yet.</string>
+    <string name="source_conflict_resolution_saved">Resolution saved on this phone · Sync to send it to the server</string>
+    <string name="source_conflict_resolution_save_failed">Couldn’t save the resolution on this phone: %1$s</string>
+    <string name="source_conflict_discard">Discard phone draft</string>
+    <string name="source_conflict_discard_title">Discard your phone edit?</string>
+    <string name="source_conflict_discard_message">This deletes your phone edit of %1$s (%2$s) that hasn’t reached the server, including its parts that didn’t conflict, and every choice made on this screen. The server’s version stays as it is.\n\nThe server accepts the discard only if this conflict is still unresolved and its copy hasn’t changed since. This can’t be undone.</string>
+    <string name="source_conflict_discard_confirm">Discard phone draft</string>
+    <string name="source_conflict_discard_failed">Couldn’t discard the draft: %1$s</string>
+    <string name="source_conflict_discard_local_failed">The server confirmed the discard, but this phone could not clear the local draft.</string>
+    <string name="source_conflict_list_title">TeX conflicts</string>
+    <string name="source_conflict_list_loading">Loading pending TeX conflicts…</string>
+    <string name="source_conflict_list_empty">No TeX conflicts need attention.</string>
+    <string name="source_merge_list_title">Source files needing a merge</string>
+    <string name="source_merge_list_empty">No source files need a merge.</string>
+    <string name="source_merge_file_reason">The phone copy and verified source both changed. The phone copy was preserved for a merge.</string>
+    <string name="source_merge_resolve">Resolve merge</string>
+    <plurals name="source_merge_differing_lines">
+        <item quantity="one">The two versions differ in %1$d line.</item>
+        <item quantity="other">The two versions differ in up to %1$d lines.</item>
+    </plurals>
+    <string name="source_merge_file_sync_sending">Sync is sending this file’s phone edit and will merge it. Resolve it here after Sync finishes if it still needs a merge.</string>
+    <string name="source_merge_file_conflict">Sync found a TeX conflict in this file.</string>
+    <string name="source_merge_file_unreadable">The phone cannot read both versions of this file as text. Merge it on Desktop.</string>
+    <string name="source_merge_choose_title">Resolve %1$s</string>
+    <string name="source_merge_keep_phone">Keep phone version</string>
+    <string name="source_merge_use_synced">Use synced version</string>
+    <string name="source_merge_keep_phone_title">Keep the phone version?</string>
+    <string name="source_merge_keep_phone_message">The next Sync sends the phone version of %1$s, replacing the synced version, so changes made to this file on other devices since your phone edit are undone. A copy of the synced version stays in this app’s storage.</string>
+    <string name="source_merge_use_synced_title">Use the synced version?</string>
+    <string name="source_merge_use_synced_message">The phone copy of %1$s is replaced by the synced version, and your phone edits to this file are not synced. A copy of the phone version stays in this app’s storage.</string>
+    <string name="source_merge_kept_phone">Phone version kept. The next Sync sends it.</string>
+    <string name="source_merge_used_synced">Synced version restored on this phone.</string>
+    <string name="source_merge_changed">This file changed or no longer needs a merge. The list was refreshed.</string>
+    <string name="source_merge_failed">Couldn’t resolve the merge: %1$s</string>
+    <string name="source_conflict_in_path">TeX conflict in %1$s</string>
+    <string name="source_failed_in_path">TeX change failed in %1$s</string>
+    <plurals name="source_conflict_count">
+        <item quantity="one">%1$d conflicting section</item>
+        <item quantity="other">%1$d conflicting sections</item>
+    </plurals>
+    <string name="source_conflict_resolve">Resolve TeX conflict</string>
+    <string name="source_style_conflict_resolve">Resolve shared style conflict</string>
+    <string name="source_editor_stale_title">Canonical source changed</string>
+    <string name="source_editor_stale_message">Your phone draft is preserved. Load the current server version only if you want to replace the editor contents.</string>
+    <string name="source_editor_keep_draft">Keep draft</string>
+    <string name="source_editor_load_mac">Load server version</string>
+    <string name="source_editor_syncing">Syncing source changes with the server…</string>
+    <string name="source_editor_sync_waiting">Saved on this phone; waiting for a network connection or the server.</string>
+    <string name="source_editor_sync_retrying">Sync with the server will retry automatically. The source request is safely stored on this phone.</string>
+    <string name="source_editor_sync_paused">Sync with the server is paused. The source request is safely stored on this phone.</string>
+    <string name="source_editor_sync_not_configured">Source request saved on this phone. Configure the Thoughts server, then retry.</string>
+    <string name="source_editor_retry_sync">Retry sync</string>
+    <string name="source_editor_unsaved_title">Save source changes?</string>
+    <string name="source_editor_unsaved_message">Save keeps the change on this phone until you Sync. Discard closes without saving the latest text.</string>
+    <string name="source_editor_discard">Discard</string>
+    <string name="source_editor_discard_failed">Couldn’t discard these changes because the server may already have accepted them.</string>
+    <string name="edit_comment">Edit comment</string>
+    <string name="view_comment">View comment</string>
+    <string name="comment">Comment</string>
+    <string name="comment_hint">Write your comment</string>
+    <string name="comment_failed">Couldn\'t add the comment</string>
+    <string name="comment_update_failed">Couldn\'t update the comment</string>
+    <string name="comment_position">%1$d of %2$d</string>
+    <string name="comment_position_loading">%1$d of …</string>
+    <string name="comment_color">Color</string>
+    <string name="comment_place">Place</string>
+    <string name="comment_move_on_pdf">Move on PDF</string>
+    <string name="comment_move_hint">Drag the selected comment marker. Drag anywhere else to move around the PDF.</string>
+    <string name="previous_comment">Previous comment</string>
+    <string name="next_comment">Next comment</string>
+    <string name="reply_to_comment">Reply</string>
+    <string name="send_reply">Send reply</string>
+    <string name="reply_failed">Couldn\'t add the reply</string>
+    <string name="unknown_comment_author">Unknown author</string>
+    <string name="more_options">More options</string>
+    <string name="translate">Translate</string>
+    <string name="settings_translation">Translation &amp; Dictionary</string>
+    <string name="settings_translation_summary">Translate selected text and define words offline</string>
+    <string name="translate_with_title">Translate with</string>
+    <string name="translate_with_summary">Choose how selected text is translated</string>
+    <string name="translation_mode_installed_apps">Installed apps</string>
+    <string name="translation_mode_web_translator">Web translator</string>
+    <string name="translation_engine_title">Engine</string>
+    <string name="translation_engine_google" translatable="false">Google Translate</string>
+    <string name="translation_engine_deepl" translatable="false">DeepL</string>
+    <string name="translation_engine_bing" translatable="false">Bing Translator</string>
+    <string name="translation_engine_lingva" translatable="false">Lingva</string>
+    <string name="translation_engine_libretranslate" translatable="false">LibreTranslate</string>
+    <string name="translation_engine_custom">Custom URL</string>
+    <string name="translation_engine_unstable">%1$s (unstable)</string>
+    <string name="translation_target_language_title">Target language</string>
+    <string name="translation_device_language">Device language (%1$s)</string>
+    <string name="translation_custom_url_hint">https://example.com/?q={text}&amp;to={lang}</string>
+    <string name="translation_custom_url_invalid">Enter an http(s) URL containing {text}</string>
+    <string name="no_translate_app_found">No translation app installed</string>
+    <string name="no_translate_app_message">No app on this device can translate selected text. Install an app that supports text translation, or choose a web translator in Settings.</string>
+    <string name="dictionary_title">Offline English dictionary</string>
+    <string name="dictionary_summary_not_installed">Not installed. %1$s download, then every lookup works offline.</string>
+    <string name="dictionary_summary_installed">Installed, %1$s. Tap to remove.</string>
+    <string name="dictionary_download_title">Download dictionary?</string>
+    <string name="dictionary_download_message">Thoughts will download the English dictionary (%1$s) from the app\'s GitLab releases. It takes %2$s of storage and definitions work fully offline.</string>
+    <string name="dictionary_download_action">Download</string>
+    <string name="dictionary_downloading">Downloading dictionary</string>
+    <string name="dictionary_download_failed">Couldn\'t download the dictionary</string>
+    <string name="dictionary_delete_title">Remove dictionary?</string>
+    <string name="dictionary_delete_message">The English dictionary will be deleted from this device.</string>
+    <string name="dictionary_define_words_title">Define single words</string>
+    <string name="dictionary_define_words_summary">Selecting one word shows its definition instead of translating</string>
+    <string name="dictionary_translate_instead">Translate instead</string>
+    <string name="dictionary_synonyms">Also: %1$s</string>
+    <string name="dictionary_pos_noun">noun</string>
+    <string name="dictionary_pos_verb">verb</string>
+    <string name="dictionary_pos_adjective">adjective</string>
+    <string name="dictionary_pos_adverb">adverb</string>
+    <string name="user_notes_title">My Notes</string>
+    <string name="no_user_notes">No notes in this document</string>
+    <string name="comments_title">Comments</string>
+    <string name="no_comments">No comments in this document</string>
+    <string name="comments_no_matches">No comments match this filter</string>
+    <string name="comments_filter_all">All</string>
+    <string name="comments_filter_user">User comments</string>
+    <string name="comments_filter_agent">Agent proposed edits</string>
+    <string name="comments_filter_user_button">User</string>
+    <string name="comments_filter_agent_button">Agent edits</string>
+    <string name="sort_by_creation_date">Sort by date</string>
+    <string name="export">Export</string>
+    <string name="export_done">Exported</string>
+    <string name="export_failed">Export failed</string>
+    <string name="export_by_author">by %1$s</string>
+    <string name="export_quote_label">Quote</string>
+    <string name="export_notes_line">%1$d notes · exported %2$s</string>
+    <string name="export_comments_line">%1$d comments · exported %2$s</string>
+    <string name="user_highlights_title">My Highlights</string>
+    <string name="no_user_highlights">No highlights in this document</string>
+    <string name="export_highlights_line">%1$d highlights · exported %2$s</string>
+    <string name="all">All</string>
+    <string name="share_quote">Share Quote</string>
+    <string name="customize">Customize</string>
+    <string name="share_quote_book_name">Book name</string>
+    <string name="share_quote_author">Author</string>
+    <string name="share_quote_show_made_by">Show made by Thoughts</string>
+    <string name="share_quote_reflow">Remove line breaks</string>
+    <string name="share_quote_shortened">The quote was shortened to fit the card</string>
+    <string name="theme_rose">Rose</string>
+    <string name="theme_lavender">Lavender</string>
+    <string name="theme_mint">Mint</string>
+    <string name="share_quote_failed">Couldn\'t share the image</string>
+    <string name="expand">Expand</string>
+    <string name="collapse">Collapse</string>
+    <string name="advanced_summary">Rendering limits and technical reader options</string>
+    <string name="anti_aliasing">Smooth Edges / Anti-Aliasing</string>
+    <string name="anti_aliasing_summary">Smooth text and page edges while rendering. Usually improves appearance with little performance cost.</string>
+    <string name="reading_section_scrolling">Scrolling</string>
+    <string name="reading_section_layout">Layout &amp; Orientation</string>
+    <string name="reading_section_session">Session</string>
+    <string name="appearance_section_theme">Theme</string>
+    <string name="appearance_section_rendering">Rendering</string>
+    <string name="appearance_section_page">Page Display</string>
+    <string name="translation_section_translation">Translation</string>
+    <string name="translation_section_dictionary">Dictionary</string>
+    <string name="horizontal_scrolling_mode">Horizontal Scrolling</string>
+    <string name="horizontal_scrolling_summary">Navigate pages horizontally instead of vertically. Thoughts will try to auto-detect the right reading direction. You can override it per PDF from Menu &gt; Reading Direction after enabling horizontal scrolling.</string>
+    <string name="dual_page_mode_title">Dual Page Mode</string>
+    <string name="dual_page_mode_summary">Show pages side by side while scrolling vertically. Useful for wide tables and book spreads. Ignored in horizontal scrolling mode.</string>
+    <string name="dual_page_first_page_alone_title">First Page Alone</string>
+    <string name="dual_page_first_page_alone_summary">Show the first page by itself so the following pages pair like a book.</string>
+    <string name="single_page_mode">Single Page Mode</string>
+    <string name="double_tap_to_exit">Double Tap Back to Exit</string>
+    <string name="double_tap_to_exit_summary">Require pressing Back twice to leave the reader. This applies when a PDF was opened from another app, or when the Home Page is disabled and Back returns to the file picker.</string>
+    <string name="always_open_first_page_title">Always Open at First Page</string>
+    <string name="always_open_first_page_summary">Ignore the saved reading position and start every PDF from page 1.</string>
+    <string name="snap">Page Snap</string>
+    <string name="snap_summary">After scrolling, snap the view to the nearest page.</string>
+    <string name="fling">Page Fling</string>
+    <string name="fling_summary">Use a quick swipe to jump to the next or previous page.</string>
+    <string name="turn_page_by_mouse_buttons_title">Turn Pages with Mouse Buttons</string>
+    <string name="turn_page_by_mouse_buttons_summary">The mouse back and forward buttons change pages. When off, the mouse back button closes the reader.</string>
+    <string name="browser_scroll_mode_title">Browser-Like Scrolling</string>
+    <string name="browser_scroll_mode_summary">Scroll vertically without sideways drift; the view moves sideways only on a clearly horizontal swipe.</string>
+    <string name="nav_back">Jump Back</string>
+    <string name="nav_forward">Jump Forward</string>
+    <string name="navigation_history">Navigation History</string>
+    <string name="history_entry_format">Page %1$d  ·  %2$s  ·  %3$s</string>
+    <string name="history_entry_subtitle_format">%1$s · %2$s</string>
+    <string name="history_origin_link">Link</string>
+    <string name="history_origin_bookmark">Bookmark</string>
+    <string name="history_origin_dwell">Reading Stop</string>
+    <string name="history_origin_visited">Visited</string>
+    <string name="history_current_page">Current page</string>
+    <string name="search_result_counter">%1$d/%2$d</string>
+    <string name="add_bookmark">Bookmark Page</string>
+    <string name="remove_bookmark">Remove Bookmark</string>
+    <string name="no_user_bookmarks">No bookmarks yet.\nUse the Bookmark action in the reader to save page locations.</string>
+    <string name="no_navigation_history">No navigation history yet.\nJump through links, search, bookmarks, or pages to build history.</string>
+    <string name="bookmark_page_label">Page %1$d</string>
+    <string name="rename_bookmark">Rename Bookmark</string>
+    <string name="delete_bookmark_confirm_message">Remove "%1$s" from bookmarks?</string>
+    <string name="bookmark_hash_unavailable">The file is still being identified, try again in a moment.</string>
+    <string name="previous_search_result">Previous result</string>
+    <string name="next_search_result">Next result</string>
+    <string name="failed_to_highlight_search_result">Failed to highlight the search result</string>
+    <string name="visual_settings">Visual</string>
+    <string name="pdf_title">Title</string>
+    <string name="pdf_author">Author</string>
+
+    <string name="file_opening_error">Could not open the PDF. The file may have been moved, deleted, or Thoughts no longer has access to it.</string>
+    <string name="protected_pdf">Protected PDF</string>
+    <string name="enter_password">Enter the correct password to open the document:</string>
+    <string name="wrong_password">Wrong password.</string>
+
+    <string name="keep_screen_on">Keep Screen On</string>
+    <string name="keep_screen_on_summary">Prevent the screen from sleeping while reading.</string>
+    <string name="space_between_pages">Show a Gap Between Pages</string>
+    <string name="privacy_info">Thoughts has no ads, telemetry, or account system. PDFs, comments, priorities, and a place that a comment already has are stored in private app storage and exchanged only with the Thoughts server you configure when you request an update. The app does not ask for your location.\n\nPermissions:\n- <b>Internet</b>: reach your private Thoughts server and open PDF links\n- <b>Storage</b>: import files selected outside the app’s private cache</string>
+    <string name="switch_theme">Toggle PDF Theme</string>
+    <string name="switch_to_light_mode">Light Mode</string>
+    <string name="switch_to_dark_mode">Dark Mode</string>
+    <string name="open_another_pdf">Open PDF</string>
+    <string name="open_online_pdf">Online PDF</string>
+    <string name="online_pdf_link">Online PDF Link</string>
+    <string name="invalid_online_pdf_link">Enter a valid HTTP or HTTPS link.</string>
+    <string name="http_online_pdf_warning">HTTP links are not encrypted. Other people on the network may be able to see or modify the file. Tap Proceed Anyway to open it.</string>
+    <string name="close">Close</string>
+    <string name="exit_fullscreen_button">Exit Fullscreen Button</string>
+    <string name="ask_restore_zoom">Restore zoom?</string>
+    <string name="rotate_screen">Rotate Screen</string>
+    <string name="exit_fullscreen_message">Tapping the screen will show an X button in the top-left corner. Click it to exit full screen.</string>
+    <string name="gitlab" translatable="false">GitLab</string>
+    <string name="github" translatable="false">GitHub</string>
+    <string name="about_built_on_title" translatable="false">Built on MJ PDF</string>
+    <string name="about_built_on_subtitle" translatable="false">Thoughts started from MJ PDF by Mudlej. We are very grateful.</string>
+    <string name="about_author_name" translatable="false">Tommaso Bendinelli</string>
+    <string name="copied">Copied</string>
+    <string name="exit_fullscreen_title">To Exit Full Screen</string>
+    <string name="exit_fullscreen_positive">Don\'t show again</string>
+    <string name="permission_denied">Permission denied</string>
+    <string name="error_load_file_name">Couldn\'t retrieve file name</string>
+    <string name="cannot_load_page">\"Cannot load page \"</string>
+
+    <string name="experimental">Experimental</string>
+    <string name="actions">Actions</string>
+    <string name="caution">Caution</string>
+    <string name="app_dark_dialog_message">On some devices, this option may cause black rectangles to show when reading PDFs. If that happens, just turn this option off.</string>
+    <string name="restore">Restore</string>
+    <string name="discard">Discard</string>
+    <string name="restore_unsaved_highlights_title">Restore unsaved highlights?</string>
+    <string name="restore_unsaved_highlights_message">Thoughts found an unsaved highlight recovery copy for this document. Restore it, or discard it and open the original file?</string>
+    <string name="no_pdf_in_app">There is no PDF open in the app</string>
+    <string name="advanced">Advanced</string>
+    <string name="advanced_config">Configuration</string>
+    <string name="part_size">Rendering Tile Size</string>
+    <string name="part_size_summary">Adjust the size of page rendering tiles. Smaller values may reduce memory use. Larger values may render faster.</string>
+    <string name="part_size_value">PART SIZE value</string>
+    <string name="max_zoom">Maximum Zoom</string>
+    <string name="max_zoom_summary">Set the highest zoom level allowed in the PDF viewer.</string>
+    <string name="max_zoom_value">MAX ZOOM value</string>
+    <string name="settings_current_value">Current: %1$d</string>
+    <string name="apply">Apply</string>
+    <string name="reset">Reset</string>
+    <string name="cancel">Cancel</string>
+    <string name="page">Page</string>
+    <string name="bookmarks">My Bookmarks</string>
+    <string name="no_bookmarks">This file doesn\'t contain bookmarks</string>
+    <string name="additional_options">More</string>
+    <string name="search">Search</string>
+    <string name="search_web">Search web</string>
+    <string name="highlight_yellow">Highlight yellow</string>
+    <string name="highlight_green">Highlight green</string>
+    <string name="highlight_blue">Highlight blue</string>
+    <string name="highlight_pink_red">Highlight pink-red</string>
+    <string name="highlight_orange">Highlight orange</string>
+    <string name="highlight_purple">Highlight purple</string>
+    <string name="highlight_teal">Highlight teal</string>
+    <string name="highlight_gray">Highlight gray</string>
+    <string name="highlight_brown">Highlight brown</string>
+    <string name="highlight_cyan">Highlight cyan</string>
+    <string name="highlight_red">Highlight red</string>
+    <string name="color_yellow">Yellow</string>
+    <string name="color_orange">Orange</string>
+    <string name="color_pink_red">Pink-Red</string>
+    <string name="color_blue">Blue</string>
+    <string name="color_green">Green</string>
+    <string name="color_purple">Purple</string>
+    <string name="color_teal">Teal</string>
+    <string name="color_gray">Gray</string>
+    <string name="color_brown">Brown</string>
+    <string name="color_cyan">Cyan</string>
+    <string name="color_red">Red</string>
+    <string name="unsaved_highlights">Unsaved</string>
+    <string name="discard_highlights">Discard highlights</string>
+    <string name="discard_unsaved_highlights_title">Discard changes?</string>
+    <string name="discard_unsaved_highlights_message">Unsaved changes will be removed from the document.</string>
+    <string name="unsaved_highlights_prompt">Save your changes before leaving this document?</string>
+    <string name="save_highlights">Save changes</string>
+    <string name="update_existing_file">Update the same file</string>
+    <string name="save_as_new_copy">Save as a new file</string>
+    <string name="saved_copy_found">Saved copy found</string>
+    <string name="saved_copy_found_message">This document matches a PDF you saved before. Update that saved copy next time, or save as a new copy?</string>
+    <string name="highlights_saved">Changes saved</string>
+    <string name="highlight_failed">Couldn\'t add highlight</string>
+    <string name="highlight_save_failed">Couldn\'t save changes. Choose a save location and try again.</string>
+    <string name="choose">Choose</string>
+    <string name="annotation_save_failed_title">Couldn\'t save changes</string>
+    <string name="annotation_save_failed_message">Your changes are still in the app, so nothing was lost. The original file was not changed. Choose Save a copy to write them to another location.</string>
+    <string name="annotation_save_failed_rescue_message">Your changes are still in the app, so nothing was lost. The original file was not changed, and a finished copy was kept in the app as %1$s. Choose Save a copy to write them to another location.</string>
+    <string name="annotation_save_unconfirmed_title">Couldn\'t confirm the save</string>
+    <string name="annotation_save_unconfirmed_message">Thoughts saved your changes but couldn\'t confirm the file was written correctly. Your changes are still in the app, so nothing was lost. Choose Save a copy to write them to another location and be sure.</string>
+    <string name="annotation_save_copy_action">Save a copy</string>
+    <string name="search_results">Search Results</string>
+    <string name="copy">Copy</string>
+    <string name="copy_all">Copy All</string>
+    <string name="highlight_update_failed">Couldn\'t update highlight</string>
+    <string name="form_field">Form field</string>
+    <string name="form_field_update_failed">Couldn\'t update form field</string>
+    <string name="add_signature">Add signature</string>
+    <string name="signature_dialog_title">Draw your signature</string>
+    <string name="signature_clear">Clear</string>
+    <string name="signature_place">Place</string>
+    <string name="signature_pending_hint">Drag to position, then press save to apply</string>
+    <string name="signature_color_black">Black ink</string>
+    <string name="signature_color_blue">Blue ink</string>
+    <string name="signature_color_red">Red ink</string>
+    <string name="signature_color_green">Green ink</string>
+    <string name="signature_commit_failed">Couldn\'t add signature</string>
+    <string name="increase_text_size">Increase Size</string>
+    <string name="decrease_text_size">Decrease Size</string>
+    <string name="search_dialog_message">This app tries to extract text from PDF, so it may not be accurate or correct</string>
+    <string name="enter_text_to_search">Enter text to look up</string>
+    <string name="this_is_experimental">This is experimental</string>
+    <string name="this_is_experimental_message">This feature of the app is still under development and is not stable or fully correct.</string>
+    <string name="go_back">Go Back</string>
+    <string name="back_to_table_of_contents">Back to Table of Contents</string>
+    <string name="back_to_page">Back to page %1$d</string>
+    <string name="page_x_of_y">Page %1$d of %2$d</string>
+    <string name="pages_x_to_y_of_z">Pages %1$d to %2$d of %3$d</string>
+    <string name="selectable_text">Selectable Text of Page</string>
+    <string name="inline_text_selection_title">Enable Text Selection on PDF Pages</string>
+    <string name="inline_text_selection_summary">Enable selecting and copying text directly from the PDF page view.</string>
+    <string name="detect_existing_highlights_title">Detect Existing Highlights</string>
+    <string name="detect_existing_highlights_summary">Selecting text that exactly matches a highlight shows its actions instead of creating a new one.</string>
+    <string name="search_ignore_accents_title">Ignore accent letters (such as é, č, ž) </string>
+    <string name="search_ignore_accents_summary">Match letters regardless of accents and diacritics (é = e, č = c, ž = z).</string>
+    <string name="search_zoom_to_result_title">Zoom to search results</string>
+    <string name="search_zoom_to_result_summary">Zoom in on the matched text when jumping between search results. When off, results are only centered on screen.</string>
+    <string name="default_text_mode">Open in Text Mode by Default</string>
+    <string name="default_text_mode_summary">Switch to Text Mode immediately after opening a PDF.</string>
+    <string name="selected_text">Selected Text</string>
+    <string name="copy_page_text">Page Text</string>
+    <string name="turn_page_by_volume_buttons_title">Turn Pages by Volume Buttons</string>
+    <string name="turn_page_by_volume_buttons_summary">Go to the next or previous page using the physical volume buttons</string>
+    <string name="show_scroll_handle_page_count_title">Show Page Count in Scroll Handle</string>
+    <string name="show_scroll_handle_page_count_summary">Show the scroll handle as current page/total pages instead of current page only.</string>
+    <string name="show_app_bar_page_count_title">Show Page Number in Toolbar</string>
+    <string name="show_app_bar_page_count_summary">Show current page and total pages before the PDF title.</string>
+    <string name="text_mode">Text Mode</string>
+    <string name="back_to_pdf">Back to PDF</string>
+    <string name="text_mode_appearance">Reader Settings</string>
+    <string name="text_mode_line_spacing">Line Spacing</string>
+    <string name="text_mode_margins">Margins</string>
+    <string name="text_mode_readable_line_length">Readable Line Length</string>
+    <string name="text_mode_join_paragraphs">Join Paragraphs</string>
+    <string name="text_mode_detect_headings">Detect Headings</string>
+    <string name="text_mode_code_blocks">Code Blocks</string>
+    <string name="text_mode_theme">Theme</string>
+    <string name="text_mode_font">Font</string>
+    <string name="text_mode_font_sans">Sans</string>
+    <string name="text_mode_font_serif">Serif</string>
+    <string name="text_mode_font_mono">Mono</string>
+    <string name="text_mode_no_text">No extractable text on this page.</string>
+    <string name="text_mode_failed_page">Failed to extract text from this page.</string>
+    <string name="text_mode_retry">Retry</string>
+    <string name="text_mode_page_label">Page %1$d</string>
+    <string name="text_mode_loading_page">Loading page…</string>
+    <string name="text_mode_previous_short">Previous</string>
+    <string name="text_mode_next_short">Next</string>
+    <string name="text_mode_page_counter">%1$d/%2$d</string>
+    <string name="text_mode_table_short">Table</string>
+    <string name="text_mode_settings_short">Settings</string>
+    <string name="text_mode_pdf_short">PDF</string>
+    <string name="system">System</string>
+    <string name="light">Light</string>
+    <string name="sepia">Sepia</string>
+    <string name="dark">Dark</string>
+    <string name="black">Black</string>
+    <string name="dracula">Dracula</string>
+    <string name="text_size">Text Size</string>
+    <string name="go_to_page">Go To Page</string>
+    <string name="no_input">No Input!</string>
+    <string name="go_to">Go To</string>
+    <string name="all_pages">All Pages</string>
+    <string name="grid_columns">Columns</string>
+    <string name="page_thumbnail_description">Page thumbnail</string>
+    <string name="failed_to_load_pages">Failed to load pages!</string>
+    <string name="search_field">Search…</string>
+    <string name="expand_or_collapse_bookmark">expand or collapse bookmark</string>
+    <string name="expand_all">Expand All</string>
+    <string name="collapse_all">Collapse All</string>
+    <string name="locate_me">Locate me</string>
+    <string name="table_of_contents">Table of Contents</string>
+    <string name="screenshot_saved">Screenshot saved successfully</string>
+    <string name="failed_save_screenshot">Couldn\'t save the screenshot!</string>
+    <string name="links_in_file">Links in the File</string>
+    <string name="page_number">[0/0]</string>
+    <string name="searching">Searching…</string>
+    <string name="expand_search_result_text">Expand search result text to show more</string>
+    <string name="no_table_of_contents">No Table of Contents</string>
+    <string name="too_short_query">Too Short Query</string>
+    <string name="too_short_query_message">WARNING: The search query \'%s\' is too short! Your phone may struggle to handle too many results. If it misbehaves afterward, close the app and open it again.</string>
+    <string name="loading">Loading…</string>
+    <string name="no_links_put_in_pdf">No links deliberately embedded in the document.</string>
+    <string name="links_activity_title">Links Embedded in The PDF</string>
+    <string name="too_many_results_may_be_slow">Too many results! Searching the results could be slow.</string>
+    <string name="links_in_document">Links in Document</string>
+    <string name="number_of_filtered_results" tools:ignore="PluralsCandidate">"%,d filtered results."</string>
+    <string name="no_app_to_open_link">Didn\'t find an appropriate app to open the link</string>
+    <string name="copy_link_url">Copy link URL</string>
+    <string name="failed_to_extract_text">Failed to extract text</string>
+    <string name="page_counter_label">Page: %1$d/%2$d</string>
+    <string name="fullscreen_page_info">Page %1$d / %2$d · %3$d%%</string>
+    <string name="fullscreen_page_number_info">Page %1$d / %2$d</string>
+    <string name="fullscreen_percentage_info">%1$d%%</string>
+    <string name="fullscreen_page_range_info">Pages %1$d-%2$d / %3$d · %4$d%%</string>
+    <string name="fullscreen_page_range_number_info">Pages %1$d-%2$d / %3$d</string>
+    <string name="next_page">Next Page</string>
+    <string name="prev_page">Prev Page</string>
+    <string name="text_color">Text Color</string>
+    <string name="background_color">Background Color</string>
+    <string name="reset_to_default">Reset to Default</string>
+    <string name="proceed_anyway">Proceed Anyway</string>
+    <string name="page_out_of_bound" tools:ignore="PluralsCandidate">Page #%d doesn\'t exist in this PDF.</string>
+    <string name="press_back_again">Press back again to exit</string>
+    <string name="dracula_theme">Dracula Theme</string>
+    <string name="delete">Delete</string>
+    <string name="delete_dialog_title">Are you sure?</string>
+    <string name="list_mode">List Mode</string>
+    <string name="status">Status</string>
+    <string name="favorite_icon">favorite icon</string>
+    <string name="last_opened_key">Last Opened:</string>
+    <string name="pdf_cover_image">PDF cover Image</string>
+    <string name="pages">pages</string>
+    <string name="exit">Exit</string>
+    <string name="rotate">Rotate</string>
+    <string name="auto_scroll">Auto Scroll</string>
+    <string name="horizontal_lock">Horiz. Lock</string>
+    <string name="horizontal_lock_action">Horizontal Lock</string>
+    <string name="reading_direction">Reading Direction</string>
+    <string name="reading_direction_message">Horizontal Scrolling must be enabled to use reading direction.</string>
+    <string name="reading_direction_auto_ltr">Auto (using Left to Right)</string>
+    <string name="reading_direction_auto_rtl">Auto (using Right to Left)</string>
+    <string name="reading_direction_ltr">Left to Right</string>
+    <string name="reading_direction_rtl">Right to Left</string>
+    <string name="zoom_lock">Zoom Lock</string>
+    <string name="screenshot">Screenshot</string>
+    <string name="hide_labels">Hide Labels</string>
+    <string name="brightness">Brightness</string>
+    <string name="scrolling_info_card">Scrolling Info Card</string>
+    <string name="scrolling_info_card_summary">Choose what the info card shows while scrolling and in fullscreen.</string>
+    <string name="scrolling_info_time">Time</string>
+    <string name="scrolling_info_pdf_name">PDF name</string>
+    <string name="scrolling_info_page_number">Page number</string>
+    <string name="scrolling_info_reading_percentage">Reading percentage</string>
+    <string name="behavior_settings">Behavior</string>
+    <string name="auto_full_screen">Open in Fullscreen</string>
+    <string name="auto_full_screen_summary">Enter fullscreen automatically when opening a document.</string>
+    <string name="always_horizontal">Default to Landscape</string>
+    <string name="always_horizontal_summary">Rotate the screen to landscape layout by default when opening PDFs.</string>
+    <string name="dark_theme_for_app">Interface Theme</string>
+    <string name="app_dark_theme_summary">Enables the app\’s user interface (not PDF content) to automatically adapt to your system’s light or dark theme. \n\nNote: This option may affect PDF background colors on some devices.</string>
+    <string name="dark_theme_for_pdf">PDF Pages Theme</string>
+    <string name="pdf_theme_follows_system">PDF Pages Theme is set to System. Choose Light or Dark in Settings to use manual theme toggle.</string>
+    <string name="pdf_dark_theme_summary">Allows the PDF pages and content to automatically adapt to your system’s light or dark theme. \n\nNote: Enabling this option disables \'Toggle PDF Theme\' in the main menu.</string>
+    <string name="enable_reload_button">Show Reload Button in App Bar</string>
+    <string name="enable_reload_summary">Swiftly refreshes your content, ensuring that any updates to documents are immediately visible.</string>
+    <string name="primary_button_action">Primary Toolbar Button</string>
+    <string name="secondary_button_action">Secondary Toolbar Button</string>
+    <string name="fullscreen_buttons">Fullscreen Buttons</string>
+    <string name="fullscreen_buttons_summary">Choose which actions appear in fullscreen mode.</string>
+    <string name="shortcut_bar_buttons">Shortcut Bar Actions</string>
+    <string name="shortcut_bar_buttons_summary">Choose which actions appear in the shortcut bar.</string>
+    <string name="crop_margins">Hide Margins</string>
+    <string name="show_margins">Show Margins</string>
+    <string name="always_hide_margins">Always Hide Page Margins</string>
+    <string name="always_hide_margins_summary">Automatically hide empty page margins when opening a PDF. Margin analysis runs once for each PDF the first time this is used.</string>
+    <string name="analyzing_margins_progress">Analyzing margins… %1$d/%2$d</string>
+    <string name="drag_to_reorder">Drag to reorder</string>
+    <string name="save_password">Save password</string>
+    <string name="send_crash_report_title">Send Anonymous Crash Report?</string>
+    <string name="send_crash_report_message">The report contains the following: (STACK_TRACE, APP_VERSION_CODE, APP_VERSION_NAME, USER_CRASH_DATE, PACKAGE_NAME, ANDROID_VERSION, PHONE_MODEL, LOGCAT, AVAILABLE_MEM_SIZE)</string>
+    <string name="send">Send</string>
+    <string name="no">No</string>
+    <string name="toggle_shortcuts">Toggle Shortcuts</string>
+    <string name="file_properties">File Properties</string>
+    <string name="pdf_pages">Pages</string>
+    <string name="pdf_subject">Subject</string>
+    <string name="pdf_keywords">Keywords</string>
+    <string name="pdf_created">Created</string>
+    <string name="pdf_modified">Modified</string>
+    <plurals name="home_open_comment_threads">
+        <item quantity="one">%d open comment</item>
+        <item quantity="other">%d open comments</item>
+    </plurals>
+    <string name="home_comments_updated">Comments %1$s</string>
+    <string name="home_pdf_modified">PDF %1$s</string>
+    <string name="home_library_pdf_modified">PDF modified: %1$s</string>
+    <string name="home_library_last_comment">Last comment: %1$s</string>
+    <string name="home_library_compact_comment_status">Comment %1$s · %2$s</string>
+    <string name="home_library_unknown">Unknown</string>
+    <string name="home_library_never">Never</string>
+    <string name="home_sync_pdf">Sync</string>
+    <string name="home_pdf_status_current">%1$s is current.</string>
+    <string name="home_pdf_status_ready_on_fedora">%1$s is ready on the server. Sync this device to use the verified PDF here.</string>
+    <string name="home_pdf_status_identity_unavailable">The server reports %1$s as current, but its publication identity is unavailable.</string>
+    <string name="home_sync_this_device">Sync this device</string>
+    <string name="home_pdf_status_out_of_sync">%1$s needs a rebuild.</string>
+    <string name="home_pdf_status_building">The server is already building %1$s.</string>
+    <string name="home_pdf_status_attention">%1$s needs attention; the last-good PDF is still active.</string>
+    <string name="home_pdf_status_error">The latest build for %1$s failed; the last-good PDF is still active.</string>
+    <string name="home_sync_now">Sync</string>
+    <string name="home_operations">Logs</string>
+    <string name="home_library_show" translatable="false">Show in Library</string>
+    <string name="home_library_show_review_cards" translatable="false">Review cards</string>
+    <string name="home_library_show_pages" translatable="false">Pages</string>
+    <string name="library_count_cards" translatable="false">%1$d cards</string>
+    <string name="library_count_card" translatable="false">1 card</string>
+    <string name="library_count_pages" translatable="false">%1$d pages</string>
+    <string name="library_count_page" translatable="false">1 page</string>
+    <string name="home_shared_tex_style" translatable="false">Project TeX styles</string>
+    <string name="home_shared_tex_style_summary" translatable="false">Choose a project and edit its style</string>
+    <string name="home_shared_tex_style_unavailable" translatable="false">Project styles are not available yet. Sync the Library first.</string>
+    <string name="edit_shared_tex_style" translatable="false">Edit shared style (.sty)</string>
+    <string name="operations_logs">Logs</string>
+    <string name="operations_current_log">Current log</string>
+    <string name="operations_built">Built</string>
+    <string name="operations_target_title">Logs · %1$s</string>
+    <string name="operations_empty">No sync or build operations yet.</string>
+    <string name="operations_empty_target">No sync or build operations for %1$s yet.</string>
+    <string name="operations_retry">Retry Sync</string>
+    <string name="operations_timestamp_unavailable">Time not recorded</string>
+    <string name="home_sync_started">Updating from the server</string>
+    <string name="home_pdf_check_current">Already up to date · %1$d ms</string>
+    <string name="home_pdf_check_changed">Some PDFs have newer inputs and need to be rebuilt on the server.</string>
+    <string name="home_pdf_check_local_changed">This phone is out of sync with the server; syncing automatically.</string>
+    <string name="home_pdf_check_building">The server is building the PDF update.</string>
+    <string name="home_pdf_check_attention">The latest PDF build needs attention.</string>
+    <string name="artifact_sync_channel">PDF and source updates</string>
+    <string name="artifact_sync_waiting_title">PDF update ready</string>
+    <string name="artifact_sync_waiting_message">Waiting for Wi-Fi</string>
+    <string name="artifact_sync_use_mobile_once">Use mobile data once</string>
+    <string name="artifact_sync_wait_for_wifi">Wait for Wi-Fi</string>
+    <string name="artifact_sync_prompt_title">Download PDF update?</string>
+    <string name="artifact_sync_prompt_message">The server update is ready. Download %1$s using mobile data, or wait for Wi-Fi?</string>
+    <string name="artifact_sync_size_unknown">updated PDFs and source files</string>
+    <string name="artifact_sync_size_known">about %1$s</string>
+    <string name="artifact_sync_status_failed">Sync failed</string>
+    <string name="home_render_show_errors">Show logs</string>
+    <string name="home_render_errors_loading">Loading PDF errors…</string>
+    <string name="home_render_errors_load_failed">Couldn’t load PDF errors: %1$s</string>
+    <string name="home_render_errors_not_saved">No locally saved build-error details are available for this operation.</string>
+    <string name="home_pdf_check_failed">Couldn’t verify PDF updates: %1$s</string>
+    <string name="home_pdf_check_invalid_response">Invalid document status response</string>
+    <string name="home_rebuild_queued">PDF rebuild queued on this phone.</string>
+    <string name="home_rebuild_already_queued">That rebuild is already queued.</string>
+    <string name="home_rebuild_queue_failed">Couldn’t write the rebuild request.</string>
+    <string name="home_rebuild_server_not_configured">PDF build request saved on this phone. Configure the Thoughts server to send it.</string>
+    <string name="home_rebuild_sync_start_failed">The PDF build request is safely queued, but Android couldn’t start the sync with the server.</string>
+    <string name="home_sync_server_not_configured">Configure the Thoughts server before updating.</string>
+    <string name="home_sync_start_failed">Android couldn’t start the sync with the server.</string>
+    <string name="home_sync_already_queued">A sync is already queued or running.</string>
+    <plurals name="home_sync_elapsed_seconds">
+        <item quantity="one">%1$d second elapsed</item>
+        <item quantity="other">%1$d seconds elapsed</item>
+    </plurals>
+    <plurals name="home_phone_files_need_sync">
+        <item quantity="one">%1$d file needs sync</item>
+        <item quantity="other">%1$d files need sync</item>
+    </plurals>
+    <string name="home_no_pending_syncs">No pending changes</string>
+    <string name="home_pending_changes">Pending changes</string>
+    <string name="home_changes_need_attention">Changes need attention</string>
+    <plurals name="home_files_have_pending_changes">
+        <item quantity="one">%1$d file has pending changes</item>
+        <item quantity="other">%1$d files have pending changes</item>
+    </plurals>
+    <plurals name="document_status_pending_other_changes">
+        <item quantity="one">%1$d other pending change</item>
+        <item quantity="other">%1$d other pending changes</item>
+    </plurals>
+    <string name="document_status_pending_library_removal">Waiting to remove this PDF from the shared Library</string>
+    <string name="document_status_pending_library_add">Waiting to add this PDF to the shared Library</string>
+    <string name="document_status_pending_library_rename">Waiting to send the new name</string>
+    <string name="document_status_pending_library_archive">Waiting to send the archive change</string>
+    <string name="home_pending_syncs">Changes pending</string>
+    <string name="home_local_changes">Local changes</string>
+    <string name="home_no_local_changes">No local changes are waiting to sync.</string>
+    <string name="home_pending_sync">Pending sync</string>
+    <string name="home_last_sync">Last sync: %1$s</string>
+    <string name="home_last_sync_failed">Last attempt: %1$s</string>
+    <string name="home_last_sync_failed_time_unknown">Last attempt: time not recorded</string>
+    <string name="home_sync_failure_content_description">Warning. %1$s. %2$s</string>
+    <string name="home_last_sync_never">Last sync: Never</string>
+    <string name="home_sync_status">Sync status</string>
+    <string name="home_sync_status_content_description">%1$s. %2$s. Tap for sync details.</string>
+    <string name="reader_toolbar_last_sync">Synced %1$s</string>
+    <string name="reader_toolbar_last_sync_never">Not synced yet</string>
+    <string name="reader_toolbar_last_sync_failed">Sync failed %1$s</string>
+    <string name="source_selection_start_handle" translatable="false">Selection start handle</string>
+    <string name="source_selection_end_handle" translatable="false">Selection end handle</string>
+    <string name="home_configure_server">Configure</string>
+    <string name="home_rebuild_pdf_succeeded">%1$s rebuilt. Syncing the verified PDF from the server.</string>
+    <string name="home_rebuild_failed">Rebuild failed: %1$s</string>
+    <string name="home_render_status_title">Sync</string>
+    <string name="home_fedora_status_not_checked">PDFs: Not checked</string>
+    <string name="home_fedora_status_current">PDFs: Current</string>
+    <string name="home_fedora_status_sync_needed">PDFs: Sync needed</string>
+    <string name="home_fedora_status_build_required">PDFs: Build required</string>
+    <string name="home_fedora_status_building">PDFs: Syncing</string>
+    <string name="home_fedora_status_attention">PDFs: Attention</string>
+    <string name="home_fedora_status_never_fetched">Server status never fetched</string>
+    <string name="home_fedora_status_fetched">Server status fetched %1$s</string>
+    <string name="home_fedora_status_not_refreshed">Status not refreshed</string>
+    <string name="home_fedora_status_not_refreshed_last">Status not refreshed · last fetched %1$s</string>
+    <plurals name="home_fedora_status_up_to_date_count">
+        <item quantity="one">%1$d PDF is up to date</item>
+        <item quantity="other">%1$d PDFs are up to date</item>
+    </plurals>
+    <plurals name="home_fedora_status_sync_needed_count">
+        <item quantity="one">%1$d PDF needs to sync</item>
+        <item quantity="other">%1$d PDFs need to sync</item>
+    </plurals>
+    <plurals name="home_fedora_status_build_required_count">
+        <item quantity="one">%1$d PDF needs a build</item>
+        <item quantity="other">%1$d PDFs need a build</item>
+    </plurals>
+    <plurals name="home_fedora_status_building_count">
+        <item quantity="one">%1$d PDF is building</item>
+        <item quantity="other">%1$d PDFs are building</item>
+    </plurals>
+    <plurals name="home_fedora_status_attention_count">
+        <item quantity="one">%1$d PDF needs attention</item>
+        <item quantity="other">%1$d PDFs need attention</item>
+    </plurals>
+    <plurals name="home_fedora_status_not_checked_count">
+        <item quantity="one">%1$d PDF has not been checked</item>
+        <item quantity="other">%1$d PDFs have not been checked</item>
+    </plurals>
+    <string name="home_fedora_built_just_now">Built just now</string>
+    <plurals name="home_fedora_built_seconds_ago">
+        <item quantity="one">Built %1$d second ago</item>
+        <item quantity="other">Built %1$d seconds ago</item>
+    </plurals>
+    <plurals name="home_fedora_built_minutes_ago">
+        <item quantity="one">Built %1$d minute ago</item>
+        <item quantity="other">Built %1$d minutes ago</item>
+    </plurals>
+    <plurals name="home_fedora_built_hours_ago">
+        <item quantity="one">Built %1$d hour ago</item>
+        <item quantity="other">Built %1$d hours ago</item>
+    </plurals>
+    <string name="home_fedora_built_exact">Built %1$s</string>
+    <string name="home_fedora_not_built">Not built yet</string>
+    <string name="home_render_status_waiting_to_send">Waiting to send to the server</string>
+    <string name="home_render_status_queued_on_fedora">Queued on the server</string>
+    <string name="document_status_sync_needed">Sync needed</string>
+    <string name="document_status_local_tex_pending">A local TeX change has not been synced to the server.</string>
+    <string name="document_status_sync_failed">Error</string>
+    <string name="document_status_comments_attention">Error</string>
+    <string name="document_status_syncing">Syncing…</string>
+    <string name="document_sync_never">Never synced</string>
+    <string name="document_status_error">Error</string>
+    <string name="document_status_synced">Up to date</string>
+    <string name="document_status_synced_description">Up to date. Tap for details.</string>
+    <string name="document_status_title">Document status</string>
+    <string name="document_status_loading">Loading…</string>
+    <string name="document_status_load_failed">Could not read this document\'s status: %1$s</string>
+    <string name="document_status_unavailable">Not available on this phone</string>
+    <string name="document_status_project">Project: %1$s</string>
+    <string name="document_status_source">Source: %1$s</string>
+    <string name="document_status_heading_pdf">PDF</string>
+    <string name="document_status_built">Built: %1$s</string>
+    <string name="document_status_built_unknown">Built: not known on this phone</string>
+    <string name="document_status_cards_none">No review cards</string>
+    <plurals name="document_status_cards_total">
+        <item quantity="one">%1$d card</item>
+        <item quantity="other">%1$d cards</item>
+    </plurals>
+    <plurals name="document_status_cards_due">
+        <item quantity="one">%1$d due now</item>
+        <item quantity="other">%1$d due now</item>
+    </plurals>
+    <plurals name="document_status_cards_new">
+        <item quantity="one">%1$d new, never reviewed</item>
+        <item quantity="other">%1$d new, never reviewed</item>
+    </plurals>
+    <plurals name="document_status_cards_attention">
+        <item quantity="one">%1$d needs attention</item>
+        <item quantity="other">%1$d need attention</item>
+    </plurals>
+    <string name="document_status_comments_none">No comments</string>
+    <plurals name="document_status_comments_total">
+        <item quantity="one">%1$d comment</item>
+        <item quantity="other">%1$d comments</item>
+    </plurals>
+    <plurals name="document_status_comments_issues">
+        <item quantity="one">%1$d with an issue</item>
+        <item quantity="other">%1$d with issues</item>
+    </plurals>
+    <string name="document_status_proposals_none">No pending agent proposals</string>
+    <plurals name="document_status_proposals">
+        <item quantity="one">%1$d pending agent proposal</item>
+        <item quantity="other">%1$d pending agent proposals</item>
+    </plurals>
+    <string name="document_status_heading_waiting">Waiting to Sync</string>
+    <string name="document_status_waiting_none">Nothing</string>
+    <plurals name="document_status_pending_source_edits">
+        <item quantity="one">%1$d source edit</item>
+        <item quantity="other">%1$d source edits</item>
+    </plurals>
+    <plurals name="document_status_pending_proposal_decisions">
+        <item quantity="one">%1$d proposal decision</item>
+        <item quantity="other">%1$d proposal decisions</item>
+    </plurals>
+    <string name="document_status_heading_problems">Problems</string>
+    <string name="document_status_problem_source_conflict">Source edit needs a merge in %1$s</string>
+    <string name="document_status_problem_source_failed">Source edit failed in %1$s</string>
+    <plurals name="document_status_problem_proposal_decisions">
+        <item quantity="one">%1$d proposal decision failed to sync</item>
+        <item quantity="other">%1$d proposal decisions failed to sync</item>
+    </plurals>
+    <string name="document_status_sync">Sync</string>
+    <string name="document_status_download_checking">Checking the server for PDF updates…</string>
+    <string name="document_status_download_already_synced">Already synced with the server.</string>
+    <string name="document_status_download_scheduled">PDF update found; sync scheduled.</string>
+    <string name="document_status_download_check_failed">Could not check for the PDF update: %1$s</string>
+    <string name="document_status_last_verified_relative">Last synced on this phone: %1$s</string>
+    <string name="pdf_status_not_checked">Not checked</string>
+    <string name="pdf_status_last_synced">Last synced: %1$s</string>
+    <string name="pdf_status_last_synced_never">Last synced: Never</string>
+    <string name="pdf_status_time_moment_ago">a moment ago</string>
+    <plurals name="pdf_status_time_minutes_ago">
+        <item quantity="one">%1$d minute ago</item>
+        <item quantity="other">%1$d minutes ago</item>
+    </plurals>
+    <plurals name="pdf_status_time_hours_ago">
+        <item quantity="one">%1$d hour ago</item>
+        <item quantity="other">%1$d hours ago</item>
+    </plurals>
+    <string name="sync_status_target">Target: %1$s</string>
+    <string name="sync_status_state">Status: %1$s</string>
+    <string name="sync_status_last_synced">Last synced: %1$s</string>
+    <string name="sync_status_fedora_storage">Server storage: %1$s used of %2$s · %3$s free</string>
+    <string name="sync_status_no_pending">%1$s has no pending status on this phone.</string>
+    <string name="sync_status_show_last_log">Show last log</string>
+    <string name="document_status_last_verified_exact">Synced on this phone: %1$s</string>
+    <plurals name="document_status_pending_comments">
+        <item quantity="one">%1$d unsynced comment change</item>
+        <item quantity="other">%1$d unsynced comment changes</item>
+    </plurals>
+    <plurals name="document_status_pending_cards">
+        <item quantity="one">%1$d unsynced review card</item>
+        <item quantity="other">%1$d unsynced review cards</item>
+    </plurals>
+    <plurals name="document_status_pending_events">
+        <item quantity="one">%1$d unsynced review event</item>
+        <item quantity="other">%1$d unsynced review events</item>
+    </plurals>
+    <string name="home_render_status_all">All PDFs</string>
+    <string name="home_render_status_queued">Waiting for the server</string>
+    <string name="home_render_status_queued_details">The request is safely saved on this phone and will be sent directly to the Thoughts server when the network is available.</string>
+    <string name="home_render_status_blocked">Sync blocked</string>
+    <string name="home_render_status_checking">Checking for changes</string>
+    <string name="home_render_status_rebuilding">Rebuilding on the server</string>
+    <string name="home_render_status_work_progress">%1$s %2$d/%3$d</string>
+    <string name="home_render_phase_checking">Checking</string>
+    <string name="home_render_phase_preparing_comments">Preparing comments</string>
+    <string name="home_render_phase_compiling">Compiling</string>
+    <string name="home_render_phase_resolving_links">Resolving links</string>
+    <string name="home_render_phase_publishing">Publishing</string>
+    <string name="home_render_phase_validating">Validating</string>
+    <string name="home_render_phase_codex_repair">Fixing with Codex</string>
+    <string name="home_render_status_current_work">Current work: %1$s</string>
+    <string name="home_render_status_waiting">Waiting for the server</string>
+    <string name="home_render_status_sync_progress">Update from the server %1$d/%2$d</string>
+    <string name="home_render_status_out_of_sync">Out of sync</string>
+    <string name="home_render_status_ready_on_fedora">Ready on the server</string>
+    <string name="home_render_status_updated">Updated</string>
+    <string name="home_render_status_already_current">Already up to date</string>
+    <string name="home_render_status_attention">Updated · Comments need attention</string>
+    <string name="home_render_status_partial">Updated with errors</string>
+    <string name="home_render_status_unverified">Server finished · Download unverified</string>
+    <string name="home_render_status_failed">Update failed</string>
+    <string name="home_render_status_failed_document">%1$s — %2$s: %3$s</string>
+    <string name="home_render_status_log_reference">Server log: %1$s</string>
+    <string name="home_render_status_target">Target: %1$s</string>
+    <string name="home_render_status_stage">Status: %1$s</string>
+    <string name="home_render_status_requested">Requested: %1$s</string>
+    <string name="home_render_status_started">Started: %1$s</string>
+    <string name="home_render_status_finished">Finished: %1$s</string>
+    <string name="home_render_status_verified">Verified on phone: %1$s</string>
+    <string name="home_render_status_retry">Retry Sync</string>
+    <string name="home_render_status_fix_with_codex">Fix with Codex</string>
+    <string name="home_render_error_title">Error %1$d of %2$d</string>
+    <string name="home_render_error_pdf">PDF: %1$s</string>
+    <string name="home_render_error_source">Source: %1$s</string>
+    <string name="home_render_error_no_details">No additional error details were provided.</string>
+    <string name="home_render_error_show_log">Show logs</string>
+    <string name="home_render_error_back">Back</string>
+    <string name="home_render_error_next">Next</string>
+    <string name="pdf_build_log_title">Server build log</string>
+    <string name="pdf_build_log_title_pdf">%1$s build log</string>
+    <string name="pdf_build_log_loading">Loading the build log saved on this phone…</string>
+    <string name="pdf_build_log_loaded">Cached server build log · %1$s</string>
+    <string name="pdf_build_log_failed">Couldn’t read the locally saved build log: %1$s</string>
+    <string name="pdf_build_log_missing">This error has no verified server build log.</string>
+    <string name="pdf_build_log_missing_local">This build log was not saved on this phone.</string>
+    <string name="pdf_build_log_empty">The server build log is empty.</string>
+    <string name="home_render_status_codex_queued">Codex repair queued on the server.</string>
+    <string name="home_render_status_codex_already_queued">That Codex repair is already queued.</string>
+    <string name="comment_anchor_status_healthy_title">Source comments linked</string>
+    <string name="comment_anchor_status_healthy_message">All %1$d comments in this document are anchored to the source.</string>
+    <string name="comment_anchor_status_pending_title">Source linking pending</string>
+    <string name="comment_anchor_status_pending_message">The comment is synced. Its source-linking build is already queued on the server.</string>
+    <string name="comment_anchor_status_sync_pending_message">The comment is saved on this phone and is waiting to sync to the server.</string>
+    <string name="comment_anchor_status_warning_title">Comment not anchored</string>
+    <plurals name="comment_anchor_status_warning_message">
+        <item quantity="one">%1$d comment is saved but could not be anchored safely to the source.</item>
+        <item quantity="other">%1$d comments are saved but could not be anchored safely to the source.</item>
+    </plurals>
+    <string name="comment_anchor_queue_failed">The comment is saved, but the server rebuild request could not be queued.</string>
+    <string name="comment_anchor_rebuild_failed">The comment is saved, but the rebuild on the server failed.</string>
+    <string name="comment_status_title">Comment status</string>
+    <string name="comment_status_problem_title">Comment problem</string>
+    <string name="comment_status_source_section">Source linking</string>
+    <string name="comment_status_reader_errors_section">Reader errors</string>
+    <string name="comment_status_save_issue_title">Comment saving failed</string>
+    <string name="comment_status_save_issue_message">Could not save comments to %1$s.</string>
+    <string name="comment_status_restore_issue_title">Comment display incomplete</string>
+    <plurals name="comment_status_restore_issue_message">
+        <item quantity="one">%d saved comment could not be displayed.</item>
+        <item quantity="other">%d saved comments could not be displayed.</item>
+    </plurals>
+    <string name="comment_status_failure_remove">Could not replace existing comment %1$s.</string>
+    <string name="comment_status_failure_root">Could not display saved comment %1$s.</string>
+    <string name="comment_status_failure_reply">Could not display saved reply %1$s.</string>
+    <string name="comment_status_failure_missing_parent">Saved reply %1$s is missing parent %2$s.</string>
+    <string name="comment_status_unknown_destination">unknown destination</string>
+    <string name="comment_status_unknown_error">No additional error details were provided.</string>
+    <plurals name="home_library_unresolved_threads">
+        <item quantity="one">%d unresolved thread</item>
+        <item quantity="other">%d unresolved threads</item>
+    </plurals>
+    <string name="pdf_created_by">Created By</string>
+    <string name="pdf_produced_by">Produced By</string>
+    <string name="pdf_file_size">File Size</string>
+    <string name="pdf_file_name">File Name</string>
+    <string name="pdf_file_path">File Path</string>
+    <string name="pdf_page_size">Page Size</string>
+    <string name="pdf_page_size_mixed">Mixed</string>
+    <string name="pdf_fonts">Fonts</string>
+    <string name="font_embedded">embedded</string>
+    <string name="font_not_embedded">not embedded</string>
+    <string name="reload_pdf">Reload PDF</string>
+    <string name="source_comment_identity_verifying">Checking this PDF’s published source identity before enabling comments.</string>
+    <string name="source_comment_index_unavailable">Source-linked comments are unavailable until the server’s publication index is downloaded.</string>
+    <string name="source_comment_publication_unverified">This source-linked PDF has no verified publication record. Build it on the server, sync, then reload.</string>
+    <string name="source_comment_pdf_mismatch">This PDF does not match its publication identity on the server. Update the PDF and index from the server, then reload.</string>
+    <string name="source_pdf_update_pending">A newer source-linked PDF is waiting on the server. Thoughts is keeping the last verified version open.</string>
+    <string name="text_extraction">Text Extraction</string>
+    <string name="search_in_page">Search in Page</string>
+
+    <string name="storage_permission_rationale_title">Allow Access to All Files</string>
+    <string name="storage_permission_rationale_message">To find and open the PDF files on this device, Thoughts needs permission to access all files. Android will open a settings screen where you can allow it. Your files never leave your device.</string>
+    <string name="storage_permission_continue">Continue</string>
+    <string name="storage_permission_not_now">Not Now</string>
+    <string name="storage_permission_grant">Allow Access</string>
+    <string name="home_recent_permission_message">Your books need file access to open again. Allow access to unlock them.</string>
+    <string name="home_permission_card_message">Allow file access so Thoughts can open and save PDFs stored on this device.</string>
+    <string name="home_search_hint">Search your library</string>
+    <string name="home_tab_library">Library</string>
+    <string name="home_tab_review" translatable="false">Review</string>
+    <string name="home_tab_ab_testing" translatable="false">A/B testing</string>
+    <string name="overview_all_comments">All (%1$d)</string>
+    <string name="overview_document_comments">%1$s (%2$d)</string>
+    <plurals name="overview_summary">
+        <item quantity="one">%1$d comment · %2$s</item>
+        <item quantity="other">%1$d comments · %2$s</item>
+    </plurals>
+    <plurals name="overview_source_orphaned_summary">
+        <item quantity="one">%1$d source comment hidden as orphaned</item>
+        <item quantity="other">%1$d source comments hidden as orphaned</item>
+    </plurals>
+    <string name="overview_filtered_summary">%1$d of %2$d comments</string>
+    <string name="overview_empty_title">No comments yet</string>
+    <string name="overview_empty_message">Comments from your Thoughts library will appear here.</string>
+    <string name="overview_no_matches">No comments match the current filters.</string>
+    <string name="overview_no_comment_text">(No comment text)</string>
+    <string name="overview_reply_prefix">↳ %1$s</string>
+    <string name="overview_page">Page %1$d</string>
+    <string name="overview_comment_document_page">%1$s · page %2$d</string>
+    <string name="overview_detail_metadata">%1$s · page %2$d · %3$s</string>
+    <string name="overview_pdf_only">PDF only</string>
+    <string name="overview_anchored">Anchored</string>
+    <string name="overview_source_projected">Linked to source</string>
+    <string name="overview_source_linked">Linked to source</string>
+    <string name="overview_only_in_pdf">Only in this PDF</string>
+    <string name="overview_linking_source">Linking to source…</string>
+    <string name="overview_source_needs_attention">Source link needs attention</string>
+    <string name="overview_source_only">Source-only</string>
+    <string name="overview_needs_anchor">Needs anchor</string>
+    <string name="overview_unknown_author">Unknown author</string>
+    <string name="overview_comment_text">Comment text</string>
+    <string name="overview_selected_text">Selected text: “%1$s”</string>
+    <string name="overview_proposal_adds">Adds:\n%1$s</string>
+    <string name="overview_proposal_removes">Removes:\n%1$s</string>
+    <string name="overview_proposal_replaces">Before:\n%1$s\n\nAfter:\n%2$s</string>
+    <string name="overview_open_comment">Open PDF</string>
+    <string name="overview_open_source">Open Source</string>
+    <string name="overview_pdf_unavailable">The matching PDF is unavailable.</string>
+    <string name="overview_pdf_revision_unavailable">This comment belongs to a different PDF revision. Sync the matching revision before opening it.</string>
+    <string name="overview_choose_location">Choose location</string>
+    <string name="overview_location_unavailable">%1$s · page %2$d · unavailable</string>
+    <string name="overview_comment_missing">The comment changed or disappeared. Opened its last known page.</string>
+    <string name="overview_comment_not_ready">This comment is unavailable in the open document. It may have been deleted or changed.</string>
+    <string name="citation_link_invalid">This Thoughts page link is invalid.</string>
+    <string name="citation_document_missing">This PDF is not in the synchronized Thoughts Library. Sync the Library and try again.</string>
+    <string name="citation_version_changed">Opened page %1$d in the current PDF. Its pagination may have changed since this link was created.</string>
+    <string name="citation_page_clamped">Page %1$d is not available. Opened page %2$d instead.</string>
+    <string name="citation_page_clamped_and_version_changed">Page %1$d is not available in the current PDF, so page %2$d was opened. Its pagination may have changed since this link was created.</string>
+    <string name="overview_edit_failed">Couldn’t save the comment change.</string>
+    <string name="overview_delete_failed">Couldn’t delete the selected comments.</string>
+    <string name="overview_comment_required">Comment text cannot be empty.</string>
+    <string name="overview_undo">Undo</string>
+    <string name="overview_deleted" translatable="false">Deleted</string>
+    <string name="overview_redo">Redo</string>
+    <string name="overview_history_invalidated">Undo history was cleared because comments changed on another device.</string>
+    <string name="overview_delete_selected">Delete selected comments</string>
+    <string name="overview_selected_count">%1$d selected</string>
+    <string name="overview_actions">Comment actions</string>
+    <string name="overview_action_add">Add</string>
+    <string name="overview_action_sort">Sort</string>
+    <string name="overview_action_filter">Filter</string>
+    <string name="overview_sort_title">Sort comments</string>
+    <string name="overview_sort_newest">Newest</string>
+    <string name="overview_sort_oldest">Oldest</string>
+    <string name="overview_sort_document">Document name</string>
+    <string name="overview_sort_page">Page order</string>
+    <string name="overview_filter_title">Filter comments</string>
+    <string name="overview_filter_type">Type: %1$s</string>
+    <string name="overview_filter_type_title">Filter by type</string>
+    <string name="overview_filter_type_comments">Comments</string>
+    <string name="overview_filter_author">Author: %1$s</string>
+    <string name="overview_filter_author_title">Filter by author</string>
+    <string name="overview_filter_all">All</string>
+    <string name="agent_proposal_type">Agent proposals</string>
+    <string name="agent_proposal_accept">Accept</string>
+    <string name="agent_proposal_disregard">Reject Proposal</string>
+    <string name="overview_correspondence_source">%1$s: %2$s:%3$d–%4$d · bytes %5$d–%6$d</string>
+    <string name="overview_correspondence_location">%1$s · page %2$d · %3$s · %4$d region(s)</string>
+    <string name="overview_correspondence_hash">%1$s SHA-256: %2$s</string>
+    <string name="overview_correspondence_proof">Proof: %1$s · %2$d candidate(s) · resolver v%3$d</string>
+    <string name="overview_correspondence_human_confirmed">Human-confirmed for this exact source/PDF revision.</string>
+    <string name="agent_proposal_queued">Decision saved locally — pending sync.</string>
+    <string name="agent_proposal_failed">Could not save the proposal decision: %1$s</string>
+    <string name="agent_proposal_pending_accept">Pending — Accept saved locally.</string>
+    <string name="agent_proposal_pending_reject">Pending — Reject saved locally.</string>
+    <string name="agent_proposal_resolution_failed">Failed — %1$s</string>
+    <plurals name="document_status_pending_proposal_accept">
+        <item quantity="one">Accept %1$d agent proposal</item>
+        <item quantity="other">Accept %1$d agent proposals</item>
+    </plurals>
+    <plurals name="document_status_pending_proposal_reject">
+        <item quantity="one">Reject %1$d agent proposal</item>
+        <item quantity="other">Reject %1$d agent proposals</item>
+    </plurals>
+    <string name="document_status_failed_proposal_accept">Accept proposal failed: %1$s</string>
+    <string name="document_status_failed_proposal_reject">Reject proposal failed: %1$s</string>
+    <string name="agent_proposal_stale">These proposals come from different source bundles; refresh and try again.</string>
+    <string name="agent_proposal_dialog_title">Agent proposal</string>
+    <string name="agent_proposal_edit_summary">Old: %1$s\n\nNew: %2$s</string>
+    <string name="agent_proposal_removal_summary">Remove: %1$s</string>
+    <string name="agent_proposal_reason">%1$s\n\nReason: %2$s</string>
+    <string name="agent_proposal_delete_marker">[delete]</string>
+    <string name="overview_filter_status_title">Anchor status</string>
+    <string name="overview_filter_document">Document: %1$s</string>
+    <string name="overview_filter_pdf_type">PDF type: %1$s</string>
+    <string name="overview_filter_pdf_type_title">PDF type</string>
+    <string name="overview_filter_status">Status: %1$s</string>
+    <string name="overview_filter_reset">Reset filters</string>
+    <string name="overview_filter_all_documents">All documents</string>
+    <string name="overview_filter_all_statuses">All</string>
+    <string name="overview_pdf_type_all">All PDFs</string>
+    <string name="overview_pdf_type_tex_linked">TeX-linked</string>
+    <string name="overview_pdf_type_other">Other PDFs</string>
+    <string name="overview_pdf_type_waiting">Waiting for source index</string>
+    <string name="overview_pdf_type_unknown">PDF type unavailable</string>
+    <string name="overview_pdf_type_unavailable">PDF classification will be available after the server’s source index is downloaded.</string>
+    <string name="overview_comment_accessibility">%1$s. %2$s. %3$s.</string>
+    <string name="overview_add_title">Add comment</string>
+    <string name="overview_add_document">Document</string>
+    <string name="overview_add_no_documents">There are no available PDFs to comment on.</string>
+    <string name="overview_add_library_unavailable">The Library list is not available yet, so a comment destination cannot be selected.</string>
+    <string name="overview_add_failed">Couldn’t add the comment.</string>
+    <string name="overview_add_success">Comment added to page 1.</string>
+    <string name="overview_priority">Priority</string>
+    <string name="overview_priority_normal">Normal</string>
+    <string name="overview_priority_high">High</string>
+    <string name="overview_priority_all">All priorities</string>
+    <string name="overview_filter_priority">Priority: %1$s</string>
+    <string name="overview_filter_priority_title">Comment priority</string>
+    <string name="overview_filter_location">Location: %1$s</string>
+    <string name="overview_filter_location_any">Any location</string>
+    <string name="overview_filter_location_title">Location range</string>
+    <string name="overview_filter_location_value">Within %1$d km of %2$s</string>
+    <string name="overview_filter_location_radius_title">Distance from %1$s</string>
+    <string name="overview_filter_location_radius">%1$d km</string>
+    <string name="overview_location_remove">Remove location</string>
+    <string name="overview_location_detail">Location: %1$s\n%2$.5f, %3$.5f</string>
+    <string name="open_chatgpt">Open ChatGPT</string>
+    <string name="chatgpt_open_failed">Neither the ChatGPT app nor a browser could open this link.</string>
+    <string name="home_empty_recent_title">Nothing read yet</string>
+    <string name="home_empty_recent_message">Books you open will show up here.</string>
+    <string name="home_open_pdf">Open PDF</string>
+    <string name="home_open_pdf_viewer">Open PDF viewer</string>
+    <string name="home_open_from_device">From device</string>
+    <string name="home_open_from_url">From URL</string>
+    <string name="home_empty_title">Your library is empty</string>
+    <string name="home_empty_message">PDFs you open on this device will show up here.</string>
+    <string name="home_empty_status_title">Nothing here yet</string>
+    <string name="home_empty_status_message">Long-press PDFs to set their reading status.</string>
+    <string name="home_empty_all_title">No PDFs found</string>
+    <string name="home_empty_all_message">No PDF files were found on this device.</string>
+    <string name="home_source_index_waiting_title">Waiting for server PDF index</string>
+    <string name="home_source_index_waiting_message">Pull down to refresh after the Thoughts server delivers the source-linked PDF list.</string>
+    <string name="home_continue_reading">Continue Reading</string>
+    <string name="home_recents">Recents</string>
+    <string name="home_chip_to_read">To Read</string>
+    <string name="home_chip_reading">Reading</string>
+    <string name="home_chip_on_hold">On Hold</string>
+    <string name="home_chip_completed">Completed</string>
+    <string name="home_chip_abandoned">Abandoned</string>
+    <string name="home_chip_all_files">All Files</string>
+    <string name="home_hero_progress_template">%1$d%% · %2$d/%3$d</string>
+    <string name="home_menu_title">Library Menu</string>
+    <string name="home_menu_view">View</string>
+    <string name="home_menu_stats">Stats</string>
+    <string name="home_stats_in_library">In library</string>
+    <string name="home_stats_section_library">Library</string>
+    <string name="home_stats_section_status">Reading Status</string>
+    <string name="home_stats_pages_read">Pages read</string>
+    <string name="home_stats_no_status">No status</string>
+    <string name="home_stats_section_usage">Usage</string>
+    <string name="home_stats_section_reading_time">Reading time</string>
+    <string name="home_stats_reading_page">Page %1$d</string>
+    <string name="home_stats_reading_empty">No detailed reading time recorded yet</string>
+    <string name="home_stats_usage_today">Today</string>
+    <string name="home_stats_usage_last_seven_days">Last 7 days</string>
+    <string name="home_stats_usage_total">All time</string>
+    <string name="home_stats_usage_under_minute">Less than 1 min</string>
+    <string name="home_stats_usage_under_second">Less than 1 sec</string>
+    <string name="home_stats_usage_seconds">%1$d sec</string>
+    <string name="home_stats_usage_minutes_seconds">%1$d min %2$d sec</string>
+    <string name="home_stats_usage_minutes">%1$d min</string>
+    <string name="home_stats_usage_hours_minutes">%1$d h %2$d min</string>
+    <string name="home_open_online">Open Online PDF</string>
+    <string name="home_folder_storage">Storage</string>
+    <string name="home_rename">Rename</string>
+    <string name="home_delete_from_device">Delete PDF</string>
+    <string name="home_remove_from_library">Delete from Library</string>
+    <string name="home_remove_from_library_title">Delete from Library?</string>
+    <string name="home_remove_from_library_confirm_message">“%1$s” will disappear from this phone now and be removed from the shared Library the next time you press Sync. Its comments, review cards, source files, and reading history will be kept.</string>
+    <string name="home_remove_from_library_failed">Could not save the Library deletion.</string>
+    <string name="home_remove_from_library_queued">Library deletion saved. Press Sync to send it.</string>
+    <string name="home_remove_from_library_withdrawn">Removed from the Library. It had not been sent yet.</string>
+    <string name="home_remove_from_library_one_at_a_time">Delete shared Library PDFs one at a time from the document menu.</string>
+    <string name="home_rename_exists">A file with that name already exists.</string>
+    <string name="home_rename_failed">Could not rename the file.</string>
+    <string name="home_rename_failed_detail">The document was not renamed. %1$s</string>
+    <string name="home_rename_success">Document name saved. Press Sync to send it.</string>
+    <string name="home_rename_empty">Enter a document name.</string>
+    <string name="home_rename_too_long">Use at most 200 characters.</string>
+    <string name="home_rename_invalid_character">Remove unsupported control characters.</string>
+    <string name="home_rename_invalid_filename">The name cannot contain “/”.</string>
+    <string name="home_share_failed">Could not share the file.</string>
+    <string name="home_delete_failed">Could not delete the file.</string>
+    <string name="home_delete_confirm_message">"%1$s" will be permanently deleted from this device.</string>
+    <plurals name="home_delete_batch_confirm_message">
+        <item quantity="one">This file will be permanently deleted from this device.</item>
+        <item quantity="other">%d files will be permanently deleted from this device.</item>
+    </plurals>
+    <string name="home_pages_size_template">%1$d pages · %2$s</string>
+    <plurals name="home_pages">
+        <item quantity="one">%d page</item>
+        <item quantity="other">%d pages</item>
+    </plurals>
+    <string name="home_percent_position_template">%1$d%% · %2$d/%3$d</string>
+    <string name="home_last_opened">Last opened: %1$s</string>
+    <string name="home_relative_today">Today</string>
+    <string name="home_relative_yesterday">Yesterday</string>
+    <string name="home_relative_days_ago">%d days ago</string>
+    <plurals name="home_relative_weeks_ago">
+        <item quantity="one">%d week ago</item>
+        <item quantity="other">%d weeks ago</item>
+    </plurals>
+    <plurals name="home_relative_months_ago">
+        <item quantity="one">%d month ago</item>
+        <item quantity="other">%d months ago</item>
+    </plurals>
+    <plurals name="home_relative_years_ago">
+        <item quantity="one">%d year ago</item>
+        <item quantity="other">%d years ago</item>
+    </plurals>
+    <string name="home_remove_from_recent">Remove from reading history</string>
+    <string name="home_hide_from_library">Hide from Library</string>
+    <string name="home_show_in_library">Show in Library</string>
+    <string name="home_view_grid">Grid View</string>
+    <string name="home_view_list">List View</string>
+    <string name="home_grid_size">Grid Size</string>
+    <string name="home_grid_size_small">Small</string>
+    <string name="home_grid_size_medium">Medium</string>
+    <string name="home_grid_size_large">Large</string>
+    <string name="home_selected_count">%1$d selected</string>
+    <string name="home_set_status">Set Status</string>
+    <string name="home_relocate_title">File Not Found</string>
+    <string name="home_relocate_message">"%1$s" is no longer at its saved location. Locate it to keep its reading progress and settings.</string>
+    <string name="home_relocate_action">Re-locate</string>
+    <string name="home_relocate_found">File found at its new location</string>
+    <string name="home_relocate_mismatch_title">Different File</string>
+    <string name="home_relocate_mismatch_message">The selected file does not match the original PDF. Open it as a new document?</string>
+    <string name="stale_shared_title">File No Longer Available</string>
+    <string name="stale_shared_message">The app that shared this file no longer allows access to it. If you have the file, you can locate it yourself.</string>
+    <string name="stale_shared_locate">Locate</string>
+    <string name="hash_failed_notice">This file could not be identified. The reading position and settings will not be saved in this session.</string>
+    <string name="shared_copy_saved_public">A copy was saved to Documents/Thoughts</string>
+    <string name="shared_copy_saved_private">A copy was kept in the app storage so this file stays available</string>
+    <string name="home_open_anyway">Open Anyway</string>
+    <string name="home_cover_description">PDF cover</string>
+    <string name="disable_home_library_title">Disable Home Library</string>
+    <string name="disable_home_library_summary">Skip the home library screen entirely. The app will open the system file picker on launch instead, like older versions.</string>
+    <string name="settings_home">Home Page</string>
+    <string name="settings_home_summary">Home library screen and its behavior</string>
+    <string name="settings_synchronization">Synchronization</string>
+    <string name="settings_synchronization_summary">Server connection and mobile-data confirmation</string>
+    <string name="home_show_pdf_title_title">Show PDF Titles</string>
+    <string name="home_show_pdf_title_summary">Use the title from the PDF metadata when available instead of the file name.</string>
+    <string name="home_title_annotated">%1$s (annotated)</string>
+    <string name="home_grid_title_lines_title">Grid Title Lines</string>
+    <string name="home_grid_title_lines_summary">How many lines the file name can use on grid cards before it is shortened.</string>
+    <string name="home_list_title_lines_title">List Title Lines</string>
+    <string name="home_list_title_lines_summary">How many lines the file name can use on list rows before it is shortened.</string>
+    <string name="home_title_ellipsize_title">Title Truncation</string>
+    <string name="home_title_ellipsize_summary">Where the three dots go when a file name is too long to fit.</string>
+    <string name="home_list_badges_title">List Card Badges</string>
+    <string name="home_list_badges_summary">Choose which details show under file names in list view.</string>
+    <string name="home_badge_pages">Page count</string>
+    <string name="home_badge_progress">Reading progress</string>
+    <string name="home_badge_last_opened">Last opened</string>
+    <string name="home_badge_file_size">File size</string>
+    <string name="home_badge_status">Reading status</string>
+    <string name="home_title_ellipsize_start">Start</string>
+    <string name="home_title_ellipsize_middle">Middle</string>
+    <string name="home_title_ellipsize_end">End</string>
+    <plurals name="home_title_lines">
+        <item quantity="one">%d line</item>
+        <item quantity="other">%d lines</item>
+    </plurals>
+    <string name="home_progress_style_title">Reading Progress Indicator</string>
+    <string name="home_progress_style_ring">Progress ring with percentage</string>
+    <string name="home_progress_style_bar">Progress bar under the cover</string>
+
+    <string name="history_action_blocked">Not available while history saving is off</string>
+    <string name="home_share_pdf">Share PDF File</string>
+    <string name="keep_shared_copies_title">Keep Copies of Shared Files</string>
+    <string name="keep_shared_copies_summary">When a PDF arrives through a temporary share from another app, save a copy in Documents/Thoughts so it stays available.</string>
+
+    <string name="source_pdf_server_owned_save_copy">This PDF is maintained by the Thoughts server. Phone-only PDF edits must be saved as a separate copy.</string>
+    <string name="put_in_library">Put in Library…</string>
+    <string name="library_import_failed">The PDF could not be added to the Library.</string>
+    <string name="library_import_name_conflict_title">Choose another PDF name</string>
+    <string name="library_import_name_conflict_message">A different Library PDF already uses this filename.</string>
+    <string name="library_import_invalid_name_message">Choose a PDF name that starts with a letter or digit and contains only letters, digits, dots, underscores, or hyphens.</string>
+    <string name="library_import_retry">Put in Library</string>
+    <string name="library_import_success">PDF added to the Library. Press Sync to send it.</string>
+    <string name="home_library_linked_documents">Linked documents</string>
+    <string name="home_library_unlinked_documents">Unlinked documents</string>
+    <plurals name="home_library_section_expanded_description">
+        <item quantity="one">%1$s, %2$d document. Expanded. Tap to collapse.</item>
+        <item quantity="other">%1$s, %2$d documents. Expanded. Tap to collapse.</item>
+    </plurals>
+    <plurals name="home_library_section_collapsed_description">
+        <item quantity="one">%1$s, %2$d document. Collapsed. Tap to expand.</item>
+        <item quantity="other">%1$s, %2$d documents. Collapsed. Tap to expand.</item>
+    </plurals>
+    <string name="home_library_archived_documents">Archived</string>
+    <string name="home_archive">Archive</string>
+    <string name="home_unarchive">Unarchive</string>
+    <string name="home_archive_failed">Could not update the document archive state.</string>
+    <string name="home_archive_success">Document archived. Press Sync to send it.</string>
+    <string name="home_unarchive_success">Document unarchived. Press Sync to send it.</string>
+    <string name="comment_author_title">Comment author name</string>
+    <string name="comment_author_hint">Your name</string>
+    <string name="comment_author_message">Written into the comments, replies and notes you create on this phone. Leave blank for the default.</string>
+    <string name="thoughts_server_title">Server</string>
+    <string name="thoughts_server_not_configured">Not configured · Updates from the server are unavailable</string>
+    <string name="thoughts_server_dialog_message">Enter your Thoughts server’s HTTPS address and this phone’s device token (created on the server with <i>thoughts-admin create-device</i>). The token is encrypted with Android Keystore and the server is the sole Thoughts document transport.</string>
+    <string name="thoughts_server_url_hint">Server URL</string>
+    <string name="thoughts_server_token_hint">Device token</string>
+    <string name="thoughts_server_token_keep_hint">Leave blank to keep the current token</string>
+    <string name="thoughts_server_token_needed">The saved token belongs to the previous server address and was removed. Enter this server’s device token.</string>
+    <string name="thoughts_server_clear">Disconnect</string>
+    <string name="source_shared_folder_title">Keep sources in a shared folder</string>
+    <string name="source_shared_folder_summary">Other apps can read and change them. Off: the sources stay in Thoughts’ private storage.</string>
+    <string name="source_shared_folder_turn_on_message">The working copy of your note sources moves to Documents/Thoughts Sources. Every app with access to your files can read and change the sources there. A change made by another app is not uploaded until you confirm it in the Sync details.</string>
+    <string name="source_shared_folder_turn_off_message">The working copy of your note sources moves into Thoughts’ private storage, where no other app can read or change it.</string>
+    <string name="source_shared_folder_move">Move</string>
+    <string name="source_shared_folder_moving">Moving the sources…</string>
+    <string name="source_shared_folder_moved">The sources were moved.</string>
+    <string name="source_shared_folder_left_behind">The sources were moved. %1$d files changed during the move and stayed in the old folder.</string>
+    <string name="source_shared_folder_outside_change">Not moved: %1$s was changed outside Thoughts. Upload or discard that change in the Sync details first.</string>
+    <string name="source_shared_folder_failed">Not moved: %1$s</string>
+    <string name="source_shared_folder_sync_running">Not moved: wait for Sync to finish, then try again.</string>
+    <string name="source_shared_folder_needs_access">Allow access to all files first: the shared folder is in Documents.</string>
+    <string name="sync_outside_changes_one">1 source file changed outside Thoughts</string>
+    <string name="sync_outside_changes_many">source files changed outside Thoughts</string>
+    <string name="sync_outside_changes_title">Changed outside Thoughts</string>
+    <string name="sync_outside_changes_none">No source file is waiting.</string>
+    <string name="sync_outside_change_item">%1$s\n+%2$d −%3$d lines</string>
+    <string name="sync_outside_change_message">%1$s was changed in the shared folder by another app, not in Thoughts (+%2$d −%3$d lines against the synced version). Sync leaves the file alone until you choose.\n\nUpload sends this change to the server at the next Sync. Discard puts back the version Thoughts has; the discarded text is kept on this phone.\n\nIf you change this file in Thoughts before you choose, that change is uploaded together with this one.</string>
+    <string name="sync_outside_change_upload">Upload</string>
+    <string name="sync_outside_change_discard">Discard my outside change</string>
+    <string name="sync_outside_change_uploaded">Queued for the next Sync.</string>
+    <string name="sync_outside_change_discarded">The outside change was discarded.</string>
+    <string name="sync_outside_change_changed">Nothing done: the file changed again. Look at it once more.</string>
+    <string name="thoughts_server_save_test">Save and test</string>
+    <string name="thoughts_server_connected">Connected. Use Sync to exchange changes and refresh the private cache.</string>
+    <string name="thoughts_server_connection_failed">Saved securely, but the server test failed. Check the server address, the internet connection and the device token.</string>
+    <string name="synchronization_threshold_title">Mobile data confirmation threshold</string>
+    <string name="synchronization_threshold_summary">Ask before an upload or download exceeds this size on mobile data. Wi-Fi is never interrupted.</string>
+    <string name="synchronization_threshold_value">Currently %1$s per upload or download direction</string>
+    <string name="synchronization_threshold_megabytes_hint">Threshold in MB</string>
+    <string name="synchronization_threshold_dialog_message">Enter a whole number of megabytes. A transfer equal to the threshold continues without asking.</string>
+    <string name="synchronization_threshold_invalid">Enter a value from %1$d to %2$d MB.</string>
+    <string name="sync_transfer_channel">Mobile-data synchronization</string>
+    <string name="sync_transfer_prompt_title">Continue synchronization on mobile data?</string>
+    <string name="sync_transfer_prompt_upload">This synchronization will upload about %1$s. Continue using mobile data?</string>
+    <string name="sync_transfer_prompt_download">This synchronization will download about %1$s. Continue using mobile data?</string>
+    <string name="sync_transfer_prompt_both">This synchronization will upload about %1$s and download about %2$s. Continue using mobile data?</string>
+    <string name="sync_transfer_continue_mobile">Continue on mobile</string>
+    <string name="sync_transfer_wait_wifi">Wait for Wi-Fi</string>
+    <string name="fedora_document_sync_requires_library">Add this PDF to the Thoughts Library before syncing it.</string>
+    <string name="sync_battery_title">Let sync finish in the background</string>
+    <string name="sync_battery_explanation">Android’s battery restrictions can interrupt a sync when you lock your phone or switch apps. Allow background sync so Thoughts can finish the syncs you start. This can increase background battery use. Your Wi-Fi and mobile-data choices still apply.</string>
+    <string name="sync_battery_allow">Allow background sync</string>
+    <string name="sync_battery_not_now">Not now</string>
+    <string name="sync_battery_settings_title">Background sync and battery</string>
+    <string name="sync_battery_allowed">Allowed by Android. Sync can continue in the background.</string>
+    <string name="sync_battery_restricted">Restricted by Android. Background sync may be interrupted.</string>
+    <string name="sync_battery_settings_unavailable">Open Android settings for Thoughts to review battery restrictions.</string>
+    <string name="comment_linking_attempt">Linking attempt: %1$s</string>
+    <string name="comment_linking_method">Linking method: %1$s</string>
+    <string name="review_card_browser_columns">Visible columns</string>
+    <string name="review_card_browser_manage_columns">Manage columns</string>
+    <string name="review_columns_active">Active</string>
+    <string name="review_columns_available">Available</string>
+    <string name="review_columns_back">Cancel column changes</string>
+    <string name="review_columns_done">Save column changes</string>
+    <string name="review_columns_add">Add %1$s column</string>
+    <string name="review_columns_remove">Remove %1$s column</string>
+    <string name="review_columns_drag">Reorder %1$s column</string>
+    <string name="review_card_browser_created">Created</string>
+    <string name="review_card_browser_last_reviewed">Last Reviewed</string>
+    <string name="review_card_browser_document">Document</string>
+    <string name="review_card_browser_source">Source</string>
+    <string name="library_add_project">Add project</string>
+    <string name="library_more_create_actions">More creation options</string>
+    <string name="pdf_highlights">Visible markup</string>
+    <string name="pdf_highlights_review">Review cards</string>
+    <string name="note_attachments">Attachments</string>
+    <string name="note_attach_pictures">Add pictures or videos</string>
+    <string name="note_attach_files">Add audio or other files</string>
+    <string name="note_attachment_working">Saving or opening attachment…</string>
+    <string name="note_attachment_sync_hint">Attachments upload when you Sync. On other devices, tap an attachment to download and open it.</string>
+    <string name="note_attachments_empty">No attachments yet.</string>
+    <string name="note_attachment_remove">Remove attachment</string>
+    <string name="note_attachment_remove_question">Remove %1$s from this note?</string>
+    <string name="close_document_tabs_left">Close tabs to the left</string>
+    <string name="close_document_tabs_right">Close tabs to the right</string>
+    <string name="copy_document_tab_name">Copy document name</string>
+    <string name="copy_document_tab_project_name">Copy project name</string>
+    <string name="copy_document_for_agent">Copy for agent</string>
+    <string name="agent_prompt_study_mode">Study mode prompt</string>
+    <string name="settings_agent_prompts">Agent notes and prompts</string>
+    <string name="settings_agent_prompts_summary">Whether this phone receives agent notes; what review cards and study mode copy to paste into Claude or Codex</string>
+    <string name="agent_notes_receive_title" translatable="false">Receive agent notes on this phone</string>
+    <string name="agent_notes_receive_summary_on" translatable="false">On: notes from your agent arrive here</string>
+    <string name="agent_notes_receive_summary_off" translatable="false">Off: agent notes from the Mac go to your other phone</string>
+    <string name="agent_prompt_default">Default</string>
+    <string name="agent_prompt_custom">Custom</string>
+    <string name="agent_prompt_reset_default">Reset to default</string>
+    <string name="agent_prompt_placeholders">Placeholders (tap one to insert it)</string>
+    <string name="agent_prompt_rules">A line is left out when one of its placeholders has no value, e.g. \"Note:\" for a card without a note. Other text in braces is copied as written. Paths are relative to the Library folder; {mentra_folder} is on the computer where the agent runs.</string>
+    <string name="agent_prompt_mentra_folder">Mentra glasses folder</string>
+    <string name="agent_prompt_mentra_folder_help">Where captures from the Mentra glasses arrive on the computer where the agent runs (photos/ and videos/ inside), for {mentra_folder}.</string>
+    <string name="review_whole_document">Whole document</string>
+    <string name="review_whole_document_details">Whole document. Every page is hidden during review; the source has no markers.</string>
+    <string name="notes_search_hint">Search your to-dos</string>
+    <string name="overview_loading_title">Loading…</string>
+    <string name="notes_empty_title">No to-dos yet</string>
+    <string name="notes_empty_message">Tap + to create a to-do.</string>
+    <string name="home_tab_diary">Diary</string>
+    <string name="diary_input_hint">What’s on your mind?</string>
+    <string name="diary_save">Save entry</string>
+    <string name="diary_today">Today</string>
+    <string name="diary_yesterday">Yesterday</string>
+    <string name="diary_empty_title">No diary entries yet</string>
+    <string name="diary_empty_message">Write a thought above. It is saved with the date and time.</string>
+    <string name="diary_search_hint">Search your diary</string>
+    <string name="diary_edit_title">%1$s, %2$s</string>
+    <string name="diary_deleted">Entry deleted</string>
+    <string name="diary_save_failed">Couldn’t save the entry.</string>
+    <string name="diary_delete_failed">Couldn’t delete the entry.</string>
+    <string name="diary_entry_accessibility">%1$s, %2$s: %3$s</string>
+    <string name="comment_issues_title">Comment issues</string>
+    <string name="overview_project_unavailable">Project unavailable</string>
+    <string name="overview_document_unavailable">Document unavailable</string>
+    <string name="overview_page_unavailable">Page unavailable</string>
+    <string name="overview_location_page">Page %1$d</string>
+    <string name="overview_location_pages">Pages %1$s</string>
+    <string name="overview_location_metadata">Project: %1$s\nDocument: %2$s · %3$s</string>
+    <string name="overview_linking_metadata">Linking: %1$s</string>
+    <string name="overview_linking_linked">Linked</string>
+    <string name="overview_linking_without_source">PDF without source location</string>
+    <string name="overview_linking_no_annotation">No source-linked text found</string>
+    <string name="overview_linking_location_unavailable">Linked but PDF-placement failed</string>
+    <string name="review_card_details_linking">Linking status</string>
+    <string name="review_card_details_linked_source_range">Linked\n%1$s · lines %2$d–%3$d</string>
+    <string name="review_card_details_linked_source_ranges">Linked, %1$d areas\n%2$s · lines %3$s</string>
+    <string name="review_card_details_linking_multiple_locations">Error: Card found at multiple source locations: %1$s</string>
+    <string name="review_card_details_linking_ambiguous">Error: Card found at multiple source locations.</string>
+    <string name="review_card_details_linking_unavailable">Error: Source location unavailable.</string>
+    <string name="review_card_details_linking_missing">Error: Source markers were not found.</string>
+    <string name="review_card_details_linking_failed">Error: %1$s</string>
+    <string name="review_linking_location_failed">Linked but PDF-placement failed</string>
+    <string name="review_linked_source_unavailable">Linked · Source location unavailable</string>
+    <string name="review_linked_source_ambiguous">Linked · Source location ambiguous</string>
+    <string name="review_card_browser_select_all" translatable="false">Select all</string>
+    <string name="review_card_browser_clear_selection" translatable="false">Deselect all</string>
+    <string name="review_card_browser_selected_count" translatable="false">%1$d selected</string>
+    <string name="review_card_browser_open" translatable="false">Open</string>
+    <string name="review_card_browser_delete" translatable="false">Delete</string>
+    <string name="review_card_browser_delete_title" translatable="false">Delete %1$d cards?</string>
+    <string name="review_card_browser_delete_failed" translatable="false">Could not delete %1$d cards. They remain selected; please try again.</string>
+    <string name="review_card_browser_selected" translatable="false">Selected</string>
+    <string name="review_card_browser_not_selected" translatable="false">Not selected</string>
+    <string name="overview_linking_proposal_location_unavailable">Not possible to generate location</string>
+    <string name="annotation_source_unavailable" translatable="false">Source location unavailable</string>
+    <string name="review_marker_removal_pending">Marker removal pending</string>
+    <string name="review_manual_markers_hint" translatable="false">Paste these markers around the answer in %1$s, save, then tap Check markers.</string>
+    <string name="review_manual_markers_hint_no_file" translatable="false">Paste these markers around the answer in its source file, save, then tap Check markers.</string>
+    <string name="review_manual_markers_copy_start" translatable="false">Copy start</string>
+    <string name="review_manual_markers_copy_end" translatable="false">Copy end</string>
+    <string name="review_manual_markers_open_source" translatable="false">Open source</string>
+    <string name="review_manual_markers_check" translatable="false">Check markers</string>
+    <string name="review_manual_markers_not_found" translatable="false">No complete marker pair for this card was found yet. Paste both markers, save the source, and try again.</string>
+    <string name="review_check_manual_markers">Linking failed · Tap to check manual markers</string>
+    <string name="read_aloud" translatable="false">Read aloud</string>
+    <string name="read_aloud_reading" translatable="false">Reading aloud</string>
+    <string name="read_aloud_reading_system_voice" translatable="false">Reading aloud · system voice</string>
+    <string name="read_aloud_paused" translatable="false">Read aloud paused</string>
+    <string name="read_aloud_pause" translatable="false">Pause</string>
+    <string name="read_aloud_resume" translatable="false">Resume</string>
+    <string name="read_aloud_stop" translatable="false">Stop</string>
+    <string name="read_aloud_cloud_unavailable_reason" translatable="false">Cloud voice unavailable (%1$s) — using system voice</string>
+    <string name="read_aloud_add_key_hint" translatable="false">Add an OpenRouter key in Settings for the cloud voice</string>
+    <string name="read_aloud_add_key_hint_action" translatable="false">Settings</string>
+    <string name="read_aloud_reason_unplayable" translatable="false">audio unplayable</string>
+    <string name="read_aloud_reason_no_key" translatable="false">no key</string>
+    <string name="read_aloud_reason_key_rejected" translatable="false">key rejected</string>
+    <string name="read_aloud_reason_no_credits" translatable="false">no OpenRouter credits</string>
+    <string name="read_aloud_reason_rate_limited" translatable="false">rate limited</string>
+    <string name="read_aloud_reason_provider_error" translatable="false">OpenRouter error</string>
+    <string name="read_aloud_reason_request_refused" translatable="false">request refused</string>
+    <string name="read_aloud_reason_not_audio" translatable="false">no audio in the answer</string>
+    <string name="read_aloud_reason_timed_out" translatable="false">timed out</string>
+    <string name="read_aloud_reason_no_connection" translatable="false">no connection</string>
+    <string name="read_aloud_voice_section" translatable="false">Read Aloud voice</string>
+    <string name="read_aloud_key_title" translatable="false">OpenRouter API key</string>
+    <string name="read_aloud_key_saved" translatable="false">Saved (%1$s) · cloud voice: Fish Audio “Ethan”</string>
+    <string name="read_aloud_key_not_set" translatable="false">Not set · Read aloud uses the system voice</string>
+    <string name="read_aloud_key_dialog_message" translatable="false">Paste an API key from openrouter.ai/keys. It stays on this phone, encrypted with the Android Keystore, and is sent only to OpenRouter; the Thoughts server never sees it. The free Fish Audio voice is tried first; when it is busy, the paid one uses your OpenRouter credits.</string>
+    <string name="read_aloud_key_keep_hint" translatable="false">Saved key ends in %1$s; paste a new one to replace it</string>
+    <string name="read_aloud_key_remove" translatable="false">Remove</string>
+    <string name="read_aloud_key_saved_toast" translatable="false">Key saved. Tap Test voice to try it.</string>
+    <string name="read_aloud_key_removed_toast" translatable="false">Key removed. Read aloud uses the system voice.</string>
+    <string name="read_aloud_test_title" translatable="false">Test voice</string>
+    <string name="read_aloud_test_summary" translatable="false">Speaks a short sentence with the voice Read aloud will use</string>
+    <string name="read_aloud_test_sentence" translatable="false">This is how Thoughts reads your writing aloud.</string>
+    <string name="read_aloud_test_cloud" translatable="false">Cloud voice works (%1$s)</string>
+    <string name="read_aloud_model_free" translatable="false">free Fish Audio model</string>
+    <string name="read_aloud_model_paid" translatable="false">paid Fish Audio model</string>
+    <string name="read_aloud_test_no_key" translatable="false">No key saved: this is the system voice</string>
+    <string name="read_aloud_test_failed" translatable="false">Cloud voice failed: %1$s. This is the system voice.</string>
+    <string name="read_aloud_unavailable" translatable="false">Can\'t read aloud right now</string>
+    <!-- Agent notes (protocol/agent-notes.md). -->
+    <string name="agent_notes" translatable="false">Agent notes</string>
+    <string name="agent_note" translatable="false">Agent note</string>
+    <string name="agent_note_notification_title" translatable="false">Agent note: %1$s</string>
+    <string name="agent_notes_listening_channel" translatable="false">Listening for agent notes</string>
+    <string name="agent_notes_listening" translatable="false">Listening for agent notes</string>
+    <string name="agent_notes_listening_detail" translatable="false">You get a notification for each note from your agent. Stops 30 minutes after your last agent action.</string>
+    <string name="agent_notes_listening_stop" translatable="false">Stop</string>
+    <string name="agent_notes_study_mode_listening_detail" translatable="false">Study mode: you get a notification for each note from your agent until you tap Stop.</string>
+    <string name="agent_notes_study_mode" translatable="false">Study mode</string>
+    <string name="agent_notes_study_mode_detail" translatable="false">Listens for notes from your agent until you turn it off</string>
+    <string name="agent_notes_study_mode_on_title" translatable="false">Study mode is on</string>
+    <string name="agent_notes_study_mode_ready_listening" translatable="false">Listening for notes from your agent until you turn study mode off</string>
+    <string name="agent_notes_study_mode_ready_notifications" translatable="false">Notifications are allowed</string>
+    <string name="agent_notes_study_mode_missing_notifications" translatable="false">Notifications are off, so notes arrive silently when Thoughts is not on screen</string>
+    <string name="agent_notes_study_mode_prompt_copied" translatable="false">The study-mode prompt is on the clipboard: paste it into your agent conversation once, so it watches the glasses photos and answers with notes.</string>
+    <string name="agent_notes_study_mode_copy_again" translatable="false">Copy again</string>
+    <string name="agent_notes_study_mode_copy_prompt" translatable="false">Copy the study-mode prompt</string>
+    <string name="agent_notes_study_mode_open_notification_settings" translatable="false">Notification settings</string>
+    <string name="agent_notes_overlay_not_now" translatable="false">Not now</string>
+    <string name="agent_note_canvas_description" translatable="false">Note image. Scroll or draw with one finger, as the selected tool says; pan and zoom with two.</string>
+    <string name="agent_note_undo" translatable="false">Undo</string>
+    <string name="agent_note_redo" translatable="false">Redo</string>
+    <string name="agent_note_scroll" translatable="false">Scroll</string>
+    <string name="agent_note_pen" translatable="false">Pen</string>
+    <string name="agent_note_highlighter" translatable="false">Highlighter</string>
+    <string name="agent_note_eraser" translatable="false">Eraser</string>
+    <string name="agent_note_number" translatable="false">Number</string>
+    <string name="agent_note_send" translatable="false">Send</string>
+    <string name="agent_note_load_failed_offline" translatable="false">Could not download this note. Check the connection and open it again.</string>
+    <string name="agent_note_load_failed" translatable="false">This note could not be opened.</string>
+    <string name="agent_note_send_failed" translatable="false">Could not save the reply. Try again.</string>
+    <string name="agent_note_page_send_failed" translatable="false">Could not reach the server. Your marks are kept; tap Send again.</string>
+    <string name="study_page_title" translatable="false">%1$s · page %2$d</string>
+    <string name="study_page_open_tools" translatable="false">Agent</string>
+    <string name="study_page_close_tools" translatable="false">Fold the agent tools</string>
+    <string name="study_page_open_failed" translatable="false">This page could not be prepared for marking up.</string>
+    <string name="agent_note_sent" translatable="false">Sent to the agent</string>
+    <string name="agent_note_sent_waiting" translatable="false">Sent ✓ · waiting for the agent</string>
+    <string name="agent_note_sent_not_listening" translatable="false">Sent ✓ · no agent is listening</string>
+    <string name="agent_note_sent_plain" translatable="false">Sent ✓</string>
+    <string name="agent_note_not_listening" translatable="false">No agent is listening for your reply right now</string>
+    <string name="agent_note_sent_nobody_listening" translatable="false">Saved with the note, but no agent is listening</string>
+    <string name="agent_note_reply_copied" translatable="false">Reply copied: paste it in the conversation</string>
+    <string name="agent_note_message_expand" translatable="false">Show the whole message</string>
+    <string name="agent_note_message_collapse" translatable="false">Show one line of the message</string>
+    <string name="agent_note_message_collapsed" translatable="false">One line shown</string>
+    <string name="agent_note_message_expanded" translatable="false">Whole message shown</string>
+    <string name="agent_note_send_with_picture" translatable="false">Send with picture</string>
+    <string name="agent_note_taking_picture" translatable="false">Taking a picture with the glasses…</string>
+    <string name="agent_note_send_without_picture" translatable="false">Send without</string>
+    <string name="agent_note_picture_not_set_up" translatable="false">Not sent: set the glasses camera address in Settings first</string>
+    <string name="agent_note_picture_not_connected" translatable="false">Not sent: glasses not connected</string>
+    <string name="agent_note_picture_not_allowed" translatable="false">Not sent: the glasses do not let this phone in (gallery allowlist)</string>
+    <string name="agent_note_picture_busy" translatable="false">Not sent: the glasses camera is busy</string>
+    <string name="agent_note_picture_no_photo" translatable="false">Not sent: no picture came from the glasses</string>
+    <string name="glasses_camera_title" translatable="false">Glasses camera</string>
+    <string name="glasses_camera_help" translatable="false">The Mentra glasses\' camera server, for Send with picture on agent notes.</string>
+    <string name="glasses_camera_not_set" translatable="false">Not set up</string>
+    <string name="glasses_camera_hint" translatable="false">http://glasses-address:8089</string>
+    <string name="glasses_camera_dialog_message" translatable="false">Address of the glasses\' camera server (port 8089 when none is given). The glasses must allow this phone\'s address in their gallery allowlist. Leave it empty to turn Send with picture off.</string>
+    <string name="glasses_camera_invalid" translatable="false">Not saved: enter an address such as http://glasses-address:8089</string>
+    <string name="agent_note_queued" translatable="false">Saved; will send when online</string>
+    <string name="agent_note_your_reply" translatable="false">Your reply</string>
+    <string name="agent_note_previous" translatable="false">Previous note</string>
+    <string name="agent_note_next" translatable="false">Next note</string>
+    <string name="agent_note_new" translatable="false">New note</string>
+    <string name="agent_notes_new" translatable="false">%1$d new notes</string>
+    <string name="agent_note_open" translatable="false">Open</string>
+    <string name="agent_note_position" translatable="false">%1$d / %2$d</string>
+    <string name="agent_note_reply_not_sent" translatable="false">Your reply (not sent yet)</string>
+    <string name="agent_note_link_no_app" translatable="false">No app on this phone can open this link.</string>
+    <string name="agent_note_too_many_strokes" translatable="false">Too many strokes or numbers to send. Undo or erase some first.</string>
+    <string name="agent_note_comment_hint" translatable="false">Comment for the agent (optional)</string>
+    <string name="agent_notes_empty" translatable="false">No agent notes yet. When an agent sends you a note while you study, it appears here.</string>
+    <string name="agent_notes_offline" translatable="false">Offline: showing the notes saved on this phone.</string>
+    <string name="agent_note_delete_title" translatable="false">Delete agent note?</string>
+    <string name="agent_note_delete_message" translatable="false">“%1$s” and your replies to it will be deleted on all devices.</string>
+    <string name="agent_note_delete_failed" translatable="false">Could not delete the note. Check the connection and try again.</string>
+    <string name="agent_note_answered" translatable="false">Answered</string>
+    <string name="agent_note_not_answered" translatable="false">Not answered</string>
+    <string name="agent_note_not_sent_yet" translatable="false">Not sent yet</string>
+</resources>

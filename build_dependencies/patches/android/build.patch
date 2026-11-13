@@ -1,0 +1,21 @@
+diff --git a/config/BUILDCONFIG.gn b/config/BUILDCONFIG.gn
+index 105e194..50499f6 100644
+--- a/config/BUILDCONFIG.gn
++++ b/config/BUILDCONFIG.gn
+@@ -251,6 +251,5 @@ _default_toolchain = ""
+ if (target_os == "android") {
+   # Targeting android on Mac is best-effort and not guaranteed to work.
+-  assert(host_os == "linux", "Android builds are only supported on Linux.")
+   _default_toolchain = "//build/toolchain/android:android_clang_$target_cpu"
+ } else if (target_os == "chromeos" || target_os == "linux") {
+   # See comments in build/toolchain/cros/BUILD.gn about board compiles.
+@@ -479,6 +479,9 @@ if (is_fuchsia) {
+ }
+ set_defaults("shared_library") {
+   configs = default_shared_library_configs
++  if (is_android) {
++    configs -= [ "//build/config/android:hide_all_but_jni_onload" ]
++  }
+ }
+ set_defaults("loadable_module") {
+   configs = default_shared_library_configs

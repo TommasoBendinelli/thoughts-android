@@ -1,0 +1,331 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Written by Mudlej. License is GPLv3. -->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+
+    <!-- Lets an app signed with the same key (TobiBoard's note field) add diary entries. -->
+    <permission
+        android:name="org.tbend.thoughts.permission.ADD_DIARY_ENTRY"
+        android:protectionLevel="signature" />
+    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />
+    <uses-permission android:name="android.permission.MANAGE_EXTERNAL_STORAGE" />
+    <uses-permission
+        android:name="android.permission.WRITE_EXTERNAL_STORAGE"
+        android:maxSdkVersion="29" />
+    <uses-permission android:name="android.permission.INTERNET" />
+    <!-- Today's events above the To-dos; asked only when the user taps "Show today's events". -->
+    <uses-permission android:name="android.permission.READ_CALENDAR" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <uses-permission android:name="android.permission.RUN_USER_INITIATED_JOBS" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
+    <!-- Read aloud keeps playing with the screen off. -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" />
+    <uses-permission android:name="android.permission.VIBRATE" />
+    <!-- Study mode: an agent note opens over other apps (background activity start). -->
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
+    <!-- Core user-started server sync must survive background battery restrictions. -->
+    <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
+
+    <queries>
+        <package android:name="com.openai.chatgpt" />
+        <!-- Claude Code conversation links open in the Claude app when it is installed. -->
+        <package android:name="com.anthropic.claude" />
+        <intent>
+            <action android:name="android.intent.action.PROCESS_TEXT" />
+            <data android:mimeType="text/plain" />
+        </intent>
+        <!-- Read aloud falls back to the system text-to-speech engine. -->
+        <intent>
+            <action android:name="android.intent.action.TTS_SERVICE" />
+        </intent>
+    </queries>
+
+
+    <application
+        android:name="com.gitlab.mudlej.MjPdfReader.App"
+        android:allowBackup="true"
+        android:dataExtractionRules="@xml/data_extraction_rules"
+        android:fullBackupContent="@xml/backup_rules"
+        android:icon="@mipmap/ic_launcher"
+        android:roundIcon="@mipmap/ic_launcher_round"
+        android:label="@string/mj_app_name"
+        android:largeHeap="true"
+        android:requestLegacyExternalStorage="true"
+        android:supportsRtl="true"
+        android:theme="@style/MJ_PDF_THEME"
+        android:usesCleartextTraffic="true">
+        <activity android:name=".ui.html.HtmlAttachmentActivity" android:exported="false" android:theme="@style/HomeTheme" />
+        <!-- Agent notes: a note sent by an agent on the Mac, annotated and answered here. All notes share
+             one window (its own task), and its arrows step through the notes of a conversation. The window
+             is one tab next to the reader's documents. -->
+        <activity android:name=".ui.agentnotes.AgentNoteActivity" android:exported="false" android:theme="@style/HomeTheme"
+            android:launchMode="singleTask" android:taskAffinity="${applicationId}.agentnotes"
+            android:windowSoftInputMode="adjustResize" />
+        <activity android:name=".ui.agentnotes.AgentNotesListActivity" android:exported="false" android:theme="@style/HomeTheme" />
+        <activity android:name=".ui.review.MentalModelActivity" android:exported="false" android:theme="@style/HomeTheme" />
+        <service
+            android:name=".data.agentnotes.AgentStudyListenerService"
+            android:exported="false"
+            android:foregroundServiceType="dataSync" />
+        <service android:name=".ui.html.OfflineHtmlService" android:exported="false" android:foregroundServiceType="specialUse">
+            <property android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE" android:value="User-opened offline HTML attachments served exclusively to the local browser until the user closes them." />
+        </service>
+        <activity
+            android:name=".ui.notes.QuickNoteActivity"
+            android:label="@string/note_quick"
+            android:theme="@style/HomeTheme"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.CREATE_NOTE" />
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
+        </activity>
+        <service
+            android:name=".data.sync.ThoughtsSyncJobService"
+            android:permission="android.permission.BIND_JOB_SERVICE"
+            android:exported="false" />
+        <service
+            android:name=".data.speech.ReadAloudService"
+            android:exported="false"
+            android:foregroundServiceType="mediaPlayback" />
+        <service
+            android:name=".data.sync.ThoughtsSyncForegroundService"
+            android:exported="false"
+            android:foregroundServiceType="dataSync"
+            android:stopWithTask="false" />
+        <service
+            android:name="androidx.work.impl.foreground.SystemForegroundService"
+            android:foregroundServiceType="dataSync"
+            tools:node="merge" />
+        <receiver
+            android:name=".data.sync.ArtifactSyncActionReceiver"
+            android:exported="false" />
+        <receiver
+            android:name=".data.sync.SyncTransferActionReceiver"
+            android:exported="false" />
+        <receiver
+            android:name=".data.annotation.DiaryEntryReceiver"
+            android:exported="true"
+            android:permission="org.tbend.thoughts.permission.ADD_DIARY_ENTRY">
+            <intent-filter>
+                <action android:name="org.tbend.thoughts.action.ADD_DIARY_ENTRY" />
+            </intent-filter>
+        </receiver>
+        <!-- Sync commands from adb (tools/thoughts-mobilectl). The shell holds DUMP; ordinary apps cannot. -->
+        <receiver
+            android:name=".data.sync.SyncCommandReceiver"
+            android:exported="true"
+            android:permission="android.permission.DUMP">
+            <intent-filter>
+                <action android:name="org.tbend.thoughts.action.SYNC_NOW" />
+                <action android:name="org.tbend.thoughts.action.SYNC_STATUS" />
+            </intent-filter>
+        </receiver>
+        <activity
+            android:name=".ui.source.ProposalSourceActivity"
+            android:exported="false"
+            android:windowSoftInputMode="adjustResize" />
+        <activity
+            android:name=".ui.source.SourceEditorActivity"
+            android:exported="false"
+            android:windowSoftInputMode="adjustResize" />
+        <activity
+            android:name=".ui.source.SourceConflictListActivity"
+            android:exported="false" />
+        <activity
+            android:name=".ui.home.PdfBuildLogActivity"
+            android:exported="false" />
+        <activity
+            android:name=".ui.review.ReviewCardBrowserActivity"
+            android:exported="false" />
+        <activity
+            android:name=".ui.review.ManageReviewColumnsActivity"
+            android:exported="false"
+            android:theme="@style/ReviewColumnsTheme" />
+        <activity
+            android:name=".ui.review.ReviewCardDetailsActivity"
+            android:exported="false" />
+        <activity
+            android:name=".ui.home.HomeActivity"
+            android:exported="false"
+            android:launchMode="singleTask"
+            android:theme="@style/HomeTheme"
+            android:windowSoftInputMode="adjustNothing" />
+        <activity-alias
+            android:name=".Launcher"
+            android:exported="true"
+            android:targetActivity=".ui.home.HomeActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+        <activity
+            android:name=".ui.search.SearchActivity"
+            android:exported="false" />
+        <activity
+            android:name=".ui.gotopage.GoToPageActivity"
+            android:exported="false" />
+        <activity
+            android:name=".ui.links.LinksActivity"
+            android:exported="false" />
+        <activity
+            android:name=".ui.tableofcontents.TableOfContentsActivity"
+            android:exported="false">
+            <meta-data
+                android:name="android.app.lib_name"
+                android:value="" />
+        </activity>
+        <activity
+            android:name=".ui.userbookmarks.UserBookmarksActivity"
+            android:exported="false" />
+        <activity
+            android:name=".ui.usernotes.UserNotesActivity"
+            android:exported="false" />
+        <activity
+            android:name=".ui.userhighlights.UserHighlightsActivity"
+            android:exported="false" />
+        <activity
+            android:name=".ui.history.NavigationHistoryActivity"
+            android:exported="false" />
+        <activity
+            android:name=".ui.text_mode.TextModeActivity"
+            android:exported="false"
+            android:theme="@style/TextModeTheme" />
+        <activity
+            android:name=".ui.links.ThoughtsCitationLinkActivity"
+            android:excludeFromRecents="true"
+            android:exported="true"
+            android:noHistory="true"
+            android:theme="@android:style/Theme.Translucent.NoTitleBar">
+            <!-- The build's public server (Gradle property thoughtsPublicServerUrl). -->
+            <intent-filter android:autoVerify="true">
+                <action android:name="android.intent.action.VIEW" />
+
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+
+                <data
+                    android:host="${thoughtsPublicHost}"
+                    android:pathPrefix="/open/document/"
+                    android:scheme="https" />
+            </intent-filter>
+            <!-- Links naming the server's former address (thoughtsLegacyServerHosts) keep opening. -->
+            <intent-filter android:autoVerify="true">
+                <action android:name="android.intent.action.VIEW" />
+
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+
+                <data
+                    android:host="${thoughtsLegacyLinkHost}"
+                    android:pathPrefix="/open/document/"
+                    android:scheme="https" />
+            </intent-filter>
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+
+                <data
+                    android:host="open"
+                    android:pathPrefix="/document/"
+                    android:scheme="thoughts" />
+            </intent-filter>
+        </activity>
+        <activity
+            android:name=".ui.reader.MainActivity"
+            android:configChanges="keyboardHidden|orientation|screenSize"
+            android:documentLaunchMode="intoExisting"
+            android:exported="true"
+            android:windowSoftInputMode="adjustResize">
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+
+                <data android:host="*" />
+                <data android:scheme="file" />
+                <data android:scheme="content" />
+                <!-- Workaround to match files in paths with dots in them, like /sdcard/my.folder/test.pdf -->
+                <data android:pathPattern=".*\\.pdf" />
+                <data android:pathPattern=".*\\..*\\.pdf" />
+                <data android:pathPattern=".*\\..*\\..*\\.pdf" />
+            </intent-filter>
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+
+                <data android:host="*" />
+                <data android:scheme="file" />
+                <data android:scheme="content" />
+                <data android:mimeType="application/pdf" />
+            </intent-filter>
+        </activity>
+        <activity
+            android:name=".ui.about.AboutActivity"
+            android:exported="true"
+            android:label="@string/action_about"
+            android:parentActivityName=".ui.reader.MainActivity" />
+        <activity
+            android:name=".ui.about.WhatsNewActivity"
+            android:exported="false"
+            android:label="@string/whats_new_title" />
+        <activity
+            android:name=".ui.about.AppFeaturesActivity"
+            android:exported="false"
+            android:label="@string/features_title" />
+        <activity
+            android:name=".ui.about.FeatureTopicActivity"
+            android:exported="false"
+            android:label="@string/features_title" />
+        <activity
+            android:name=".ui.intro.MainIntroActivity"
+            android:exported="true"
+            android:label="@string/mj_app_name" />
+        <activity
+            android:name=".ui.settings.SettingsActivity"
+            android:exported="true"
+            android:label="@string/settings" />
+
+        <activity android:name=".ui.notes.NoteAttachmentsActivity" android:exported="false" />
+
+        <!-- Agent API (AGENT-API.md): content://${applicationId}.agent and AgentActivity. The provider
+             checks every caller itself. Android does not name the caller of "am start", so AgentActivity
+             is guarded by DUMP, which the adb shell holds and ordinary apps cannot. Other apps start the
+             alias, where AgentActivity runs nothing unless Android names the caller and it is allowed. -->
+        <provider
+            android:name="org.tbend.agent.AgentProvider"
+            android:authorities="${applicationId}.agent"
+            android:exported="true" />
+        <activity
+            android:name="org.tbend.agent.AgentActivity"
+            android:exported="true"
+            android:permission="android.permission.DUMP"
+            android:excludeFromRecents="true"
+            android:noHistory="true"
+            android:theme="@android:style/Theme.Translucent.NoTitleBar" />
+        <activity-alias
+            android:name="org.tbend.agent.AgentAppActivity"
+            android:exported="true"
+            android:targetActivity="org.tbend.agent.AgentActivity" />
+
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.fileprovider"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/file_paths" />
+        </provider>
+    </application>
+
+</manifest>

@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Written for Thoughts. License is GPLv3. -->
+<resources>
+    <string name="comments_search">Search comments</string>
+    <string name="comments_expand_panel">Expand comments panel</string>
+    <string name="comments_collapse_panel">Collapse comments panel</string>
+    <string name="comments_load_failed">Could not load comments. Close this panel and try again.</string>
+    <string name="comments_location_unavailable">Location unavailable</string>
+    <string name="comments_row_user">User comment</string>
+    <string name="comments_row_agent">Agent edit</string>
+    <string name="comments_back_to_list">All comments</string>
+    <string name="comments_open_thread">Open thread</string>
+    <string name="comments_before_preview">Before · preview</string>
+    <string name="comments_after_preview">After · preview</string>
+    <string name="comments_no_text">No text</string>
+    <string name="comments_options">Comments options</string>
+    <string name="agent_edits_title">Agent edits</string>
+    <string name="agent_edits_search">Search agent edits</string>
+    <string name="agent_edits_options">Agent edits options</string>
+    <string name="agent_edits_back_to_list">All agent edits</string>
+    <string name="agent_edit_added">Added %1$s</string>
+    <string name="agent_edits_expand_panel">Expand agent edits panel</string>
+    <string name="agent_edits_collapse_panel">Collapse agent edits panel</string>
+    <string name="agent_edits_load_failed">Could not load agent edits. Close this panel and try again.</string>
+    <string name="agent_edits_no_matches">No agent edits match this search</string>
+    <string name="no_agent_edits">No agent edits</string>
+</resources>

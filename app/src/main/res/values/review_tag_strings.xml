@@ -1,0 +1,109 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Written for Thoughts. License is GPLv3. -->
+<resources>
+    <string name="review_tags_title">Rating</string>
+    <string name="review_tags_new">New tag</string>
+    <string name="review_tags_new_hint">Tag name</string>
+    <string name="review_tags_none">Not rated</string>
+    <string name="review_field_tag">Rating</string>
+    <string name="review_field_interval">Interval</string>
+    <string name="review_tags_more">%1$s +%2$d</string>
+    <string name="review_tags_add">Add</string>
+    <string name="review_tags_change_interval">Again in %1$s. Change the interval or the rating</string>
+    <string name="review_tags_record">%1$s, again in %2$s</string>
+    <string name="review_current_tags">Current %1$s</string>
+    <string name="review_card_browser_tagged_count">Tagged %1$s (%2$d)</string>
+    <!-- Tag groups: they only organize the tag list; tags from any groups can be chosen. -->
+    <string name="review_tag_groups_other">Other</string>
+    <string name="review_tag_groups_new">New group</string>
+    <string name="review_tag_groups_new_hint">Group name</string>
+    <string name="review_tag_groups_create">Create</string>
+    <string name="review_tag_groups_options">Options for %1$s</string>
+    <string name="review_tag_groups_rename">Rename</string>
+    <string name="review_tag_groups_rename_title">Rename group</string>
+    <string name="review_tag_groups_save">Save</string>
+    <string name="review_tag_groups_move_up">Move up</string>
+    <string name="review_tag_groups_move_down">Move down</string>
+    <string name="review_tag_groups_delete">Delete</string>
+    <string name="review_tag_groups_delete_title">Delete “%1$s”?</string>
+    <string name="review_tag_groups_delete_message">Its tags move to Other. No tags or answers are deleted.</string>
+    <string name="review_tag_groups_move_tags_here">Move tags here…</string>
+    <string name="review_tag_groups_move_tags_title">Move tags to “%1$s”</string>
+    <string name="review_tag_groups_move_tags_action">Move</string>
+    <string name="review_tag_groups_move_tags_none">All tags are already in this group</string>
+    <!-- Group notes: a short note per group, recorded with the answer. -->
+    <string name="review_tag_groups_note_hint">Note for %1$s</string>
+    <string name="review_tag_groups_has_note">Has a note</string>
+    <!-- A closed group's header: its name, then this with the tags chosen in it ("Recall · Recalled"). -->
+    <string name="review_tag_group_summary">· %1$s</string>
+    <string name="review_tag_group_expanded">Expanded</string>
+    <string name="review_tag_group_collapsed">Collapsed</string>
+    <!-- The answer's one free-form note at the end of the tag sheet (key "note" of the group notes). -->
+    <string name="review_answer_note">Note</string>
+    <string name="review_answer_note_hint">Anything else about this answer…</string>
+    <!-- "About this…": one note per section, page or document, shared by every card of the document. -->
+    <string name="review_context_title">About this…</string>
+    <string name="review_context_section">Section</string>
+    <string name="review_context_page">Page</string>
+    <string name="review_context_document">Document</string>
+    <string name="review_context_no_sections">No section headings in this PDF</string>
+    <string name="review_context_section_hint">A note on this section, shared by its cards…</string>
+    <string name="review_context_page_hint">A note on this page, shared by its cards…</string>
+    <string name="review_context_document_hint">A note on this document, shared by its cards…</string>
+    <string name="review_tag_groups_name_empty">Enter a name</string>
+    <string name="review_tag_groups_name_too_long">Use at most %1$d characters</string>
+    <string name="review_tag_groups_name_reserved">“Other” is kept for tags in no group</string>
+    <string name="review_tag_groups_name_taken">There is already a group with this name</string>
+    <string name="review_tag_groups_too_many">There can be at most %1$d groups</string>
+    <string name="review_tag_groups_tag_too_long">Tags longer than %1$d characters can\'t be put in a group</string>
+    <string name="review_tag_groups_too_many_tags">Groups can hold at most %1$d tags</string>
+    <string name="review_tag_groups_failed">Could not save the tag groups</string>
+    <!-- Slider groups: a group whose ordered steps are picked on a slider, one step per answer. -->
+    <string name="review_tag_scale_show_as_slider">Show as slider…</string>
+    <string name="review_tag_scale_show_as_tags">Show as tags</string>
+    <!-- Sections: a header shared by adjacent groups with the same section name. -->
+    <string name="review_tag_section_menu">Section…</string>
+    <string name="review_tag_section_title">Section for “%1$s”</string>
+    <string name="review_tag_section_message">Groups next to each other with the same section show under one header.</string>
+    <string name="review_tag_section_hint">Section name</string>
+    <string name="review_tag_section_existing">Or use a section:</string>
+    <string name="review_tag_section_none">No section</string>
+    <string name="review_tag_section_too_long">Use at most %1$d characters</string>
+    <!-- The slider editor: only the steps, apart from the group's tags. -->
+    <string name="review_tag_scale_edit">Edit slider</string>
+    <string name="review_tag_scale_edit_menu">Edit slider…</string>
+    <string name="review_tag_scale_edit_title">Edit slider “%1$s”</string>
+    <string name="review_tag_scale_make_title">Make “%1$s” a slider</string>
+    <string name="review_tag_scale_edit_message">Steps go from left to right. Removing a step does not change past answers.</string>
+    <string name="review_tag_scale_edit_empty">No steps yet.</string>
+    <string name="review_tag_scale_add_step">Add step</string>
+    <string name="review_tag_scale_step_hint">Step name</string>
+    <string name="review_tag_scale_add_step_existing">Or use a tag of this group:</string>
+    <string name="review_tag_scale_remove_step">Remove %1$s</string>
+    <string name="review_tag_scale_min_steps">A slider needs at least two steps.</string>
+    <string name="review_tag_scale_tags_caption">Tags</string>
+    <string name="review_tag_scale_no_steps">No steps yet: tap ✎ to add them</string>
+    <string name="review_tag_scale_note">Note for %1$s</string>
+    <string name="review_tag_scale_value">%1$s: %2$s</string>
+    <string name="review_tag_scale_unset">%1$s: not set</string>
+    <string name="review_tag_scale_step_up">Move %1$s left</string>
+    <string name="review_tag_scale_step_down">Move %1$s right</string>
+    <!-- Review in two steps: when a review asks a group (its menu's "Ask" choice, the record's `phase`). -->
+    <string name="review_tag_phase_menu">Ask</string>
+    <string name="review_tag_phase_after">After the answer</string>
+    <string name="review_tag_phase_before">Before the answer</string>
+    <string name="review_tag_phase_before_and_after">Before and after</string>
+    <!-- The before panel under the question, while the answer is hidden; locked once it is shown. -->
+    <string name="review_before_note_hint">Before note</string>
+    <string name="review_before_summary">Before: %1$s · Tap to change</string>
+    <string name="review_before_summary_note">Before: %1$s — %2$s · Tap to change</string>
+    <string name="review_before_nothing">nothing picked</string>
+    <!-- The agent's recall prediction, shown once the answer is shown. -->
+    <string name="review_agent_predicting">Agent: predicting…</string>
+    <string name="review_agent_predicted">Agent predicted: %1$s</string>
+    <string name="review_agent_predicted_reason">Agent predicted: %1$s — %2$s</string>
+    <!-- A past answer given in two steps, in the card's history. -->
+    <string name="review_history_before">Before</string>
+    <string name="review_history_after">After</string>
+    <string name="review_history_agent">Agent predicted</string>
+</resources>

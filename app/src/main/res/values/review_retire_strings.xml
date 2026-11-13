@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Written for Thoughts. License is GPLv3. Retired review cards (protocol/review-card-retire.md). -->
+<resources>
+    <string name="review_card_retire_menu">Retire card</string>
+    <string name="review_card_restore_menu">Restore to review</string>
+    <string name="review_card_retired">Card retired</string>
+    <string name="review_card_restored_to_review">Card restored to review</string>
+    <string name="review_card_browser_retired">Retired</string>
+    <string name="review_card_browser_unpublished">Unpublished</string>
+    <string name="review_card_browser_retired_or_unpublished">Retired / Unpublished</string>
+    <string name="review_retired_on">Retired %1$s</string>
+    <string name="review_card_details_retired">%1$s. It is not offered for review and keeps its history; Restore to review in the menu brings it back with its old schedule.</string>
+    <string name="review_card_details_unpublished">Unpublished. Its document is not published in its Project, so the card is not offered for review. It keeps its history and schedule; publishing the document again brings it back.</string>
+    <string name="review_history_retire">Retired</string>
+    <string name="review_history_restore">Restored to review</string>
+    <string name="review_history_undo_retire">Undo retire</string>
+    <string name="review_card_browser_retire">Retire</string>
+    <string name="review_card_browser_restore">Restore</string>
+    <string name="review_card_browser_retired_count">Retired %1$d cards</string>
+    <string name="review_card_browser_restored_count">Restored %1$d cards to review</string>
+    <string name="review_card_browser_retire_failed">Could not retire or restore %1$d cards. They remain selected; please try again.</string>
+</resources>

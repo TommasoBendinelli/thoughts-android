@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Written for Thoughts. License is GPLv3. -->
+<resources>
+    <!-- A comment whose source anchor was removed without an explicit delete. -->
+    <string name="overview_anchor_removed">Anchor removed</string>
+    <string name="overview_anchor_removed_detail">Removed from %1$s:%2$d</string>
+    <string name="overview_anchor_removed_detail_file">Removed from %1$s</string>
+    <string name="overview_restore_anchor">Restore</string>
+    <string name="overview_restore_anchor_description">Restore the comment\'s anchor in the source</string>
+    <string name="overview_restore_anchor_restored">Anchor restored at %1$s:%2$d.</string>
+    <string name="overview_restore_anchor_nearest_line">Line %1$d no longer exists in %2$s; anchor restored at line %3$d.</string>
+    <string name="overview_restore_anchor_moved_line">Line %1$d in %2$s can\'t hold an anchor; anchor restored at line %3$d.</string>
+    <string name="overview_restore_anchor_end_of_file">No safe line in %1$s; anchor restored at the end (line %2$d).</string>
+    <string name="overview_restore_anchor_fallback_file">%1$s no longer exists; anchor restored at %2$s:%3$d.</string>
+    <string name="overview_restore_anchor_already_present">Anchor already present at %1$s:%2$d.</string>
+    <string name="overview_restore_anchor_point">Restored as a point anchor.</string>
+    <string name="overview_restore_anchor_publish">Restored on this phone; publishes at next Sync.</string>
+    <string name="overview_restore_anchor_sources_unavailable">Download sources (Sync) to restore.</string>
+    <string name="overview_restore_anchor_file_missing">The source file no longer exists; link the comment manually.</string>
+    <string name="overview_restore_anchor_malformed">The anchor text is still in %1$s:%2$d but malformed; fix it by hand.</string>
+    <string name="overview_restore_anchor_failed">Couldn\'t restore the anchor.</string>
+</resources>

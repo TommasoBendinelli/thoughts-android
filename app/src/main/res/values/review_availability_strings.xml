@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Written for Thoughts. License is GPLv3. -->
+<resources>
+    <plurals name="review_cards_unavailable" translatable="false">
+        <item quantity="one">View %1$d unavailable card</item>
+        <item quantity="other">View %1$d unavailable cards</item>
+    </plurals>
+    <string name="review_card_browser_unavailable" translatable="false">Unavailable</string>
+    <string name="review_unavailable_title" translatable="false">Cards unavailable</string>
+    <string name="review_unavailable_message" translatable="false">Open a card’s details to see why it is unavailable.</string>
+    <string name="review_location_updating_reason" translatable="false">Location updating: the answer’s position is being checked. This card will return when its location is verified.</string>
+    <string name="review_location_failed_reason" translatable="false">Location repair failed: Thoughts could not locate the answer reliably. Its location needs repair before you can review this card.</string>
+    <string name="review_location_stale_reason" translatable="false">Location needs updating: the saved answer position was verified for a different PDF version. The PDF on this device may already be current.</string>
+</resources>

@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Written for Thoughts. License is GPLv3. -->
+<resources>
+    <string name="comment_editor_hint">Write your comment…</string>
+    <string name="comment_editor_details">Details</string>
+    <string name="comment_action_needed">Action needed</string>
+    <string name="comment_action_mark">Mark as needing action</string>
+    <string name="comment_action_remove">Remove action requirement</string>
+    <string name="comment_details_collapsed">Collapsed</string>
+    <string name="comment_details_expanded">Expanded</string>
+</resources>

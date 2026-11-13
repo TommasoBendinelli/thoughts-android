@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Written for Thoughts. License is GPLv3. -->
+<resources>
+    <!-- Settings > Agent notes and prompts editors, found by instrumented tests. -->
+    <item name="agentPromptTemplateEditor" type="id" />
+    <item name="agentPromptMentraFolderEditor" type="id" />
+    <item name="glassesCameraUrlEditor" type="id" />
+    <item name="readAloudKeyEditor" type="id" />
+    <!-- Home's "Comment issues" toolbar action. -->
+    <item name="commentIssuesActions" type="id" />
+</resources>

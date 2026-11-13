@@ -1,0 +1,122 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Written for MJ PDF. License is GPLv3. -->
+<LinearLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/comment_sheet_background"
+    android:orientation="vertical"
+    android:paddingHorizontal="16dp">
+
+    <View
+        android:id="@+id/commentSheetHandle"
+        android:layout_width="34dp"
+        android:layout_height="4dp"
+        android:layout_gravity="center_horizontal"
+        android:layout_marginTop="6dp"
+        android:layout_marginBottom="6dp"
+        android:background="@color/comment_sheet_handle" />
+
+    <LinearLayout
+        android:id="@+id/commentNavigationRow"
+        android:layout_width="match_parent"
+        android:layout_height="48dp"
+        android:gravity="center"
+        android:orientation="horizontal">
+
+        <ImageButton
+            android:id="@+id/previousCommentButton"
+            android:layout_width="48dp"
+            android:layout_height="48dp"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:contentDescription="@string/previous_comment"
+            android:padding="12dp"
+            android:src="@drawable/ic_chevron_left"
+            app:tint="@color/comment_sheet_on_background" />
+
+        <TextView
+            android:id="@+id/commentPositionText"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginHorizontal="10dp"
+            android:minWidth="84dp"
+            android:gravity="center"
+            android:textAppearance="?attr/textAppearanceTitleMedium"
+            android:textColor="@color/comment_sheet_on_background" />
+
+        <ImageButton
+            android:id="@+id/nextCommentButton"
+            android:layout_width="48dp"
+            android:layout_height="48dp"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:contentDescription="@string/next_comment"
+            android:padding="12dp"
+            android:src="@drawable/ic_chevron_right"
+            app:tint="@color/comment_sheet_on_background" />
+    </LinearLayout>
+
+    <androidx.core.widget.NestedScrollView
+        android:id="@+id/commentThreadScroll"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:clipToPadding="false"
+        android:fillViewport="true"
+        android:paddingTop="4dp"
+        android:paddingBottom="6dp">
+
+        <LinearLayout
+            android:id="@+id/commentMessagesContainer"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical" />
+    </androidx.core.widget.NestedScrollView>
+
+    <LinearLayout
+        android:id="@+id/replyComposerRow"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginBottom="12dp"
+        android:gravity="center_vertical"
+        android:orientation="horizontal">
+
+        <ImageButton
+            android:id="@+id/replyExpandButton"
+            android:layout_width="48dp"
+            android:layout_height="48dp"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:contentDescription="@string/expand"
+            android:padding="12dp"
+            android:src="@drawable/ic_small_arrow_up"
+            android:visibility="gone"
+            app:tint="@color/comment_sheet_on_background" />
+
+        <com.google.android.material.textfield.TextInputLayout
+            android:id="@+id/replyInputLayout"
+            style="@style/Widget.Material3.TextInputLayout.OutlinedBox"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:hint="@string/reply_to_comment"
+            app:boxBackgroundColor="@android:color/transparent"
+            app:boxStrokeColor="@color/comment_sheet_input_stroke"
+            app:endIconContentDescription="@string/send_reply"
+            app:endIconDrawable="@drawable/ic_send"
+            app:endIconMode="custom"
+            app:endIconTint="@color/comment_sheet_on_background"
+            app:hintTextColor="@color/comment_sheet_input_hint">
+
+            <com.google.android.material.textfield.TextInputEditText
+                android:id="@+id/replyEditText"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:imeOptions="actionSend"
+                android:inputType="textCapSentences|textMultiLine"
+                android:maxLines="4"
+                android:minHeight="48dp"
+                android:textColor="@color/comment_sheet_on_background"
+                android:textColorHint="@color/comment_sheet_on_background_muted" />
+        </com.google.android.material.textfield.TextInputLayout>
+    </LinearLayout>
+</LinearLayout>

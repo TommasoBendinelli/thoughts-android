@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Written for Thoughts. License is GPLv3. -->
+<resources>
+    <!-- An agent proposal whose markup vanished from the source without Accept or Reject (spec section 10). -->
+    <string name="overview_removed_proposal">Removed outside Thoughts</string>
+    <string name="overview_removed_proposal_explanation">The proposal\'s markup was removed from the source without Accept or Reject. Restore it to decide it, or dismiss it.</string>
+    <string name="overview_removed_proposal_looks_accepted">The text now reads as if it was accepted.</string>
+    <string name="overview_removed_proposal_looks_rejected">The text now reads as if it was rejected.</string>
+    <string name="overview_removed_proposal_looks_edited">The text was edited since.</string>
+    <string name="overview_removed_proposal_file_deleted">The source file was deleted.</string>
+    <string name="overview_restore_proposal_description">Restore the proposal\'s markup in the source</string>
+    <string name="overview_dismiss_proposal">Dismiss</string>
+    <string name="overview_dismiss_proposal_description">Dismiss the removed proposal without changing the source</string>
+    <string name="overview_dismiss_proposal_title">Dismiss this proposal?</string>
+    <string name="overview_dismiss_proposal_message">It will no longer be listed. The source is not changed.</string>
+    <string name="overview_dismiss_proposal_done">Proposal dismissed on this phone; publishes at next Sync.</string>
+    <string name="overview_dismiss_proposal_failed">Couldn\'t dismiss the proposal.</string>
+    <string name="overview_restore_proposal_restored">Proposal restored at %1$s:%2$d.</string>
+    <string name="overview_restore_proposal_already_present">Proposal already present at %1$s:%2$d; it returns to the list at next Sync.</string>
+    <string name="overview_restore_proposal_publish">Restored on this phone; publishes at next Sync.</string>
+    <string name="overview_restore_proposal_failed">Couldn\'t restore the proposal.</string>
+    <string name="overview_restore_proposal_refused_title">Couldn\'t restore the proposal</string>
+    <string name="overview_restore_proposal_location">Removed from %1$s:%2$d</string>
+    <string name="overview_restore_proposal_location_file">Removed from %1$s</string>
+    <string name="overview_restore_proposal_text_changed">The proposed and the original text were both edited since the markup was removed; Thoughts cannot tell where the proposal belongs.</string>
+    <string name="overview_restore_proposal_ambiguous">The text occurs more than once at the same distance from where the proposal was; Thoughts cannot tell which one it covered.</string>
+    <string name="overview_restore_proposal_id_in_source">The proposal\'s ID is still in the source (broken markup or a comment); fix it by hand.</string>
+    <string name="overview_restore_proposal_source_missing">The source file no longer exists.</string>
+    <string name="overview_restore_proposal_not_restorable">The proposal can\'t be written back into this source.</string>
+    <string name="overview_restore_proposal_texts">Original:\n%1$s\n\nProposed:\n%2$s</string>
+    <string name="overview_restore_proposal_copy">Copy…</string>
+    <string name="overview_restore_proposal_copy_original">Copy original text</string>
+    <string name="overview_restore_proposal_copy_proposed">Copy proposed text</string>
+    <string name="overview_restore_proposal_copy_explanation">Copy explanation</string>
+    <string name="overview_restore_proposal_copied">Copied.</string>
+    <!-- Plain source editor: a save that removes a whole proposal wrapper by hand. -->
+    <string name="source_editor_proposal_removed_title">Remove an AI proposal?</string>
+    <string name="source_editor_proposal_removed_message">This edit removes an AI proposal. Accept or reject it in Thoughts instead; if you save, it will be listed as removed outside Thoughts.</string>
+    <string name="source_editor_proposal_removed_save">Save anyway</string>
+</resources>

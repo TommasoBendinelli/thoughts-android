@@ -1,0 +1,9 @@
+include ':AndroidPdfViewer:android-pdf-viewer'
+include ':app'
+include ':NoteShortcut'
+include ':PdfiumAndroid'
+include ':ThoughtsClient'
+// The Thoughts server's Kotlin SDK: a thoughts-server checkout beside this one by default, or the
+// directory given with -PthoughtsClientDir=/path/to/thoughts-server/sdk/kotlin (or in gradle.properties).
+def thoughtsClientDir = providers.gradleProperty('thoughtsClientDir').orNull
+project(':ThoughtsClient').projectDir = file(thoughtsClientDir ?: '../thoughts-server/sdk/kotlin')

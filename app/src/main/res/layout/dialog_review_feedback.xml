@@ -1,0 +1,170 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Written for Thoughts. License is GPLv3. -->
+<!-- Review card feedback editor: the quoted passage, Like / Dislike, the comment and its dates, then
+     Delete and Change passage. There is no Save or Cancel: closing the editor saves it. -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:paddingHorizontal="24dp"
+    android:paddingTop="8dp">
+
+    <TextView
+        android:id="@+id/reviewFeedbackQuote"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:ellipsize="end"
+        android:maxLines="3"
+        android:textColor="?attr/colorOnSurfaceVariant"
+        android:textSize="14sp"
+        android:textStyle="italic"
+        tools:text="“the KL term keeps the policy close”" />
+
+    <!-- Feedback made on another card of the document whose passage is in this answer. -->
+    <TextView
+        android:id="@+id/reviewFeedbackSharedFrom"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="4dp"
+        android:ellipsize="end"
+        android:maxLines="2"
+        android:textColor="?attr/colorOnSurfaceVariant"
+        android:textSize="12sp"
+        android:visibility="gone"
+        tools:text="From another card · “What keeps the policy close?”" />
+
+    <com.google.android.material.button.MaterialButtonToggleGroup
+        android:id="@+id/reviewFeedbackPolarity"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="12dp"
+        app:selectionRequired="true"
+        app:singleSelection="true">
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/reviewFeedbackLike"
+            style="?attr/materialButtonOutlinedStyle"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/review_feedback_like"
+            app:icon="@drawable/ic_feedback_like"
+            android:textColor="@color/review_feedback_toggle_text"
+            android:backgroundTint="@color/review_feedback_positive_toggle_background"
+            app:iconTint="@color/review_feedback_positive_toggle_icon"
+            app:strokeColor="@color/review_feedback_positive_toggle_stroke"
+            app:strokeWidth="1dp" />
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/reviewFeedbackDislike"
+            style="?attr/materialButtonOutlinedStyle"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/review_feedback_dislike"
+            app:icon="@drawable/ic_feedback_dislike"
+            android:textColor="@color/review_feedback_toggle_text"
+            android:backgroundTint="@color/review_feedback_negative_toggle_background"
+            app:iconTint="@color/review_feedback_negative_toggle_icon"
+            app:strokeColor="@color/review_feedback_negative_toggle_stroke"
+            app:strokeWidth="1dp" />
+
+        <!-- Document comments only (document-feedback.md section 9). -->
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/reviewFeedbackQuestion"
+            style="?attr/materialButtonOutlinedStyle"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/review_feedback_kind_question"
+            android:visibility="gone" />
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/reviewFeedbackOther"
+            style="?attr/materialButtonOutlinedStyle"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/review_feedback_kind_other"
+            android:visibility="gone" />
+    </com.google.android.material.button.MaterialButtonToggleGroup>
+
+    <com.google.android.material.button.MaterialButton
+        android:id="@+id/reviewFeedbackResolve"
+        style="?attr/materialButtonOutlinedStyle"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="8dp"
+        android:text="@string/review_feedback_resolve"
+        android:visibility="gone" />
+
+    <com.google.android.material.textfield.TextInputLayout
+        android:id="@+id/reviewFeedbackCommentLayout"
+        style="@style/Widget.Material3.TextInputLayout.OutlinedBox"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="12dp"
+        android:hint="@string/review_feedback_comment_hint"
+        app:counterEnabled="true"
+        app:counterMaxLength="4000">
+
+        <com.google.android.material.textfield.TextInputEditText
+            android:id="@+id/reviewFeedbackComment"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:gravity="top|start"
+            android:inputType="textCapSentences|textMultiLine"
+            android:maxLength="4000"
+            android:maxLines="8"
+            android:minLines="2" />
+    </com.google.android.material.textfield.TextInputLayout>
+
+    <TextView
+        android:id="@+id/reviewFeedbackDates"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="4dp"
+        android:textColor="?attr/colorOnSurfaceVariant"
+        android:textSize="12sp"
+        android:visibility="gone"
+        tools:text="Created 20 Oct 2026, 10:14" />
+
+    <!-- A saved highlight: Delete (with Undo) and, on the PDF, select another passage for it. -->
+    <LinearLayout
+        android:id="@+id/reviewFeedbackActions"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="8dp"
+        android:layout_marginBottom="8dp"
+        android:layout_marginHorizontal="-12dp"
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        android:visibility="gone"
+        tools:visibility="visible">
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/reviewFeedbackDelete"
+            style="@style/Widget.Material3.Button.TextButton.Icon"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/review_feedback_delete"
+            android:textColor="?attr/colorError"
+            app:icon="@drawable/ic_delete"
+            app:iconTint="?attr/colorError"
+            app:strokeWidth="0dp" />
+
+        <Space
+            android:layout_width="0dp"
+            android:layout_height="0dp"
+            android:layout_weight="1" />
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/reviewFeedbackChangePassage"
+            style="@style/Widget.Material3.Button.TextButton.Icon"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/review_feedback_change_passage"
+            android:visibility="gone"
+            app:icon="@drawable/ic_edit"
+            app:strokeWidth="0dp"
+            tools:visibility="visible" />
+    </LinearLayout>
+</LinearLayout>

@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Script-rendered page (test fixture)</title>
+<style>
+  body { font-family: sans-serif; margin: 0; padding: 0 16px 48px; line-height: 1.5; }
+  nav a { display: inline-block; margin: 12px 12px 12px 0; }
+  nav a.active { font-weight: bold; }
+  #app p { margin: 0 0 12px; }
+</style>
+</head>
+<body>
+<!-- A page whose text is written by its own script: tabs routed by location.hash, rendered after
+     load, re-rendered on input, like a single-page app attached to a document. -->
+<nav>
+  <a href="#experiment">The experiment</a>
+  <a href="#simulator">Simulator</a>
+  <a href="#activity">My activity</a>
+</nav>
+<main id="app"></main>
+<script>
+(function () {
+  var tabs = {
+    experiment: [
+      "The experiment compares three layouts of the same sign-up page.",
+      "Each visitor sees one of them and decides in under a minute."
+    ],
+    simulator: [
+      "The simulator replays a week of agent traffic against your rules.",
+      "Blocked requests are counted per sender and shown as a daily total."
+    ],
+    activity: [
+      "My activity lists the requests your rules blocked today."
+    ]
+  };
+  var count = 0;
+  function render() {
+    var name = (location.hash || "#experiment").slice(1);
+    if (!tabs[name]) name = "experiment";
+    var app = document.getElementById("app");
+    app.innerHTML = "";
+    tabs[name].forEach(function (text) {
+      var p = document.createElement("p");
+      p.textContent = text;
+      app.appendChild(p);
+    });
+    if (name === "simulator") {
+      var input = document.createElement("input");
+      input.id = "senders";
+      input.placeholder = "Senders";
+      input.addEventListener("input", function () {
+        count += 1;
+        document.getElementById("result").textContent = "Simulated " + count + " changes.";
+      });
+      var result = document.createElement("p");
+      result.id = "result";
+      result.textContent = "Simulated 0 changes.";
+      app.appendChild(input);
+      app.appendChild(result);
+    }
+    Array.prototype.forEach.call(document.querySelectorAll("nav a"), function (a) {
+      a.className = a.getAttribute("href") === "#" + name ? "active" : "";
+    });
+    document.body.setAttribute("data-tab", name);
+  }
+  window.addEventListener("hashchange", function () { setTimeout(render, 120); });
+  // Rendered after load, like a real single-page app.
+  window.addEventListener("load", function () { setTimeout(render, 200); });
+})();
+</script>
+</body>
+</html>

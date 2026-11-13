@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Written for Thoughts. License is GPLv3. -->
+<resources>
+    <!-- The reader's HTML view (thoughts-html-view-SPEC.md). -->
+    <string name="html_view" translatable="false">HTML view</string>
+    <string name="html_view_show_html" translatable="false">HTML view</string>
+    <string name="html_view_show_pdf" translatable="false">PDF view</string>
+    <string name="html_view_text_size" translatable="false">Text size</string>
+    <string name="html_view_building" translatable="false">HTML is being built. It is downloaded at the next Sync after the server finishes it; the PDF is not affected.</string>
+    <string name="html_view_downloading" translatable="false">Downloading the HTML edition…</string>
+    <string name="html_view_unavailable" translatable="false">HTML not available: %1$s</string>
+    <string name="html_view_showing_pdf" translatable="false">Showing the PDF. %1$s</string>
+    <string name="html_view_not_shown_title" translatable="false">Not shown in HTML view</string>
+    <string name="html_view_show_list" translatable="false">Show</string>
+    <plurals name="html_view_cards_not_shown">
+        <item quantity="one">%d card is not shown in the HTML view; it reviews in the PDF.</item>
+        <item quantity="other">%d cards are not shown in the HTML view; they review in the PDF.</item>
+    </plurals>
+    <string name="html_view_link_missing" translatable="false">%1$s is not on this phone. Sync to get it.</string>
+    <string name="html_view_comment_saved" translatable="false">Comment saved; its marker is placed at the next Sync.</string>
+    <string name="html_view_card_saved" translatable="false">Review card created; placed in the PDF at the next Sync.</string>
+    <string name="html_view_placed_next_sync_title" translatable="false">Placed at next Sync</string>
+    <string name="html_view_card_placed_next_sync" translatable="false">Placed at next Sync — review it in the HTML view. This card was made in the HTML view; it gets its place in the PDF when the next Sync links it.</string>
+    <string name="html_view_review_in_pdf" translatable="false">Not shown in HTML view: reviewing this card in the PDF.</string>
+    <string name="html_view_pending_proposals" translatable="false">Pending proposals are shown in the PDF; switch to the PDF view to review them.</string>
+</resources>

@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Written for Thoughts. License is GPLv3. -->
+<resources>
+    <!-- Review cards inside HTML attachment pages (thoughts-html-attachment-cards-SPEC.md). -->
+    <string name="html_attachment_open_in_browser" translatable="false">Open in browser</string>
+    <string name="html_attachment_new_review_card" translatable="false">New review card</string>
+    <string name="html_attachment_not_downloaded" translatable="false">HTML attachment not downloaded for this PDF. Sync this document and try again.</string>
+    <string name="html_attachment_card_saved" translatable="false">Review card created in this page.</string>
+    <string name="html_attachment_card_linking" translatable="false">In an HTML attachment page: found by its text, no source markers.</string>
+    <string name="html_attachment_card_placement" translatable="false">In %1$s</string>
+    <string name="html_attachment_answer_not_found" translatable="false">Answer not found in the current page</string>
+    <string name="html_attachment_answer_not_found_review" translatable="false">Answer not found in the current page.</string>
+    <string name="html_attachment_stored_answer" translatable="false">The answer saved with the card:\n%1$s</string>
+    <string name="html_attachment_card_not_sent" translatable="false">Not sent: the server does not know this version of the page</string>
+</resources>

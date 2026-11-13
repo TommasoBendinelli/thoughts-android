@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Written for Thoughts. License is GPLv3. -->
+<!-- A slider group of the review card's before panel (review in two steps), on one row so the page
+     stays in view above the card: its name, the steps' track with their labels under the ticks,
+     then its menu ("Ask: …"). -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent" android:layout_height="wrap_content"
+    android:baselineAligned="false"
+    android:orientation="horizontal" android:paddingTop="2dp">
+    <TextView android:id="@+id/reviewBeforeScaleName"
+        android:layout_width="56dp" android:layout_height="22dp"
+        android:ellipsize="end" android:gravity="center_vertical" android:maxLines="1"
+        android:textAppearance="?attr/textAppearanceTitleSmall"
+        android:textColor="?attr/colorOnSurface" />
+    <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content"
+        android:layout_weight="1" android:orientation="vertical">
+        <com.gitlab.mudlej.MjPdfReader.ui.reader.ReviewScaleTrack android:id="@+id/reviewBeforeScaleTrack"
+            android:layout_width="match_parent" android:layout_height="22dp"
+            android:focusable="true" />
+        <!-- One equal-width cell per step, so each label sits under its tick. -->
+        <LinearLayout android:id="@+id/reviewBeforeScaleLabels"
+            android:layout_width="match_parent" android:layout_height="wrap_content"
+            android:orientation="horizontal" />
+    </LinearLayout>
+    <androidx.appcompat.widget.AppCompatImageButton android:id="@+id/reviewBeforeScaleMenu"
+        android:layout_width="24dp" android:layout_height="32dp"
+        android:background="?attr/selectableItemBackgroundBorderless"
+        android:padding="4dp" android:scaleType="centerInside"
+        android:src="@drawable/ic_more_vert"
+        app:tint="?attr/colorOnSurfaceVariant" />
+</LinearLayout>

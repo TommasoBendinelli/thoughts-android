@@ -1,0 +1,23 @@
+// Written for Thoughts. License is GPLv3.
+
+plugins {
+    id 'com.android.application'
+}
+
+android {
+    namespace 'org.tbend.thoughts.shortcut'
+    compileSdk 36
+
+    defaultConfig {
+        applicationId 'org.tbend.thoughts.shortcut'
+        minSdk 23
+        targetSdk 36
+        versionCode 2
+        versionName '2.0'
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+}

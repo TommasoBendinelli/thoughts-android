@@ -1,0 +1,40 @@
+<!-- Written for Thoughts. License is GPLv3. -->
+<resources>
+    <string name="note_details">Details</string>
+    <string name="note_project">Project</string>
+    <string name="note_project_value">Project: %1$s</string>
+    <string name="note_check_where">Where to check this</string>
+    <string name="note_check_where_hint">For example: at Migros, at home, or during a meeting</string>
+    <string name="note_check_where_summary">Where: %1$s</string>
+    <string name="note_calendar_date">Date: %1$s</string>
+    <string name="note_calendar_time">Time: %1$s</string>
+    <string name="note_calendar_unset">Not set</string>
+    <string name="note_calendar_no_time">No time</string>
+    <string name="note_calendar_clear_short">Clear</string>
+    <string name="note_calendar_clear">Clear date and time</string>
+    <string name="note_calendar_clear_time">Remove time</string>
+    <string name="todo_visible_from">Hide until: %1$s</string>
+    <string name="todo_visible_from_always">Always shown</string>
+    <string name="todo_visible_from_clear">Show it now</string>
+    <string name="todo_hide_until">Hide until…</string>
+    <string name="todo_hide_until_title">Show this to-do from</string>
+    <string name="todo_show_now">Show now</string>
+    <string name="todo_hidden_until">Hidden until %1$s</string>
+    <string name="todo_show_hidden">Show hidden</string>
+    <string name="todo_hide_later">Hide later ones</string>
+    <plurals name="todos_summary">
+        <item quantity="one">%1$d to-do</item>
+        <item quantity="other">%1$d to-dos</item>
+    </plurals>
+    <string name="todos_summary_hidden">%1$s · %2$d hidden until later</string>
+    <string name="todo_calendar_today">Today · %1$s</string>
+    <string name="todo_open_calendar">Open calendar</string>
+    <string name="todo_calendar_choose">Calendars to show</string>
+    <string name="todo_calendar_allow">Show today\'s events from your calendar</string>
+    <string name="todo_calendar_empty">Nothing in your calendar today</string>
+    <string name="todo_calendar_event">%1$s–%2$s  %3$s</string>
+    <string name="todo_calendar_all_day">All day  %1$s</string>
+    <string name="todo_calendar_more">%1$d more…</string>
+    <string name="todo_calendar_untitled">(No title)</string>
+    <string name="todo_calendar_open_failed">No calendar app found</string>
+</resources>

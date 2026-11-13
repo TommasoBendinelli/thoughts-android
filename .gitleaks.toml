@@ -1,0 +1,21 @@
+# Written for Thoughts. License is GPLv3.
+
+# gitleaks configuration: the default rules plus allowlists for known test fixtures.
+# Run: gitleaks git --config .gitleaks.toml .
+title = "Thoughts Android"
+
+[extend]
+useDefault = true
+
+[[rules]]
+id = "generic-api-key"
+
+[[rules.allowlists]]
+description = "Synthetic OpenRouter keys in the read-aloud key store and speech client tests"
+condition = "AND"
+paths = ['''(^|/)app/src/(test|androidTest)/java/com/gitlab/mudlej/MjPdfReader/data/speech/OpenRouter[A-Za-z]+Test\.kt$''']
+regexes = ['''^sk-or-v1-(0123456789abcdef)+$''']
+
+[allowlist]
+description = "History only: MAPS_API_KEY in the former secrets.defaults.properties was a placeholder. The file left with the Google Maps place picker; no build reads a Maps key any more"
+paths = ['''(^|/)secrets\.defaults\.properties$''']

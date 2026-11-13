@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Written for Thoughts. License is GPLv3. -->
+<resources>
+    <!-- A comment marker in a managed source whose comment no longer exists (desktop docs/comment-missing.md). -->
+    <string name="overview_comment_missing_status">Comment missing</string>
+    <string name="overview_comment_missing_deleted_explanation">This marker belongs to a comment that was deleted. Remove the marker to take it out of the source, or restore the comment.</string>
+    <string name="overview_comment_missing_unknown_explanation">This marker belongs to no known comment. Remove the marker to take it out of the source, or create the comment from it.</string>
+    <string name="overview_comment_missing_remove">Remove marker</string>
+    <string name="overview_comment_missing_remove_description">Take the marker out of its source; highlighted words stay</string>
+    <string name="overview_comment_missing_restore">Restore</string>
+    <string name="overview_comment_missing_restore_description">Bring the comment back from the marker\'s text, or create it when it was never known</string>
+    <string name="overview_comment_missing_removed">Marker removed from %1$s.</string>
+    <string name="overview_comment_missing_restored">Comment restored from the marker in %1$s.</string>
+    <string name="overview_comment_missing_recreated">Comment recreated from the marker in %1$s.</string>
+    <string name="overview_comment_missing_publish">Publishes at next Sync.</string>
+    <string name="overview_comment_missing_invalid_id">The marker id cannot name a comment.</string>
+    <string name="overview_comment_missing_not_managed">%1$s is not a managed source.</string>
+    <string name="overview_comment_missing_sources_unavailable">Download sources (Sync) to resolve this marker.</string>
+    <string name="overview_comment_missing_exists_again">The comment of the marker in %1$s exists again; the marker was kept.</string>
+    <string name="overview_comment_missing_already_exists">The comment of the marker in %1$s already exists.</string>
+    <string name="overview_comment_missing_marker_gone">The marker is no longer in %1$s.</string>
+    <string name="overview_comment_missing_duplicated">The marker appears %1$d times in %2$s; remove the extra copies by hand.</string>
+    <string name="overview_comment_missing_not_verified">The marker removal in %1$s could not be verified; the file was left unchanged.</string>
+    <string name="overview_comment_missing_document_deleted">The comment\'s document was deleted, so the server does not restore it. Remove the marker instead.</string>
+    <string name="overview_comment_missing_no_revision">The deleted comment has no valid revision; Sync and try again.</string>
+    <string name="overview_comment_missing_not_in_library">The document of %1$s is not in the Library yet; Sync before restoring this comment.</string>
+    <string name="overview_comment_missing_save_failed">The comment could not be saved to the local sync queue.</string>
+    <string name="overview_comment_missing_failed">Couldn\'t resolve the marker.</string>
+</resources>

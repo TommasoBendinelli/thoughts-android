@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Written for Thoughts. License is GPLv3. -->
+<!-- Review card feedback: liked / disliked passages of a revealed answer. -->
+<resources>
+    <string name="review_feedback_like">Like</string>
+    <string name="review_feedback_dislike">Dislike</string>
+    <string name="review_feedback_comment">Comment…</string>
+    <string name="review_feedback_question">Question…</string>
+    <string name="review_feedback_kind_question">Question</string>
+    <string name="review_feedback_kind_other">Comment</string>
+    <string name="review_feedback_resolve">Resolve</string>
+    <string name="review_feedback_reopen">Reopen</string>
+    <string name="review_feedback_needs_text">Write it first.</string>
+    <string name="review_feedback_not_saved_needs_text">Not saved: a question or a comment needs its text.</string>
+    <string name="review_feedback_show">Show</string>
+    <string name="review_feedback_comment_hint_any">Your comment</string>
+    <plurals name="review_feedback_earlier">
+        <item quantity="one">%1$d from earlier versions</item>
+        <item quantity="other">%1$d from earlier versions</item>
+    </plurals>
+    <string name="review_feedback_liked">Liked</string>
+    <string name="review_feedback_disliked">Disliked</string>
+    <string name="review_feedback_comment_hint">What do you like or dislike here?</string>
+    <string name="review_feedback_title">Feedback</string>
+    <string name="review_feedback_drawing">Drawing</string>
+    <string name="review_feedback_text_box">Text</string>
+    <string name="review_feedback_save">Save</string>
+    <string name="review_feedback_delete">Delete</string>
+    <string name="review_feedback_created">Created %1$s</string>
+    <string name="review_feedback_created_edited">Created %1$s, edited %2$s</string>
+    <string name="review_feedback_deleted">Feedback deleted</string>
+    <string name="review_feedback_undo">Undo</string>
+    <string name="review_feedback_failed">Could not save the feedback: %1$s</string>
+    <string name="review_feedback_liked_count">%1$d liked</string>
+    <string name="review_feedback_disliked_count">%1$d disliked</string>
+    <string name="review_feedback_not_found_count">(%1$d not found)</string>
+    <string name="review_feedback_list_title">Answer feedback</string>
+    <string name="review_feedback_not_found">Not found in the current answer</string>
+    <string name="text_selection_more_actions">More actions</string>
+    <string name="review_feedback_change_passage">Change passage</string>
+    <string name="review_feedback_save_passage">Save passage</string>
+    <string name="review_feedback_change_passage_hint">Drag the handles, then tap Save passage</string>
+    <string name="review_feedback_passage_outside">The passage must lie inside the answer</string>
+    <string name="review_feedback_passage_unavailable">Could not select this passage</string>
+    <string name="review_feedback_passage_changed">Passage changed</string>
+    <string name="review_feedback_quote">“%1$s”</string>
+    <string name="review_feedback_from_another_card">From another card</string>
+    <string name="review_feedback_from_another_card_question">From another card · “%1$s”</string>
+</resources>

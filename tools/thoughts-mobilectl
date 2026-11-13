@@ -1,0 +1,246 @@
+#!/usr/bin/env python3
+# Written for Thoughts. License is GPLv3.
+"""Trigger and inspect Thoughts Mobile synchronization through ADB."""
+
+from __future__ import annotations
+
+import argparse
+import json
+import os
+import re
+import shutil
+import subprocess
+import sys
+import time
+from pathlib import Path
+from typing import Any
+
+
+PACKAGE = "org.tbend.thoughts"
+ACTION_SYNC_NOW = "org.tbend.thoughts.action.SYNC_NOW"
+ACTION_SYNC_STATUS = "org.tbend.thoughts.action.SYNC_STATUS"
+DEFAULT_TIMEOUT_SECONDS = 30 * 60
+POLL_INTERVAL_SECONDS = 2.0
+
+
+class CommandError(RuntimeError):
+    pass
+
+
+def adb_path() -> str:
+    discovered = shutil.which("adb")
+    if discovered:
+        return discovered
+    mac_sdk = Path.home() / "Library/Android/sdk/platform-tools/adb"
+    if mac_sdk.is_file():
+        return str(mac_sdk)
+    raise CommandError("adb was not found in PATH or the standard Android SDK location")
+
+
+def connected_serial(adb: str, requested: str | None) -> str:
+    if requested:
+        return requested
+    if os.environ.get("ANDROID_SERIAL"):
+        return os.environ["ANDROID_SERIAL"]
+    process = subprocess.run(
+        [adb, "devices"],
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    devices = [
+        line.split()[0]
+        for line in process.stdout.splitlines()[1:]
+        if len(line.split()) >= 2 and line.split()[1] == "device"
+    ]
+    if len(devices) != 1:
+        raise CommandError(
+            "exactly one ADB device must be connected, or pass --serial/ANDROID_SERIAL",
+        )
+    return devices[0]
+
+
+def parse_broadcast_result(output: str) -> tuple[int, dict[str, Any]]:
+    completed = next(
+        (line.strip() for line in reversed(output.splitlines()) if "Broadcast completed:" in line),
+        None,
+    )
+    if completed is None:
+        raise CommandError(f"Android did not return a broadcast result:\n{output.strip()}")
+    result_match = re.search(r"\bresult=(-?\d+)", completed)
+    if result_match is None:
+        raise CommandError(f"Android returned an unreadable broadcast result: {completed}")
+    result_code = int(result_match.group(1))
+    data_match = re.search(r"\bdata=(.*?)(?:,\s+extras:|$)", completed)
+    if data_match is None:
+        raise CommandError(f"Thoughts did not return command JSON: {completed}")
+    raw_data = data_match.group(1).strip()
+    try:
+        decoded = json.loads(raw_data)
+    except json.JSONDecodeError as error:
+        if not (raw_data.startswith('"') and raw_data.endswith('"')):
+            raise CommandError(f"Thoughts returned invalid command JSON: {error}") from error
+        try:
+            decoded = json.loads(raw_data[1:-1])
+        except json.JSONDecodeError as inner_error:
+            raise CommandError(f"Thoughts returned invalid command JSON: {inner_error}") from inner_error
+    try:
+        payload = json.loads(decoded) if isinstance(decoded, str) else decoded
+    except json.JSONDecodeError as error:
+        raise CommandError(f"Thoughts returned invalid command JSON: {error}") from error
+    if not isinstance(payload, dict):
+        raise CommandError("Thoughts command result was not a JSON object")
+    return result_code, payload
+
+
+def broadcast(
+    adb: str,
+    serial: str,
+    action: str,
+    extras: dict[str, str] | None = None,
+) -> tuple[int, dict[str, Any]]:
+    command = [
+        adb,
+        "-s",
+        serial,
+        "shell",
+        "am",
+        "broadcast",
+        "--receiver-foreground",
+        # FLAG_INCLUDE_STOPPED_PACKAGES: also reach Thoughts after a force-stop.
+        "-f",
+        "0x00000020",
+        "-a",
+        action,
+        "-p",
+        PACKAGE,
+    ]
+    for key, value in (extras or {}).items():
+        command.extend(["--es", key, value])
+    process = subprocess.run(command, capture_output=True, text=True)
+    combined = "\n".join(part for part in (process.stdout, process.stderr) if part)
+    if process.returncode != 0:
+        raise CommandError(combined.strip() or f"adb exited with {process.returncode}")
+    return parse_broadcast_result(combined)
+
+
+def status(adb: str, serial: str, operation_id: str) -> tuple[int, dict[str, Any]]:
+    return broadcast(
+        adb,
+        serial,
+        ACTION_SYNC_STATUS,
+        {"operation_id": operation_id},
+    )
+
+
+def wait_for_terminal(
+    adb: str,
+    serial: str,
+    initial: dict[str, Any],
+    timeout_seconds: float,
+) -> tuple[int, dict[str, Any]]:
+    operation_id = initial.get("operation_id")
+    if not isinstance(operation_id, str) or not operation_id:
+        raise CommandError("Thoughts accepted the command without returning an operation ID")
+    deadline = time.monotonic() + timeout_seconds
+    current = initial
+    current_code = -1
+    while not current.get("terminal"):
+        if time.monotonic() >= deadline:
+            timed_out = dict(current)
+            timed_out["client_timeout"] = True
+            timed_out["message"] = "Timed out waiting; synchronization continues on the phone."
+            return 5, timed_out
+        time.sleep(POLL_INTERVAL_SECONDS)
+        current_code, current = status(adb, serial, operation_id)
+    return current_code, current
+
+
+def exit_code(result_code: int, payload: dict[str, Any]) -> int:
+    if payload.get("client_timeout"):
+        return 5
+    if payload.get("error_code") == "busy":
+        return 6
+    if payload.get("error_code") in {"invalid_request", "unknown_operation"}:
+        return 2
+    if payload.get("error_code") in {"not_configured", "transport_unavailable"}:
+        return 3
+    if payload.get("state") == "failed" or result_code == 4:
+        return 4
+    return 0
+
+
+def print_result(payload: dict[str, Any], as_json: bool) -> None:
+    if as_json:
+        print(json.dumps(payload, separators=(",", ":"), sort_keys=True))
+        return
+    state = str(payload.get("state", "unknown")).capitalize()
+    operation_id = payload.get("operation_id")
+    target = payload.get("target") or "all documents"
+    detail = payload.get("message")
+    line = f"{state}: {target}"
+    if operation_id:
+        line += f" ({operation_id})"
+    if detail:
+        line += f" — {detail}"
+    print(line)
+    for timing in payload.get("timings") or []:
+        print(f"  {timing}")
+
+
+def parser() -> argparse.ArgumentParser:
+    root = argparse.ArgumentParser(description=__doc__)
+    root.add_argument("--serial", help="ADB device serial; defaults to ANDROID_SERIAL or the only connected device")
+    subcommands = root.add_subparsers(dest="command", required=True)
+
+    sync = subcommands.add_parser("sync", help="queue a full or targeted Thoughts synchronization")
+    sync.add_argument("--target", help="exact Library PDF filename; omit for all documents")
+    add_observation_options(sync)
+
+    operation_status = subcommands.add_parser("status", help="read a durable Thoughts sync operation")
+    operation_status.add_argument("operation_id")
+    add_observation_options(operation_status)
+    return root
+
+
+def add_observation_options(command: argparse.ArgumentParser) -> None:
+    command.add_argument("--wait", action="store_true", help="wait for terminal success or failure")
+    command.add_argument(
+        "--timeout",
+        type=float,
+        default=DEFAULT_TIMEOUT_SECONDS,
+        metavar="SECONDS",
+        help=f"wait timeout; default {DEFAULT_TIMEOUT_SECONDS}",
+    )
+    command.add_argument("--json", action="store_true", help="write one machine-readable JSON result")
+
+
+def main(argv: list[str] | None = None) -> int:
+    args = parser().parse_args(argv)
+    if args.timeout <= 0:
+        print("error: --timeout must be positive", file=sys.stderr)
+        return 2
+    try:
+        adb = adb_path()
+        serial = connected_serial(adb, args.serial)
+        if args.command == "sync":
+            extras = {"target": args.target} if args.target else None
+            result_code, payload = broadcast(adb, serial, ACTION_SYNC_NOW, extras)
+        else:
+            result_code, payload = status(adb, serial, args.operation_id)
+        if args.wait and payload.get("accepted") and not payload.get("terminal"):
+            result_code, payload = wait_for_terminal(
+                adb,
+                serial,
+                payload,
+                args.timeout,
+            )
+        print_result(payload, args.json)
+        return exit_code(result_code, payload)
+    except (CommandError, OSError, subprocess.SubprocessError) as error:
+        print(f"error: {error}", file=sys.stderr)
+        return 3
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Written for Thoughts. License is GPLv3. -->
+<!-- History in the reader menu: the document's versions and the comments made on each. -->
+<resources>
+    <string name="document_history" translatable="false">History</string>
+    <string name="document_history_current" translatable="false">Current version</string>
+    <string name="document_history_earlier" translatable="false">Earlier version · %1$s</string>
+    <string name="document_history_earlier_undated" translatable="false">Earlier version</string>
+    <string name="document_history_open" translatable="false">tap to open</string>
+    <string name="document_history_open_here" translatable="false"> · open here</string>
+    <string name="document_history_card_feedback" translatable="false">Card answer feedback</string>
+    <string name="document_history_empty" translatable="false">No comments on this document yet: the current version is the only one here.</string>
+    <string name="document_history_unavailable" translatable="false">History is kept for Library documents.</string>
+    <string name="document_history_downloading" translatable="false">Getting that version…</string>
+    <string name="document_history_download_failed" translatable="false">Could not get that version: %1$s</string>
+    <string name="document_history_file" translatable="false">%1$s (version of %2$s)</string>
+    <plurals name="document_history_comments">
+        <item quantity="one">%d comment</item>
+        <item quantity="other">%d comments</item>
+    </plurals>
+</resources>

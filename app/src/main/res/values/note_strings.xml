@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Written for Thoughts. License is GPLv3. -->
+<resources>
+    <string name="note_type">To-do</string>
+    <string name="note_type_plural">To-dos</string>
+    <string name="note_add">Add to-do</string>
+    <string name="note_edit">Edit to-do</string>
+    <string name="note_quick">New to-do</string>
+    <string name="quick_note_hint">Write a to-do…</string>
+    <string name="note_saved">Saved in Thoughts</string>
+    <string name="note_saving">Saving…</string>
+    <string name="quick_note_failed">Could not save the to-do. Your draft is kept on this phone.</string>
+    <string name="note_text_only">Write a to-do, then add details if needed.</string>
+    <string name="note_done">Done</string>
+    <string name="note_draft_only">Not added to your to-dos until you tap Done</string>
+    <string name="note_leave_draft">Back to To-dos</string>
+    <string name="note_discard_draft">Discard draft</string>
+    <string name="note_discard_question">Discard this unfinished to-do?</string>
+    <string name="note_keep_editing">Keep editing</string>
+    <string name="comment_editor_discard_question">Discard your changes?</string>
+    <string name="note_resume_draft">Resume draft</string>
+    <string name="note_untitled_draft">Unfinished to-do</string>
+</resources>

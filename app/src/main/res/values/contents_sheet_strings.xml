@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Written for Thoughts. License is GPLv3. -->
+<resources>
+    <string name="contents_sheet_title">Contents</string>
+    <string name="contents_current_section">Current section</string>
+    <string name="contents_search_headings">Search headings…</string>
+    <string name="contents_current_page">Page %1$d · You are here</string>
+    <string name="contents_expand_heading">Expand %1$s</string>
+    <string name="contents_collapse_heading">Collapse %1$s</string>
+    <string name="contents_expand_panel">Expand contents panel</string>
+    <string name="contents_collapse_panel">Collapse contents panel</string>
+    <string name="contents_load_failed">Could not load the contents. Close this panel and try again.</string>
+    <string name="contents_no_matches">No matching headings</string>
+    <string name="contents_expand_all">Expand all</string>
+    <string name="contents_collapse_all">Collapse all</string>
+    <string name="contents_options">Contents options</string>
+</resources>

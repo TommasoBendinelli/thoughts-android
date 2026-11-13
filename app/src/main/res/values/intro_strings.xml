@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Written for Thoughts. License is GPLv3. -->
+<resources>
+    <string name="intro_thoughts_welcome_tagline">Read, comment on and edit your own writing</string>
+    <string name="intro_thoughts_welcome_private">Your documents stay on your devices and your own server</string>
+    <string name="intro_thoughts_library_title">Your projects in one place</string>
+    <string name="intro_thoughts_library_tagline">PDFs built from your LaTeX and Markdown sources</string>
+    <string name="intro_thoughts_library_source">Open any passage in its source and edit it</string>
+    <string name="intro_thoughts_library_search">Search every document and comment</string>
+    <string name="intro_thoughts_comments_title">Think with your documents</string>
+    <string name="intro_thoughts_comments_tagline">Comment on a passage. The comment follows the text when the source changes.</string>
+    <string name="intro_thoughts_comments_notes">Quick notes and voice notes</string>
+    <string name="intro_thoughts_comments_review">Review cards with spaced repetition</string>
+    <string name="intro_thoughts_comments_proposals">Accept or reject proposed edits</string>
+    <string name="intro_thoughts_sync_title">Sync when you choose</string>
+    <string name="intro_thoughts_sync_tagline">One Sync sends your changes and brings back the rebuilt PDFs</string>
+    <string name="intro_thoughts_sync_offline">Works offline. Changes wait until you sync.</string>
+    <string name="intro_thoughts_sync_server">Connect your Thoughts server in Settings</string>
+    <string name="whats_new_thoughts_intro">Here is what changed recently.</string>
+    <string name="whats_new_thoughts_section_sync">Sync</string>
+    <string name="whats_new_thoughts_rebuild_title">Only edited documents rebuild</string>
+    <string name="whats_new_thoughts_rebuild_body">Editing one document of a project rebuilds that document, not the whole project.</string>
+    <string name="whats_new_thoughts_large_sync_title">Faster large syncs</string>
+    <string name="whats_new_thoughts_large_sync_body">A first Sync of a large Library takes about an eighth of the time it did.</string>
+    <string name="whats_new_thoughts_synced_edits_title">Synced edits appear by themselves</string>
+    <string name="whats_new_thoughts_synced_edits_body">The reader and the source editor reload when a synced edit arrives.</string>
+    <string name="whats_new_thoughts_section_diary">Diary</string>
+    <string name="whats_new_thoughts_diary_title">A Diary instead of the Comments tab</string>
+    <string name="whats_new_thoughts_diary_body">Type a thought at the top of the Diary and press Enter. It is saved with the exact date and time and syncs like a to-do. Comments with issues still open from the Sync dialog.</string>
+    <string name="whats_new_thoughts_section_comments">Comments</string>
+    <string name="whats_new_thoughts_comment_load_title">Comments open faster</string>
+    <string name="whats_new_thoughts_comment_load_body">A document\'s comments load about three times faster.</string>
+    <string name="whats_new_thoughts_section_review">Review</string>
+    <string name="whats_new_thoughts_tags_title">Tags instead of grades</string>
+    <string name="whats_new_thoughts_tags_body">Tag review cards instead of marking them correct or wrong.</string>
+    <string name="whats_new_thoughts_areas_title">Several areas per card</string>
+    <string name="whats_new_thoughts_areas_body">A review card can cover several separate areas of a page.</string>
+</resources>

@@ -1,0 +1,16 @@
+<!-- Written for Thoughts. License is GPLv3. -->
+<resources>
+    <string name="global_search_hint">Search everything</string>
+    <string name="global_search_empty">Search document names, PDF text, review cards, comments, to-dos and the diary.</string>
+    <string name="global_search_no_results">Nothing found</string>
+    <string name="global_search_indexing">Reading PDF text: %1$d of %2$d documents…</string>
+    <string name="global_search_documents">Documents (%1$d)</string>
+    <string name="global_search_pages">Text in %1$d documents</string>
+    <string name="global_search_page">Page %1$d</string>
+    <string name="global_search_more_pages">%1$d pages match</string>
+    <string name="global_search_cards">Review cards (%1$d)</string>
+    <string name="global_search_untitled_card">Card without a question</string>
+    <string name="global_search_comments">Comments (%1$d)</string>
+    <string name="global_search_todos">To-dos (%1$d)</string>
+    <string name="global_search_diary">Diary (%1$d)</string>
+</resources>

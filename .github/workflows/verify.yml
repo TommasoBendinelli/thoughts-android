@@ -1,0 +1,165 @@
+# Written for Thoughts. License is GPLv3.
+
+name: Verify phone workflow
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: verify-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  mac-tools:
+    name: Mac tool tests
+    runs-on: ubuntu-latest
+    steps:
+      # Actions are pinned to a commit: a tag can be moved to other code, a commit cannot.
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
+        with:
+          python-version: "3.13"
+      - name: Install tool test dependencies
+        # The source bundle publisher tests build small PDFs with pypdf.
+        run: python3 -m pip install pypdf==6.7.1
+      - name: Test phone workflow tools
+        run: python3 -m unittest discover -s tools/tests -p 'test_*.py'
+
+  android:
+    name: Android tests and APK
+    runs-on: ubuntu-latest
+    env:
+      # Repository variable: the SHA-256 of the debug certificate installed builds carry (lower-case hex,
+      # no colons). Without it the signature checks and the APK upload are skipped.
+      EXPECTED_CERT_SHA256: ${{ vars.EXPECTED_DEBUG_CERT_SHA256 }}
+      EXPECTED_PACKAGE: org.tbend.thoughts
+      EXPECTED_VERSION_NAME: 3.0.0
+      EXPECTED_VERSION_CODE: "57"
+      NDK_VERSION: 27.1.12297006
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          # No later step pushes or fetches: the token does not stay in .git/config.
+          persist-credentials: false
+      - name: Require the thoughts-server repository
+        env:
+          THOUGHTS_SERVER_REPOSITORY: ${{ vars.THOUGHTS_SERVER_REPOSITORY }}
+        run: |
+          if [ -z "$THOUGHTS_SERVER_REPOSITORY" ]; then
+            echo "::error::The app builds against thoughts-server/sdk/kotlin. Set the repository variable THOUGHTS_SERVER_REPOSITORY (owner/name); for a private repository also add a read-only deploy key as the THOUGHTS_SERVER_DEPLOY_KEY secret."
+            exit 1
+          fi
+      - name: Check out the Thoughts Kotlin client
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          repository: ${{ vars.THOUGHTS_SERVER_REPOSITORY }}
+          ssh-key: ${{ secrets.THOUGHTS_SERVER_DEPLOY_KEY }}
+          path: thoughts-server-checkout
+          sparse-checkout: sdk/kotlin
+          persist-credentials: false
+      - name: Place thoughts-server beside the app, as settings.gradle expects
+        run: ln -s "$GITHUB_WORKSPACE/thoughts-server-checkout" "$GITHUB_WORKSPACE/../thoughts-server"
+      # Still on a tag: pin to the commit of the v5 release in use (git ls-remote https://github.com/actions/setup-java).
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "17"
+          cache: gradle
+      - name: Install Android SDK components
+        run: |
+          sdkmanager="$ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager"
+          test -x "$sdkmanager"
+          yes | "$sdkmanager" --licenses >/dev/null || true
+          "$sdkmanager" "platforms;android-36" "build-tools;36.0.0" "ndk;$NDK_VERSION"
+      - name: Create local build properties
+        run: |
+          {
+            printf 'sdk.dir=%s\n' "$ANDROID_SDK_ROOT"
+            printf 'AI=\nAK=\nAU=\n'
+          } > local.properties
+      - name: Restore update-compatible debug signing identity
+        id: signing
+        env:
+          ANDROID_DEBUG_KEYSTORE_BASE64: ${{ secrets.ANDROID_DEBUG_KEYSTORE_BASE64 }}
+          ANDROID_DEBUG_STORE_PASSWORD: ${{ secrets.ANDROID_DEBUG_STORE_PASSWORD }}
+          ANDROID_DEBUG_KEY_ALIAS: ${{ secrets.ANDROID_DEBUG_KEY_ALIAS }}
+        run: |
+          # Without the secrets the tests and build still run; only the
+          # update-compatible signature checks and the APK upload are skipped.
+          if [ -z "$EXPECTED_CERT_SHA256" ] || [ -z "$ANDROID_DEBUG_KEYSTORE_BASE64" ] || [ -z "$ANDROID_DEBUG_STORE_PASSWORD" ] || [ -z "$ANDROID_DEBUG_KEY_ALIAS" ]; then
+            echo "::notice::Debug signing secrets or EXPECTED_DEBUG_CERT_SHA256 are not configured; skipping signature checks and APK upload."
+            echo "available=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          mkdir -p "$HOME/.android"
+          printf '%s' "$ANDROID_DEBUG_KEYSTORE_BASE64" | base64 --decode > "$HOME/.android/debug.keystore"
+          actual="$(keytool -list -v -keystore "$HOME/.android/debug.keystore" -storepass "$ANDROID_DEBUG_STORE_PASSWORD" -alias "$ANDROID_DEBUG_KEY_ALIAS" | sed -n 's/.*SHA256: //p' | tr -d ':' | tr '[:upper:]' '[:lower:]')"
+          if [ "$actual" != "$EXPECTED_CERT_SHA256" ]; then
+            echo "::error::The restored debug keystore has certificate $actual, expected $EXPECTED_CERT_SHA256."
+            exit 1
+          fi
+          # The Android Gradle plugin signs debug builds with the debug.keystore in
+          # ANDROID_USER_HOME, and silently creates a new one if it finds none there.
+          # Point it at the restored keystore so the APK keeps the installed app's signature.
+          echo "ANDROID_USER_HOME=$HOME/.android" >> "$GITHUB_ENV"
+          echo "available=true" >> "$GITHUB_OUTPUT"
+      - name: Install patched PDFium and build the JNI bridge
+        # PDFium itself is committed prebuilt (PdfiumAndroid/prebuilt); only the bridge is compiled.
+        run: python3 build_dependencies/install_patched_libs.py
+      - name: Test and build debug APK
+        run: ./gradlew :AndroidPdfViewer:android-pdf-viewer:testDebugUnitTest :app:testSandboxUnitTest :app:assembleDebug :NoteShortcut:assembleDebug --no-daemon --console=plain
+      - name: Validate APK identity and contents
+        env:
+          SIGNING_AVAILABLE: ${{ steps.signing.outputs.available }}
+        run: |
+          apk=app/build/outputs/apk/debug/app-debug.apk
+          shortcut_apk=NoteShortcut/build/outputs/apk/debug/NoteShortcut-debug.apk
+          aapt="$ANDROID_SDK_ROOT/build-tools/36.0.0/aapt"
+          apksigner="$ANDROID_SDK_ROOT/build-tools/36.0.0/apksigner"
+          fail() { echo "::error::$1"; exit 1; }
+          [ -s "$apk" ] || fail "$apk was not built."
+          [ -s "$shortcut_apk" ] || fail "$shortcut_apk was not built."
+          [ -x "$aapt" ] || fail "aapt is missing at $aapt."
+          [ -x "$apksigner" ] || fail "apksigner is missing at $apksigner."
+          badging="$("$aapt" dump badging "$apk" | head -n 1)"
+          echo "$badging"
+          grep -qF "name='$EXPECTED_PACKAGE'" <<<"$badging" || fail "The APK package is not $EXPECTED_PACKAGE."
+          grep -qF "versionCode='$EXPECTED_VERSION_CODE'" <<<"$badging" || fail "The APK versionCode is not $EXPECTED_VERSION_CODE."
+          grep -qF "versionName='$EXPECTED_VERSION_NAME'" <<<"$badging" || fail "The APK versionName is not $EXPECTED_VERSION_NAME."
+          shortcut_badging="$("$aapt" dump badging "$shortcut_apk" | head -n 1)"
+          echo "$shortcut_badging"
+          grep -qF "name='org.tbend.thoughts.shortcut'" <<<"$shortcut_badging" || fail "The shortcut APK package is not org.tbend.thoughts.shortcut."
+          if [ "$SIGNING_AVAILABLE" = "true" ]; then
+            for signed in "$apk" "$shortcut_apk"; do
+              cert="$("$apksigner" verify --print-certs "$signed" 2>/dev/null | sed -n 's/Signer #1 certificate SHA-256 digest: //p')" || fail "apksigner could not verify $signed."
+              [ "$cert" = "$EXPECTED_CERT_SHA256" ] || fail "$signed is signed with certificate '$cert', expected $EXPECTED_CERT_SHA256 (the installed app's debug key)."
+            done
+          fi
+          contents="$(unzip -l "$apk")"
+          for abi in arm64-v8a armeabi-v7a x86 x86_64; do
+            for library in libmodpdfium.so libjniPdfium.so; do
+              grep -qF "lib/$abi/$library" <<<"$contents" || fail "The APK lacks lib/$abi/$library."
+            done
+          done
+          echo "Package, version, signature and native libraries verified."
+          sha256sum "$apk" > app/build/outputs/apk/debug/app-debug.apk.sha256
+          sha256sum "$shortcut_apk" > NoteShortcut/build/outputs/apk/debug/NoteShortcut-debug.apk.sha256
+      - name: Upload private debug APK
+        if: steps.signing.outputs.available == 'true'
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: mj-pdf-phone-debug-${{ github.sha }}
+          path: |
+            app/build/outputs/apk/debug/app-debug.apk
+            app/build/outputs/apk/debug/app-debug.apk.sha256
+            NoteShortcut/build/outputs/apk/debug/NoteShortcut-debug.apk
+            NoteShortcut/build/outputs/apk/debug/NoteShortcut-debug.apk.sha256
+          if-no-files-found: error
+          retention-days: 30

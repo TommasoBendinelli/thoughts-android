@@ -1,0 +1,330 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Written for Thoughts. License is GPLv3. -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="?android:attr/colorBackground"
+    android:orientation="vertical">
+
+    <com.google.android.material.appbar.MaterialToolbar
+        android:id="@+id/agentNoteToolbar"
+        android:layout_width="match_parent"
+        android:layout_height="?attr/actionBarSize"
+        app:titleTextAppearance="?attr/textAppearanceTitleMedium" />
+
+    <!-- The reader's open-document tabs: this notes window is one of them, so the PDFs are one tap away. -->
+    <com.google.android.material.tabs.TabLayout
+        android:id="@+id/agentNoteTabs"
+        android:layout_width="match_parent"
+        android:layout_height="40dp"
+        android:background="?attr/colorSurfaceContainerHigh"
+        android:contentDescription="@string/open_document_tabs"
+        android:visibility="gone"
+        app:tabGravity="start"
+        app:tabIndicatorColor="?attr/colorPrimary"
+        app:tabIndicatorFullWidth="false"
+        app:tabIndicatorHeight="2dp"
+        app:tabMaxWidth="180dp"
+        app:tabMinWidth="72dp"
+        app:tabMode="scrollable"
+        app:tabPaddingEnd="12dp"
+        app:tabPaddingStart="12dp"
+        app:tabRippleColor="?attr/colorSurfaceVariant"
+        app:tabSelectedTextColor="?attr/colorOnSurface"
+        app:tabTextAppearance="@style/TextAppearance.Material3.LabelLarge"
+        app:tabTextColor="?attr/colorOnSurfaceVariant" />
+
+    <!-- The note's message: one line while collapsed, all of it while expanded; a tap on it or on the
+         chevron switches, and the choice holds for the next notes, so the picture keeps the room. -->
+    <LinearLayout
+        android:id="@+id/agentNoteMessageRow"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:background="?attr/selectableItemBackground"
+        android:gravity="top"
+        android:orientation="horizontal"
+        android:paddingStart="16dp"
+        android:paddingEnd="4dp"
+        android:visibility="gone">
+
+        <TextView
+            android:id="@+id/agentNoteMessage"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:ellipsize="end"
+            android:maxLines="1"
+            android:paddingTop="2dp"
+            android:paddingBottom="6dp"
+            android:textAppearance="?attr/textAppearanceBodyMedium"
+            android:textColor="?attr/colorOnSurface" />
+
+        <!-- Invisible (never gone) when the message fits on one line, so the text width never changes. -->
+        <ImageView
+            android:id="@+id/agentNoteMessageToggle"
+            android:layout_width="24dp"
+            android:layout_height="24dp"
+            android:layout_marginStart="4dp"
+            android:importantForAccessibility="no"
+            android:src="@drawable/ic_small_arrow_down"
+            app:tint="?attr/colorOnSurfaceVariant" />
+    </LinearLayout>
+
+    <FrameLayout
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:background="#FFE6E6E6">
+
+        <com.gitlab.mudlej.MjPdfReader.ui.agentnotes.AnnotationCanvasView
+            android:id="@+id/agentNoteCanvas"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:contentDescription="@string/agent_note_canvas_description" />
+
+        <ProgressBar
+            android:id="@+id/agentNoteProgress"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center" />
+
+        <TextView
+            android:id="@+id/agentNoteStatus"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center"
+            android:gravity="center"
+            android:padding="24dp"
+            android:textAppearance="?attr/textAppearanceBodyLarge"
+            android:visibility="gone" />
+    </FrameLayout>
+
+    <!-- While no agent listens for a reply to this note (protocol "Who hears a reply"): the reply would
+         be stored, but nobody acts on it. Open conversation continues the conversation that sent it. -->
+    <LinearLayout
+        android:id="@+id/agentNoteNotListening"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:background="?attr/colorErrorContainer"
+        android:gravity="center_vertical"
+        android:minHeight="48dp"
+        android:orientation="horizontal"
+        android:paddingStart="16dp"
+        android:paddingEnd="4dp"
+        android:visibility="gone">
+
+        <TextView
+            android:id="@+id/agentNoteNotListeningText"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:paddingVertical="8dp"
+            android:text="@string/agent_note_not_listening"
+            android:textAppearance="?attr/textAppearanceBodyMedium"
+            android:textColor="?attr/colorOnErrorContainer" />
+
+        <Button
+            android:id="@+id/agentNoteOpenConversation"
+            style="@style/Widget.Material3.Button.TextButton"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/proposal_open_conversation"
+            android:textColor="?attr/colorOnErrorContainer"
+            android:visibility="gone" />
+    </LinearLayout>
+
+    <LinearLayout
+        android:id="@+id/agentNoteTools"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:paddingHorizontal="8dp"
+        android:paddingVertical="4dp">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:gravity="center_vertical"
+            android:orientation="horizontal">
+
+            <!-- The comment for the agent is typed here, under the note, so scrolling, drawing and
+                 numbering stay possible while it is open. It grows to four lines, then scrolls. -->
+            <com.google.android.material.textfield.TextInputLayout
+                android:id="@+id/agentNoteCommentLayout"
+                style="@style/Widget.Material3.TextInputLayout.OutlinedBox.Dense"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="4dp"
+                android:layout_marginEnd="4dp"
+                android:layout_weight="1"
+                app:hintEnabled="false">
+
+                <com.google.android.material.textfield.TextInputEditText
+                    android:id="@+id/agentNoteCommentField"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:gravity="top|start"
+                    android:hint="@string/agent_note_comment_hint"
+                    android:importantForAutofill="no"
+                    android:inputType="textMultiLine|textCapSentences"
+                    android:maxLength="4000"
+                    android:maxLines="4"
+                    android:minLines="1"
+                    android:scrollbars="vertical"
+                    android:textAppearance="?attr/textAppearanceBodyMedium" />
+            </com.google.android.material.textfield.TextInputLayout>
+
+            <ImageButton
+                android:id="@+id/agentNoteUndo"
+                android:layout_width="48dp"
+                android:layout_height="48dp"
+                android:background="?attr/selectableItemBackgroundBorderless"
+                android:contentDescription="@string/agent_note_undo"
+                android:src="@drawable/ic_undo"
+                app:tint="?attr/colorOnSurface" />
+
+            <ImageButton
+                android:id="@+id/agentNoteRedo"
+                android:layout_width="48dp"
+                android:layout_height="48dp"
+                android:background="?attr/selectableItemBackgroundBorderless"
+                android:contentDescription="@string/agent_note_redo"
+                android:src="@drawable/ic_redo"
+                app:tint="?attr/colorOnSurface" />
+
+            <!-- Send with picture: a photo from the glasses goes with the comment and drawing, so the
+                 agent that sent the note gets the words and the picture together. -->
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/agentNoteSendWithPicture"
+                style="@style/Widget.Material3.Button.Icon"
+                android:layout_width="48dp"
+                android:layout_height="48dp"
+                android:layout_marginStart="4dp"
+                android:insetTop="0dp"
+                android:insetBottom="0dp"
+                android:minWidth="0dp"
+                android:paddingStart="0dp"
+                android:paddingEnd="0dp"
+                android:backgroundTint="@color/agent_note_send_background"
+                android:contentDescription="@string/agent_note_send_with_picture"
+                android:tooltipText="@string/agent_note_send_with_picture"
+                android:visibility="gone"
+                app:backgroundTint="@color/agent_note_send_background"
+                app:icon="@drawable/ic_photo_camera"
+                app:iconGravity="textStart"
+                app:iconPadding="0dp"
+                app:iconSize="22dp"
+                app:iconTint="@android:color/white"
+                app:strokeWidth="0dp" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:gravity="center_vertical"
+            android:orientation="horizontal">
+
+            <com.google.android.material.button.MaterialButtonToggleGroup
+                android:id="@+id/agentNoteToolGroup"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                app:selectionRequired="true"
+                app:singleSelection="true">
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/agentNoteScroll"
+                    style="@style/Widget.Material3.Button.OutlinedButton.Icon"
+                    android:layout_width="48dp"
+                    android:layout_height="wrap_content"
+                    android:minWidth="0dp"
+                    android:paddingStart="0dp"
+                    android:paddingEnd="0dp"
+                    android:contentDescription="@string/agent_note_scroll"
+                    app:icon="@drawable/ic_pan_tool"
+                    app:iconGravity="textStart"
+                    app:iconPadding="0dp" />
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/agentNotePen"
+                    style="@style/Widget.Material3.Button.OutlinedButton.Icon"
+                    android:layout_width="48dp"
+                    android:layout_height="wrap_content"
+                    android:minWidth="0dp"
+                    android:paddingStart="0dp"
+                    android:paddingEnd="0dp"
+                    android:contentDescription="@string/agent_note_pen"
+                    app:icon="@drawable/ic_edit"
+                    app:iconGravity="textStart"
+                    app:iconPadding="0dp" />
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/agentNoteHighlighter"
+                    style="@style/Widget.Material3.Button.OutlinedButton.Icon"
+                    android:layout_width="48dp"
+                    android:layout_height="wrap_content"
+                    android:minWidth="0dp"
+                    android:paddingStart="0dp"
+                    android:paddingEnd="0dp"
+                    android:contentDescription="@string/agent_note_highlighter"
+                    app:icon="@drawable/ic_highlight"
+                    app:iconGravity="textStart"
+                    app:iconPadding="0dp" />
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/agentNoteEraser"
+                    style="@style/Widget.Material3.Button.OutlinedButton.Icon"
+                    android:layout_width="48dp"
+                    android:layout_height="wrap_content"
+                    android:minWidth="0dp"
+                    android:paddingStart="0dp"
+                    android:paddingEnd="0dp"
+                    android:contentDescription="@string/agent_note_eraser"
+                    app:icon="@drawable/ic_eraser"
+                    app:iconGravity="textStart"
+                    app:iconPadding="0dp" />
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/agentNoteNumber"
+                    style="@style/Widget.Material3.Button.OutlinedButton.Icon"
+                    android:layout_width="48dp"
+                    android:layout_height="wrap_content"
+                    android:minWidth="0dp"
+                    android:paddingStart="0dp"
+                    android:paddingEnd="0dp"
+                    android:contentDescription="@string/agent_note_number"
+                    app:icon="@drawable/ic_numbered_marker"
+                    app:iconGravity="textStart"
+                    app:iconPadding="0dp" />
+            </com.google.android.material.button.MaterialButtonToggleGroup>
+
+            <Space
+                android:layout_width="0dp"
+                android:layout_height="0dp"
+                android:layout_weight="1" />
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/agentNoteSend"
+                style="@style/Widget.Material3.Button.Icon"
+                android:layout_width="wrap_content"
+                android:layout_height="48dp"
+                android:layout_marginStart="8dp"
+                android:insetTop="0dp"
+                android:insetBottom="0dp"
+                android:minWidth="96dp"
+                android:paddingStart="16dp"
+                android:paddingEnd="20dp"
+                android:backgroundTint="@color/agent_note_send_background"
+                android:text="@string/agent_note_send"
+                android:textColor="@android:color/white"
+                android:textSize="16sp"
+                android:textStyle="bold"
+                app:backgroundTint="@color/agent_note_send_background"
+                app:icon="@drawable/ic_send"
+                app:iconPadding="8dp"
+                app:iconSize="20dp"
+                app:iconTint="@android:color/white"
+                app:strokeWidth="0dp" />
+        </LinearLayout>
+    </LinearLayout>
+</LinearLayout>

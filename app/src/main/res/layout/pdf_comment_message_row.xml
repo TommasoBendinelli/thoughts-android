@@ -1,0 +1,96 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Written for MJ PDF. License is GPLv3. -->
+<androidx.constraintlayout.widget.ConstraintLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:paddingTop="8dp"
+    android:paddingBottom="10dp">
+
+    <TextView
+        android:id="@+id/commentAuthorAvatar"
+        android:layout_width="40dp"
+        android:layout_height="40dp"
+        android:gravity="center"
+        android:textColor="@android:color/white"
+        android:textSize="17sp"
+        android:textStyle="bold"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent"
+        tools:text="TB" />
+
+    <TextView
+        android:id="@+id/commentAuthorText"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:ellipsize="middle"
+        android:maxLines="1"
+        android:textAppearance="?attr/textAppearanceTitleMedium"
+        android:textColor="@color/comment_sheet_on_background"
+        android:textStyle="bold"
+        app:layout_constraintEnd_toStartOf="@id/commentOverflowButton"
+        app:layout_constraintStart_toEndOf="@id/commentAuthorAvatar"
+        app:layout_constraintTop_toTopOf="@id/commentAuthorAvatar"
+        android:layout_marginStart="12dp"
+        tools:text="Alex Example" />
+
+    <TextView
+        android:id="@+id/commentDateText"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:textAppearance="?attr/textAppearanceBodyMedium"
+        android:textColor="@color/comment_sheet_on_background_muted"
+        app:layout_constraintEnd_toStartOf="@id/commentOverflowButton"
+        app:layout_constraintStart_toStartOf="@id/commentAuthorText"
+        app:layout_constraintTop_toBottomOf="@id/commentAuthorText"
+        tools:text="Yesterday" />
+
+    <ImageButton
+        android:id="@+id/commentOverflowButton"
+        android:layout_width="48dp"
+        android:layout_height="48dp"
+        android:background="?attr/selectableItemBackgroundBorderless"
+        android:contentDescription="@string/more_options"
+        android:padding="12dp"
+        android:src="@drawable/ic_more_vert"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintTop_toTopOf="parent"
+        app:tint="@color/comment_sheet_on_background" />
+
+    <TextView
+        android:id="@+id/commentBodyText"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="6dp"
+        android:lineSpacingExtra="3dp"
+        android:textAppearance="?attr/textAppearanceBodyLarge"
+        android:textColor="@color/comment_sheet_on_background"
+        android:textIsSelectable="true"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="@id/commentAuthorText"
+        app:layout_constraintTop_toBottomOf="@id/commentDateText"
+        tools:text="[1] should go to the pdf" />
+
+    <com.google.android.material.button.MaterialButton
+        android:id="@+id/commentOpenChatGpt"
+        style="@style/Widget.Material3.Button.TextButton"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="4dp"
+        android:text="@string/open_chatgpt"
+        android:visibility="gone"
+        app:layout_constraintStart_toStartOf="@id/commentAuthorText"
+        app:layout_constraintTop_toBottomOf="@id/commentBodyText" />
+
+    <View
+        android:id="@+id/commentDivider"
+        android:layout_width="0dp"
+        android:layout_height="1dp"
+        android:layout_marginTop="10dp"
+        android:background="@color/comment_sheet_divider"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="@id/commentAuthorText"
+        app:layout_constraintTop_toBottomOf="@id/commentOpenChatGpt" />
+</androidx.constraintlayout.widget.ConstraintLayout>

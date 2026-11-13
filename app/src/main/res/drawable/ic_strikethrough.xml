@@ -1,0 +1,4 @@
+<!-- Written for Thoughts. License is GPLv3. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android" android:width="24dp" android:height="24dp" android:viewportWidth="24" android:viewportHeight="24">
+    <path android:fillColor="#FF000000" android:pathData="M4,11h16v2H4zM7,4h10v2h-4v4h-2V6H7zM11,14h2v6h-2z" />
+</vector>

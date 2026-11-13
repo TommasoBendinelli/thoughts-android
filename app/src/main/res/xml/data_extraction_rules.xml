@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Written for Thoughts. License is GPLv3. -->
+<data-extraction-rules>
+    <cloud-backup>
+        <exclude domain="file" path="verified-source-pdfs/" />
+        <exclude domain="sharedpref" path="read_aloud_voice.xml" />
+        <exclude domain="sharedpref" path="agent_notes_device.xml" />
+    </cloud-backup>
+    <device-transfer>
+        <exclude domain="file" path="verified-source-pdfs/" />
+        <exclude domain="sharedpref" path="read_aloud_voice.xml" />
+        <exclude domain="sharedpref" path="agent_notes_device.xml" />
+    </device-transfer>
+</data-extraction-rules>

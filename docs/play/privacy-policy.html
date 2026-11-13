@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Thoughts for Android — Privacy Policy</title>
+<style>
+  :root { --fg: #1b1b1f; --bg: #fbfbfe; --muted: #55565c; --accent: #3b5ba9; }
+  @media (prefers-color-scheme: dark) { :root { --fg: #e4e2e6; --bg: #121316; --muted: #a9a9b0; --accent: #a9c1ff; } }
+  body { font: 16px/1.55 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; color: var(--fg); background: var(--bg);
+         max-width: 46rem; margin: 0 auto; padding: 2rem 1rem 4rem; }
+  h1 { font-size: 1.6rem; margin-bottom: .2rem; } h2 { font-size: 1.15rem; margin-top: 2rem; }
+  .meta { color: var(--muted); margin-top: 0; } a { color: var(--accent); } li { margin: .3rem 0; }
+</style>
+</head>
+<body>
+<h1>Thoughts for Android — Privacy Policy</h1>
+<!-- Template: replace [PUBLISHER], [EFFECTIVE DATE] and [CONTACT EMAIL] before publishing it for a store listing. -->
+<p class="meta">App: Thoughts (package <code>org.tbend.thoughts</code>), published by [PUBLISHER]. Effective [EFFECTIVE DATE].</p>
+
+<p>Thoughts is a PDF reader and note-taking app that synchronizes with a <strong>Thoughts server that you run or
+choose yourself</strong>. The developer does not operate a service for the app and does not receive your data.
+There are no ads, no analytics and no tracking in the app.</p>
+
+<h2>1. Data stored on your phone</h2>
+<p>Documents you open or import, your comments, highlights, notes and their attachments, review cards and review
+history, reading positions and app settings are stored in the app's private storage on your phone.
+Your Thoughts device token and, if you add one, your OpenRouter key are stored encrypted with a key held in the
+Android Keystore.</p>
+
+<h2>2. Data sent to your own Thoughts server</h2>
+<p>Only after you enter a server address and device token in <em>Settings → Synchronization</em>, and only when you
+start a Sync, the app exchanges data with that server over HTTPS. While a server is configured, the app also asks
+it about every 15 minutes for new "agent notes" (notes you send to the phone from your own computer) and sends your
+replies. The data exchanged is: documents and source files of your Library, your comments, highlights and notes (with the
+author name you set, any attachments you add and a place that a comment already has), review cards and review ratings, and
+changes you make to them. That server is operated by you (or by whoever gave you the device token); the developer has
+no access to it. To delete this data, delete it in the app and Sync, or delete it on your server.</p>
+
+<h2>3. Optional features that contact third parties</h2>
+<ul>
+  <li><strong>Read aloud with OpenRouter.</strong> If you add your own OpenRouter API key in Settings and use Read
+    aloud, the text being read is sent to OpenRouter (<a href="https://openrouter.ai/privacy">openrouter.ai/privacy</a>),
+    which forwards it to a text-to-speech model, under your own OpenRouter account. Without a key, Read aloud uses the
+    phone's built-in text-to-speech engine and nothing is sent.</li>
+  <li><strong>Importing papers.</strong> When you import a paper from a link, the app downloads it and its metadata
+    from the site you named (for example arXiv or OpenReview).</li>
+  <li><strong>Links you open.</strong> Translation, web search and other links you tap open in your browser or the
+    corresponding app, which then handle the request under their own policies.</li>
+</ul>
+
+<h2>4. Permissions</h2>
+<ul>
+  <li><strong>All files access</strong> (optional): to list and open the PDFs stored on your phone and save annotations
+    back into them. Files stay on your phone unless you add them to your Library and Sync.</li>
+  <li><strong>Notifications, foreground services, battery-optimization exemption, user-initiated jobs</strong>: to show
+    and finish a Sync you started, to keep Read aloud playing, and to serve an offline HTML attachment to your browser.</li>
+  <li><strong>Display over other apps</strong> (optional): only for the optional "Study mode", which opens a note sent to
+    you from your own computer.</li>
+</ul>
+
+<h2>5. Sharing, selling, children</h2>
+<p>The developer does not collect, sell or share your data. The app is not directed at children.</p>
+
+<h2>6. Backups</h2>
+<p>If Android backup is enabled on your phone, Android may include the app's data (except the OpenRouter key and
+verified source PDFs) in your Google backup, under your Google account's backup settings. The encrypted device token
+cannot be decrypted on another phone; you enter it again after a restore.</p>
+
+<h2>7. Source code</h2>
+<p>Thoughts is free software under the GNU General Public License v3, based on MJ PDF. Testers can request the
+complete corresponding source code at the address below.</p>
+
+<h2>8. Contact</h2>
+<p>Questions or requests: <a href="mailto:[CONTACT EMAIL]">[CONTACT EMAIL]</a>.
+Changes to this policy are published at this address with a new effective date.</p>
+</body>
+</html>

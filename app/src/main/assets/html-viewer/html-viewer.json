@@ -1,0 +1,19 @@
+{
+  "css": "viewer.css",
+  "files": {
+    "VERSION": "71015c979ccb0fc8a0be7ca0ae83046ab045cdc2c8faa09fb2f0f7e440f9b4a6",
+    "geometry.js": "8fa9f9a3153f87e2d7d617226ae230726f7730fcd492921188ecd24bfd4c571a",
+    "text.js": "b28e54c2b91203931b570b2ac77666406c13e6cb1d0f2f36b984f25b7f5332a8",
+    "viewer.css": "ff10fd8a29b3303b7f6f6af799b1284ca13954a054754054e5922a6fb96d9c70",
+    "viewer.js": "11f8b7b9870b7dd2e1eb427b388de8fc1f3a800d85ded4209a905901c2fa6459"
+  },
+  "inject": [
+    "geometry.js",
+    "text.js",
+    "viewer.js"
+  ],
+  "name": "thoughts-html-viewer",
+  "protocol": 1,
+  "source_commit": "c9176f1222ab10d34f630f34c95540e023ba93bd",
+  "version": "0.2.1"
+}

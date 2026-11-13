@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Written for MJ PDF. License is GPLv3. -->
+<selector xmlns:android="http://schemas.android.com/apk/res/android">
+    <item
+        android:color="@color/comment_sheet_on_background_muted"
+        android:state_enabled="true" />
+    <item android:color="@color/comment_sheet_on_background_muted" />
+</selector>

@@ -1,0 +1,102 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Written for Thoughts. License is GPLv3. -->
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent" android:layout_height="wrap_content">
+    <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
+        android:orientation="vertical" android:paddingHorizontal="24dp" android:paddingTop="20dp" android:paddingBottom="16dp">
+        <TextView android:layout_width="match_parent" android:layout_height="wrap_content"
+            android:text="@string/review_tags_title" android:textSize="22sp"
+            android:textColor="?attr/colorOnSurface" />
+        <!-- Review in two steps: the agent's recall prediction, while Recall is asked again. -->
+        <TextView android:id="@+id/reviewTagSheetAgent"
+            android:layout_width="match_parent" android:layout_height="wrap_content"
+            android:layout_marginTop="4dp"
+            android:textAppearance="?attr/textAppearanceBodySmall"
+            android:textColor="?attr/colorOnSurfaceVariant"
+            android:visibility="gone" />
+        <!-- Slider groups, always open, in record order. -->
+        <LinearLayout android:id="@+id/reviewTagScales"
+            android:layout_width="match_parent" android:layout_height="wrap_content"
+            android:layout_marginTop="4dp" android:orientation="vertical" />
+        <!-- One row per chip group (heading + chips), then Other. -->
+        <LinearLayout android:id="@+id/reviewTags"
+            android:layout_width="match_parent" android:layout_height="wrap_content"
+            android:layout_marginTop="4dp" android:orientation="vertical" />
+        <com.google.android.material.button.MaterialButton android:id="@+id/reviewNewTagGroup"
+            style="@style/Widget.Material3.Button.TextButton.Icon"
+            android:layout_width="wrap_content" android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:text="@string/review_tag_groups_new"
+            app:icon="@drawable/ic_library_add" />
+        <!-- The answer's one free-form note, always open, at the end of the sheet. -->
+        <TextView android:id="@+id/reviewAnswerNoteCaption"
+            android:layout_width="match_parent" android:layout_height="wrap_content"
+            android:layout_marginTop="12dp"
+            android:text="@string/review_answer_note"
+            android:textAppearance="?attr/textAppearanceLabelSmall"
+            android:textColor="?attr/colorOnSurfaceVariant" />
+        <com.google.android.material.textfield.TextInputLayout android:id="@+id/reviewAnswerNoteLayout"
+            style="@style/Widget.Material3.TextInputLayout.OutlinedBox.Dense"
+            android:layout_width="match_parent" android:layout_height="wrap_content"
+            android:layout_marginTop="4dp"
+            app:hintEnabled="false">
+            <com.google.android.material.textfield.TextInputEditText android:id="@+id/reviewAnswerNote"
+                android:layout_width="match_parent" android:layout_height="wrap_content"
+                android:gravity="top|start"
+                android:hint="@string/review_answer_note_hint"
+                android:inputType="textMultiLine|textCapSentences"
+                android:maxLength="500"
+                android:minLines="3" android:maxLines="6"
+                android:scrollbars="vertical" />
+        </com.google.android.material.textfield.TextInputLayout>
+        <!-- "About this…": one note on the card's section, page or document, shared by every card
+             of the document; the selector picks which, the label names it. -->
+        <LinearLayout android:id="@+id/reviewContextBlock"
+            android:layout_width="match_parent" android:layout_height="wrap_content"
+            android:orientation="vertical" android:visibility="gone">
+            <TextView android:id="@+id/reviewContextCaption"
+                android:layout_width="match_parent" android:layout_height="wrap_content"
+                android:layout_marginTop="16dp"
+                android:text="@string/review_context_title"
+                android:textAppearance="?attr/textAppearanceLabelSmall"
+                android:textColor="?attr/colorOnSurfaceVariant" />
+            <com.google.android.material.button.MaterialButtonToggleGroup android:id="@+id/reviewContextScopes"
+                android:layout_width="match_parent" android:layout_height="wrap_content"
+                android:layout_marginTop="4dp"
+                app:singleSelection="true" app:selectionRequired="true">
+                <com.google.android.material.button.MaterialButton android:id="@+id/reviewContextSection"
+                    style="?attr/materialButtonOutlinedStyle"
+                    android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1"
+                    android:text="@string/review_context_section" />
+                <com.google.android.material.button.MaterialButton android:id="@+id/reviewContextPage"
+                    style="?attr/materialButtonOutlinedStyle"
+                    android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1"
+                    android:text="@string/review_context_page" />
+                <com.google.android.material.button.MaterialButton android:id="@+id/reviewContextDocument"
+                    style="?attr/materialButtonOutlinedStyle"
+                    android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1"
+                    android:text="@string/review_context_document" />
+            </com.google.android.material.button.MaterialButtonToggleGroup>
+            <TextView android:id="@+id/reviewContextLabel"
+                android:layout_width="match_parent" android:layout_height="wrap_content"
+                android:layout_marginTop="4dp"
+                android:maxLines="2" android:ellipsize="end"
+                android:textAppearance="?attr/textAppearanceBodySmall"
+                android:textColor="?attr/colorOnSurfaceVariant" />
+            <com.google.android.material.textfield.TextInputLayout android:id="@+id/reviewContextNoteLayout"
+                style="@style/Widget.Material3.TextInputLayout.OutlinedBox.Dense"
+                android:layout_width="match_parent" android:layout_height="wrap_content"
+                android:layout_marginTop="4dp"
+                app:hintEnabled="false">
+                <com.google.android.material.textfield.TextInputEditText android:id="@+id/reviewContextNote"
+                    android:layout_width="match_parent" android:layout_height="wrap_content"
+                    android:gravity="top|start"
+                    android:inputType="textMultiLine|textCapSentences"
+                    android:maxLength="500"
+                    android:minLines="3" android:maxLines="6"
+                    android:scrollbars="vertical" />
+            </com.google.android.material.textfield.TextInputLayout>
+        </LinearLayout>
+    </LinearLayout>
+</ScrollView>

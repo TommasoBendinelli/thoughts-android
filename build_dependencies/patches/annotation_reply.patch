@@ -1,0 +1,100 @@
+diff --git a/public/fpdf_annot.h b/public/fpdf_annot.h
+index 3620ebd34..2a27862f7 100644
+--- a/public/fpdf_annot.h
++++ b/public/fpdf_annot.h
+@@ -655,5 +655,17 @@ FPDF_EXPORT FPDF_ANNOTATION FPDF_CALLCONV
+ FPDFAnnot_GetLinkedAnnot(FPDF_ANNOTATION annot, FPDF_BYTESTRING key);
+-
++
++// MJ PDF extension. Link a markup annotation to the annotation it replies to.
++// Writes /IRT as an indirect annotation reference and /RT as the /Reply name.
++FPDF_EXPORT FPDF_BOOL FPDF_CALLCONV
++MJPDFAnnot_SetReplyTo(FPDF_ANNOTATION annot,
++                      FPDF_ANNOTATION in_reply_to);
++
++// MJ PDF extension. Set the standard icon name for a text annotation.
++// Writes a PDF name object rather than the string written by the public API.
++FPDF_EXPORT FPDF_BOOL FPDF_CALLCONV
++MJPDFAnnot_SetIconName(FPDF_ANNOTATION annot,
++                       FPDF_BYTESTRING icon_name);
++
+ // Experimental API.
+ // Get the annotation flags of |annot|.
+ //
+diff --git a/fpdfsdk/fpdf_annot.cpp b/fpdfsdk/fpdf_annot.cpp
+index cb18d053f..f582f9e7a 100644
+--- a/fpdfsdk/fpdf_annot.cpp
++++ b/fpdfsdk/fpdf_annot.cpp
+@@ -1292,5 +1292,71 @@ FPDFAnnot_GetLinkedAnnot(FPDF_ANNOTATION annot, FPDF_BYTESTRING key) {
+   return FPDFAnnotationFromCPDFAnnotContext(pLinkedAnnot.release());
+ }
+-
++
++FPDF_EXPORT FPDF_BOOL FPDF_CALLCONV
++MJPDFAnnot_SetReplyTo(FPDF_ANNOTATION annot,
++                      FPDF_ANNOTATION in_reply_to) {
++  CPDF_AnnotContext* reply_context =
++      CPDFAnnotContextFromFPDFAnnotation(annot);
++  CPDF_AnnotContext* parent_context =
++      CPDFAnnotContextFromFPDFAnnotation(in_reply_to);
++  if (!reply_context || !parent_context) {
++    return false;
++  }
++
++  RetainPtr<CPDF_Dictionary> reply_dict =
++      reply_context->GetMutableAnnotDict();
++  CPDF_Document* document = reply_context->GetPage()->GetDocument();
++  if (!reply_dict || !document ||
++      parent_context->GetPage()->GetDocument() != document) {
++    return false;
++  }
++
++  // FPDFPage_CreateAnnot() inserts new annotation dictionaries directly into
++  // /Annots. /IRT must be an indirect reference, so promote both annotations
++  // before linking them. Existing annotations are already indirect.
++  auto ensure_indirect = [document](CPDF_AnnotContext* context) {
++    RetainPtr<CPDF_Dictionary> dict = context->GetMutableAnnotDict();
++    if (dict->GetObjNum() != 0) {
++      return true;
++    }
++    CPDF_Page* page = context->GetPage()->AsPDFPage();
++    RetainPtr<CPDF_Array> annots = page ? page->GetMutableAnnotsArray() : nullptr;
++    if (!annots) {
++      return false;
++    }
++    for (size_t index = 0; index < annots->size(); ++index) {
++      if (annots->GetMutableDirectObjectAt(index).Get() == dict.Get()) {
++        annots->ConvertToIndirectObjectAt(index, document);
++        return dict->GetObjNum() != 0;
++      }
++    }
++    return false;
++  };
++  if (!ensure_indirect(parent_context) || !ensure_indirect(reply_context)) {
++    return false;
++  }
++
++  const CPDF_Dictionary* parent_dict = parent_context->GetAnnotDict();
++  reply_dict->SetNewFor<CPDF_Reference>("IRT", document,
++                                        parent_dict->GetObjNum());
++  reply_dict->SetNewFor<CPDF_Name>("RT", "Reply");
++  return true;
++}
++
++FPDF_EXPORT FPDF_BOOL FPDF_CALLCONV
++MJPDFAnnot_SetIconName(FPDF_ANNOTATION annot,
++                       FPDF_BYTESTRING icon_name) {
++  CPDF_AnnotContext* context = CPDFAnnotContextFromFPDFAnnotation(annot);
++  if (!context || !icon_name) {
++    return false;
++  }
++  RetainPtr<CPDF_Dictionary> dict = context->GetMutableAnnotDict();
++  if (!dict) {
++    return false;
++  }
++  dict->SetNewFor<CPDF_Name>("Name", icon_name);
++  return true;
++}
++
+ FPDF_EXPORT int FPDF_CALLCONV FPDFAnnot_GetFlags(FPDF_ANNOTATION annot) {
+   const CPDF_Dictionary* pAnnotDict = GetAnnotDictFromFPDFAnnotation(annot);

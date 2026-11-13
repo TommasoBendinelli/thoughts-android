@@ -1,0 +1,66 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Written by Mudlej. License is GPLv3. -->
+<resources xmlns:tools="http://schemas.android.com/tools">
+    <color name="md_theme_primary">#3B3B3B</color>
+    <color name="md_theme_onPrimary">#FFFFFF</color>
+    <color name="md_theme_primaryContainer">#C9DFDC</color>
+    <color name="md_theme_onPrimaryContainer">#001F24</color>
+    <color name="md_theme_secondary">#4A6267</color>
+    <color name="md_theme_onSecondary">#FFFFFF</color>
+    <color name="md_theme_secondaryContainer">#CDE7EC</color>
+    <color name="md_theme_onSecondaryContainer">#051F23</color>
+    <color name="md_theme_tertiary">#525E7D</color>
+    <color name="md_theme_onTertiary">#FFFFFF</color>
+    <color name="md_theme_tertiaryContainer">#DAE2FF</color>
+    <color name="thoughts_sync_success">#2E7D32</color>
+    <color name="thoughts_sync_pending">#B26A00</color>
+    <color name="source_conflict_fedora_background">#FFE9E7</color>
+    <color name="source_conflict_fedora_marker">#BA1A1A</color>
+    <color name="source_conflict_fedora_on_marker">#FFFFFF</color>
+    <color name="source_conflict_fedora_text">#660008</color>
+    <color name="source_conflict_phone_background">#E0F5E7</color>
+    <color name="source_conflict_phone_marker">#176B3A</color>
+    <color name="source_conflict_phone_on_marker">#FFFFFF</color>
+    <color name="source_conflict_phone_text">#0D4825</color>
+    <color name="source_conflict_fedora_word">#FFC2BB</color>
+    <color name="source_conflict_phone_word">#A9E5BE</color>
+    <color name="source_conflict_shared_background">#FFF3CD</color>
+    <color name="source_conflict_shared_text">#5D4500</color>
+    <color name="md_theme_onTertiaryContainer">#0E1B37</color>
+    <color name="md_theme_error">#BA1A1A</color>
+    <color name="md_theme_errorContainer">#FFDAD6</color>
+    <color name="md_theme_onError">#FFFFFF</color>
+    <color name="md_theme_onErrorContainer">#410002</color>
+    <color name="md_theme_background">#FAFDFD</color>
+    <color name="md_theme_onBackground">#191C1D</color>
+    <color name="md_theme_surface">#FAFDFD</color>
+    <color name="md_theme_onSurface">#191C1D</color>
+    <color name="md_theme_surfaceContainerHigh">#E9EEEE</color>
+    <color name="md_theme_surfaceVariant">#DBE4E6</color>
+    <color name="md_theme_onSurfaceVariant">#3F484A</color>
+    <color name="md_theme_outline">#6F797A</color>
+    <color name="md_theme_inverseOnSurface">#EFF1F1</color>
+    <color name="md_theme_inverseSurface">#2E3132</color>
+    <color name="md_theme_inversePrimary">#DDDDDD</color>
+
+    <color name="favorite">#FF0052</color>
+    <color name="search">#019a66</color>
+
+    <color name="comment_sheet_background">#080808</color>
+    <color name="comment_sheet_on_background">#F5F5F5</color>
+    <color name="comment_sheet_on_background_muted">#BDBDBD</color>
+    <color name="comment_sheet_outline">#E0E0E0</color>
+    <color name="comment_sheet_handle">#8A8A8A</color>
+    <color name="comment_sheet_divider">#282828</color>
+
+    <color name="abc_decor_view_status_guard" tools:ignore="PrivateResource">@android:color/transparent</color>
+    <color name="abc_decor_view_status_guard_light" tools:ignore="PrivateResource">@android:color/transparent</color>
+
+
+    <!-- The agent note Send button: the same strong blue in light and dark (the theme primary is pale grey at night). -->
+    <color name="agent_note_send">#1565C0</color>
+    <!-- Review card feedback (liked / disliked answer passages); the PDF view draws the same colours. -->
+    <color name="review_feedback_positive">#2E7D32</color>
+    <color name="review_feedback_negative">#C62828</color>
+    <color name="review_feedback_on_selected">#FFFFFF</color>
+</resources>

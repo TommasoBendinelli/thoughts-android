@@ -1,0 +1,96 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Written for MJ PDF. License is GPLv3. -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:paddingHorizontal="24dp"
+    android:paddingTop="8dp">
+
+    <RadioGroup
+        android:id="@+id/pageSelectionGroup"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:checkedButton="@id/allPages">
+
+        <RadioButton
+            android:id="@+id/allPages"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:checked="true"
+            android:text="@string/share_all_pages" />
+
+        <RadioButton
+            android:id="@+id/pageRange"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/share_page_range" />
+
+        <RadioButton
+            android:id="@+id/projectDocument"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/share_project_document" />
+    </RadioGroup>
+
+    <TextView
+        android:id="@+id/projectDocumentStatus"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="@string/share_documents_loading"
+        android:paddingVertical="8dp" />
+
+    <Spinner
+        android:id="@+id/projectDocumentPicker"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:minHeight="48dp"
+        android:visibility="gone"
+        android:spinnerMode="dialog"
+        android:prompt="@string/share_project_document" />
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="8dp"
+        android:baselineAligned="false"
+        android:orientation="horizontal">
+
+        <com.google.android.material.textfield.TextInputLayout
+            android:id="@+id/fromPageLayout"
+            style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginEnd="8dp"
+            android:layout_weight="1"
+            android:enabled="false"
+            android:hint="@string/share_from_page">
+
+            <com.google.android.material.textfield.TextInputEditText
+                android:id="@+id/fromPage"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:digits="0123456789"
+                android:inputType="number" />
+        </com.google.android.material.textfield.TextInputLayout>
+
+        <com.google.android.material.textfield.TextInputLayout
+            android:id="@+id/toPageLayout"
+            style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="8dp"
+            android:layout_weight="1"
+            android:enabled="false"
+            android:hint="@string/share_to_page">
+
+            <com.google.android.material.textfield.TextInputEditText
+                android:id="@+id/toPage"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:digits="0123456789"
+                android:inputType="number" />
+        </com.google.android.material.textfield.TextInputLayout>
+    </LinearLayout>
+</LinearLayout>

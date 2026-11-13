@@ -1,0 +1,13 @@
+<!-- Written for Thoughts. License is GPLv3. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <path
+        android:fillColor="@android:color/transparent"
+        android:strokeColor="?colorOnBackground"
+        android:strokeWidth="1.6"
+        android:strokeLineJoin="round"
+        android:pathData="M5,3 L14,3 L19,8 L19,19 L5,19 Z M14,3 L14,8 L19,8 M2,6 L2,22 L16,22" />
+</vector>

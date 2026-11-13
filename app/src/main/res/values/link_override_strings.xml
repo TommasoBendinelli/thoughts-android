@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Written for Thoughts. License is GPLv3. -->
+<resources>
+    <string name="link_override_link_to_library">Link to Library document…</string>
+    <string name="link_override_open_original">Open original link</string>
+    <string name="link_override_change">Change Library document…</string>
+    <string name="link_override_remove">Remove Library link</string>
+    <string name="link_override_choose_document">Link to Library document</string>
+    <string name="link_override_find_document">Find a document</string>
+    <string name="link_override_no_documents">No other Library documents</string>
+    <string name="link_override_saved">This link now opens %1$s</string>
+    <string name="link_override_removed">The link opens its original destination again</string>
+    <string name="link_override_failed">Could not save the Library link</string>
+    <string name="link_override_target_missing">The linked Library document is not on this phone; opening the original link</string>
+</resources>
