@@ -69,6 +69,10 @@ interface ThoughtsSyncDao {
     @Query("SELECT * FROM ThoughtsOutbox WHERE entityType = :entityType ORDER BY deviceSequence")
     fun observeByEntityType(entityType: String): Flow<List<ThoughtsOutboxEntity>>
 
+    /** Proposal decisions and their undos: an undone decision no longer decides its proposals. */
+    @Query("SELECT * FROM ThoughtsOutbox WHERE entityType IN ('agent_proposal_resolution', 'agent_proposal_undo') ORDER BY deviceSequence")
+    fun observeAgentProposalDecisions(): Flow<List<ThoughtsOutboxEntity>>
+
     @Query("SELECT * FROM ThoughtsOutbox WHERE deliveryState IN ('pending', 'blocked') ORDER BY deviceSequence")
     suspend fun undelivered(): List<ThoughtsOutboxEntity>
 

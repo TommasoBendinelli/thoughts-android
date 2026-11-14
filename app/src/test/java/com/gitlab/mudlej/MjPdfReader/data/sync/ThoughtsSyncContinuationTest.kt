@@ -17,74 +17,21 @@ import org.junit.Test
 class ThoughtsSyncContinuationTest {
 
     @Test
-    fun visiblePhaseFollowsSyncBuildAndOverlappingArtifactTransfer() {
-        assertEquals(
-            SyncOperationStore.STATUS_BUILDING,
-            controlPhaseAfterSync(buildsActive = true, artifactTransferPending = false),
-        )
-        assertNull(
-            controlPhaseAfterSync(buildsActive = true, artifactTransferPending = true),
-        )
-        assertEquals(
-            SyncOperationStore.STATUS_BUILDING,
-            artifactCompletionStatus(buildsStillActive = true),
-        )
-        assertEquals(
-            SyncOperationStore.STATUS_SYNCED,
-            artifactCompletionStatus(buildsStillActive = false),
-        )
-        assertEquals(
-            SyncOperationStore.STATUS_BUILDING,
-            continuationStatus(buildsActive = true),
-        )
-        assertEquals(
-            SyncOperationStore.STATUS_WAITING,
-            continuationStatus(buildsActive = false),
-        )
-    }
-
-    @Test
-    fun activeBuildContinuesThroughBackgroundSync() {
-        assertTrue(
-            needsBackgroundSyncContinuation(
-                buildsActive = true,
-                sourceRequestsPending = false,
-                explicit = false,
-            ),
-        )
+    fun aBuildStillRunningOnFedoraNoLongerKeepsTheSyncGoing() {
+        // 13 November 2026: a Sync spent 44 of its 63 s waiting for a Fedora build. It now ends
+        // and RemoteWorkWatch fetches the PDFs; only undelivered source edits continue it.
+        assertFalse(needsBackgroundSyncContinuation(sourceRequestsPending = false, explicit = true))
+        assertFalse(needsBackgroundSyncContinuation(sourceRequestsPending = false, explicit = false))
     }
 
     @Test
     fun pendingSourceRequestDoesNotAuthorizeABackgroundContinuation() {
-        assertFalse(
-            needsBackgroundSyncContinuation(
-                buildsActive = false,
-                sourceRequestsPending = true,
-                explicit = false,
-            ),
-        )
+        assertFalse(needsBackgroundSyncContinuation(sourceRequestsPending = true, explicit = false))
     }
 
     @Test
     fun pendingSourceRequestContinuesAnExplicitSync() {
-        assertTrue(
-            needsBackgroundSyncContinuation(
-                buildsActive = false,
-                sourceRequestsPending = true,
-                explicit = true,
-            ),
-        )
-    }
-
-    @Test
-    fun settledSyncDoesNotScheduleAContinuation() {
-        assertFalse(
-            needsBackgroundSyncContinuation(
-                buildsActive = false,
-                sourceRequestsPending = false,
-                explicit = true,
-            ),
-        )
+        assertTrue(needsBackgroundSyncContinuation(sourceRequestsPending = true, explicit = true))
     }
 
     @Test
@@ -150,15 +97,11 @@ class ThoughtsSyncContinuationTest {
 
         assertEquals(
             ArtifactCompletionOutcome.SYNCED,
-            artifactCompletionOutcome(buildsStillActive = false, sourceAttention = emptyList()),
+            artifactCompletionOutcome(sourceAttention = emptyList()),
         )
         assertEquals(
             ArtifactCompletionOutcome.ATTENTION,
-            artifactCompletionOutcome(buildsStillActive = false, sourceAttention = listOf(conflict)),
-        )
-        assertEquals(
-            ArtifactCompletionOutcome.ATTENTION,
-            artifactCompletionOutcome(buildsStillActive = true, sourceAttention = listOf(conflict)),
+            artifactCompletionOutcome(sourceAttention = listOf(conflict)),
         )
     }
 

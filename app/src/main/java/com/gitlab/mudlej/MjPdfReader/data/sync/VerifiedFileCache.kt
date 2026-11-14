@@ -21,6 +21,8 @@ internal class FileVerificationCache(
     }
     private var journalLoaded = false
     private var journalLines = 0
+    private var batchDepth = 0
+    private val batchedLines = StringBuilder()
 
     /** Called once at startup; the journal is read lazily on the first verification. */
     fun persistTo(file: File) = synchronized(verified) {
@@ -70,14 +72,45 @@ internal class FileVerificationCache(
         }
     }
 
+    /**
+     * Runs [block] and writes the verifications it records to the journal once, at its end. Moving
+     * the kept files of a Library generation recorded one verification per file, each its own
+     * open, append and close of the journal. The journal only spares hashing after a restart, so
+     * records lost with the process cost a hash later, never a wrong answer.
+     */
+    fun <T> batchingJournal(block: () -> T): T {
+        synchronized(verified) { batchDepth++ }
+        try {
+            return block()
+        } finally {
+            synchronized(verified) {
+                if (--batchDepth == 0 && batchedLines.isNotEmpty()) {
+                    val lines = batchedLines.toString()
+                    val count = lines.count { it == '\n' }
+                    batchedLines.setLength(0)
+                    appendToJournal(lines, count)
+                }
+            }
+        }
+    }
+
     /** Caller holds the lock. */
     private fun put(identity: String, sha256: String) {
         if (verified.put(identity, sha256) == sha256) return
+        if (batchDepth > 0) {
+            if (journal != null) batchedLines.append(identity).append('\t').append(sha256).append('\n')
+            return
+        }
+        appendToJournal("$identity\t$sha256\n", 1)
+    }
+
+    /** Caller holds the lock. */
+    private fun appendToJournal(lines: String, count: Int) {
         val target = journal ?: return
         runCatching {
             target.parentFile?.mkdirs()
-            java.io.FileOutputStream(target, true).use { it.write("$identity\t$sha256\n".toByteArray()) }
-            journalLines++
+            java.io.FileOutputStream(target, true).use { it.write(lines.toByteArray()) }
+            journalLines += count
             if (journalLines > MAX_ENTRIES * 2) compactJournal(target)
         }
     }

@@ -300,6 +300,24 @@ fun syncDialogPrimaryAction(status: com.gitlab.mudlej.MjPdfReader.data.render.Ph
         }
 }
 
+/**
+ * A document status's label. While Fedora builds the document's new PDF it says "Updating…": the
+ * previous PDF stays open and Sync does not wait; the new one arrives when it is built.
+ */
+@StringRes
+fun documentStatusLabelRes(
+    stage: com.gitlab.mudlej.MjPdfReader.data.render.PhoneRenderStage,
+    verifiedAtEpochMillis: Long = 0,
+): Int = when (stage) {
+    PhoneRenderStage.REBUILDING, PhoneRenderStage.FEDORA_QUEUED -> R.string.document_status_updating
+    else -> when (documentStatusPresentation(stage, verifiedAtEpochMillis).code) {
+        DocumentStatusCode.SYNC_NEEDED -> R.string.document_status_sync_needed
+        DocumentStatusCode.SYNCING -> R.string.document_status_syncing
+        DocumentStatusCode.SYNCED -> R.string.document_status_synced
+        DocumentStatusCode.ERROR -> R.string.document_status_error
+    }
+}
+
 data class DocumentStatusPresentation(
     val code: DocumentStatusCode,
     val action: DocumentStatusAction,

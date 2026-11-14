@@ -430,10 +430,18 @@ class OfflineSourceBundleStore internal constructor(
         }
     }
 
+    /**
+     * Removes what the active source generation no longer uses. [inventoryCheckEvery]: once the
+     * active generation has been pruned, the walk over every file that would notice files left
+     * behind since (about 2 s on a large Library, after every Sync that installed something) runs
+     * only every that many calls; a new generation, whose superseded objects are the garbage,
+     * is always pruned.
+     */
     @Synchronized
     internal fun pruneActiveBundle(
         alreadyPrunedBundleId: String? = null,
         diagnostics: SyncDiagnostics? = null,
+        inventoryCheckEvery: Int = CLEANUP_INVENTORY_CHECK_EVERY,
         cooperate: () -> Unit = {},
     ): Boolean {
         // The receipt is local to this sync attempt, issued only after install cleanup succeeds.
@@ -447,8 +455,22 @@ class OfflineSourceBundleStore internal constructor(
         // A new bundle cannot reuse the old receipt, so avoid an extra tree
         // scan before the cleanup that is already required.
         fun <T> step(stage: String, block: () -> T): T = diagnostics?.measure(stage, block) ?: block()
+        if (receipt?.string("bundle_id") == activeId) {
+            val skipped = receipt.int("skipped_inventory_checks")
+            if (skipped + 1 < inventoryCheckEvery) {
+                atomicWrite(cleanupReceipt, receipt.deepCopy().apply {
+                    addProperty("skipped_inventory_checks", skipped + 1)
+                }.toString().toByteArray(StandardCharsets.UTF_8))
+                diagnostics?.decision("source_bundle_cleanup", "active_bundle_already_pruned")
+                return true
+            }
+        }
         val inventory = if (receipt?.string("bundle_id") == activeId) step("source_cleanup_inventory", ::cleanupInventory) else null
         if (inventory != null && receipt?.string("inventory_sha256") == inventory) {
+            atomicWrite(cleanupReceipt, JsonObject().apply {
+                addProperty("bundle_id", activeId)
+                addProperty("inventory_sha256", inventory)
+            }.toString().toByteArray(StandardCharsets.UTF_8))
             diagnostics?.decision("source_bundle_cleanup", "unchanged_cleanup_inventory")
             return true
         }
@@ -2726,6 +2748,8 @@ class OfflineSourceBundleStore internal constructor(
     companion object {
         private val pendingMergeCache = hashMapOf<String, Pair<String, List<Pair<String, String>>>>()
         private const val SCHEMA_VERSION = 3
+        /** [pruneActiveBundle] walks every file for an already pruned generation every this many Syncs. */
+        internal const val CLEANUP_INVENTORY_CHECK_EVERY = 8
         private const val INDEX_FILENAME = "index.json"
         private const val MAX_INDEX_BYTES = 100_000L
         private const val MAX_MANIFEST_BYTES = 64_000_000L

@@ -74,4 +74,23 @@ class LibrarySyncStatusPresentationTest {
         )
         assertEquals(listOf("tex/intro.tex", "tex/results.tex"), files)
     }
+
+    @Test
+    fun refusedChangesAloneAreNotASyncFailure() {
+        val status = refusedChangesStatus(refusedChangeCount = 1, hasOtherBlockedLocalChanges = false, lastSync = "Last sync today")
+        assertEquals(SyncStatusLabels.CHANGE_REFUSED, status?.label)
+        assertEquals("1 change was refused by the server · Last sync today", status?.timestamp)
+        // The issue mark stays on the Sync button until the user has retried or discarded the change.
+        assertEquals(LibrarySyncIconState.ERROR, status?.iconState())
+        assertEquals(
+            "3 changes were refused by the server · Last sync today",
+            refusedChangesStatus(3, hasOtherBlockedLocalChanges = false, lastSync = "Last sync today")?.timestamp,
+        )
+    }
+
+    @Test
+    fun anotherBlockedChangeKeepsTheSyncFailedStatus() {
+        assertEquals(null, refusedChangesStatus(2, hasOtherBlockedLocalChanges = true, lastSync = "Last sync today"))
+        assertEquals(null, refusedChangesStatus(0, hasOtherBlockedLocalChanges = false, lastSync = "Last sync today"))
+    }
 }

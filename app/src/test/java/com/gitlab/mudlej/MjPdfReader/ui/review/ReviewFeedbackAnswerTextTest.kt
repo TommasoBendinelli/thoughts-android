@@ -74,7 +74,7 @@ class ReviewFeedbackAnswerTextTest {
         assertTrue(lines[1].toString(), abs(lines[1].top - 0.36) < 1e-4 && abs(lines[1].left - 0.10) < 1e-4)
     }
 
-    @Test fun relocatedFeedbackIsDrawnAndAQuoteOutsideTheAnswerIsOrphaned() {
+    @Test fun feedbackOfAnotherVersionIsListedApartAndAnUnknownVersionIsRelocated() {
         fun feedback(exact: String) = ReviewCardFeedback.parse(JsonObject().apply {
             addProperty("schema_version", 1)
             addProperty("feedback_id", "5b0f6c1e-2a47-4d1b-9c35-7e0a4f2b9d13")
@@ -102,7 +102,13 @@ class ReviewFeedbackAnswerTextTest {
             addProperty("origin_id", "a")
             addProperty("deleted", false)
         })!!
-        val placed = placeFeedback(listOf(feedback("line second"), feedback("outside"), feedback("first")), "b".repeat(64), answer)
+        // Another PDF version: likes and dislikes belong to the version they were given on, so none is
+        // drawn or relocated by its quote; each is listed apart.
+        val elsewhere = placeFeedback(listOf(feedback("line second"), feedback("outside"), feedback("first")), "b".repeat(64), answer)
+        assertEquals(listOf(true, true, true), elsewhere.map { it.earlierVersion })
+        assertEquals(listOf(emptyList<Region>(), emptyList(), emptyList()), elsewhere.map { it.regions })
+        // A version that cannot be told (no PDF on screen): found by its quote, as before.
+        val placed = placeFeedback(listOf(feedback("line second"), feedback("outside"), feedback("first")), "", answer)
         assertEquals(listOf(State.RELOCATED, State.ORPHANED, State.RELOCATED), placed.map { it.state })
         assertEquals(2, placed[0].regions.size)
         assertEquals(emptyList<Region>(), placed[1].regions)

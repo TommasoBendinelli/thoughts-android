@@ -58,7 +58,7 @@ class ProposalDecisionsTest {
             }
             assertEquals(id, case.getAsJsonObject("expect"), actual)
         }
-        assertEquals(21, cases.size())
+        assertEquals(27, cases.size())
     }
 
     @Test fun restoreReportsTheRestoredLineAndTheMatchedText() {

@@ -65,6 +65,7 @@ import com.gitlab.mudlej.MjPdfReader.data.render.CommentDeliveryScheduler
 import com.gitlab.mudlej.MjPdfReader.data.render.PhoneRenderQueue
 import com.gitlab.mudlej.MjPdfReader.data.sync.ThoughtsSyncScheduler
 import com.gitlab.mudlej.MjPdfReader.data.sync.SyncOperationRecord
+import com.gitlab.mudlej.MjPdfReader.data.sync.PendingFedoraBuildStore
 import com.gitlab.mudlej.MjPdfReader.data.sync.SyncOperationStore
 import com.gitlab.mudlej.MjPdfReader.data.sync.isPendingSyncOperationStatus
 import com.gitlab.mudlej.MjPdfReader.data.sync.nextSyncOperationReconciliationDelayMillis
@@ -260,6 +261,7 @@ class HomeActivity : AppCompatActivity(), HomeItemFunctions {
     private var sourceIndexObserver: FileObserver? = null
     private var renderReceiptJob: Job? = null
     private var renderStatusPollJob: Job? = null
+    private val renderStatusIdleGate = com.gitlab.mudlej.MjPdfReader.data.IdleRefreshGate(RENDER_STATUS_IDLE_BACKSTOP_MS)
     private val renderStatusRefreshMutex = Mutex()
     private val renderStatusRequestGeneration = AtomicLong()
     private var renderStatusCompletedGeneration = 0L
@@ -587,8 +589,10 @@ class HomeActivity : AppCompatActivity(), HomeItemFunctions {
             repeatOnLifecycle(Lifecycle.State.STARTED) {
                 combine(
                     PendingChangesSignal.generation,
+                    // The server's PDF status arrives beside a Sync, possibly after it ended.
+                    com.gitlab.mudlej.MjPdfReader.data.render.PhoneRenderStatusSignal.generation,
                     AppDatabase.getInstance(applicationContext).thoughtsSyncDao().observeUndelivered(),
-                ) { _, _ -> Unit }
+                ) { _, _, _ -> Unit }
                     .collectLatest {
                         delay(PENDING_CHANGES_DEBOUNCE_MS)
                         refreshRenderStatus()
@@ -1126,6 +1130,9 @@ class HomeActivity : AppCompatActivity(), HomeItemFunctions {
             getString(R.string.home_title_annotated),
         )
         pendingLibraryRemovalFilenames = withContext(Dispatchers.IO) {
+            // The Library draws its Projects on the main thread: read their catalogue here, so
+            // that drawing finds it parsed instead of reading and parsing the state file there.
+            LibraryProjectStore(applicationContext).warm()
             LibraryRemovalStore(applicationContext).matchingFilenames(
                 sourceSnapshot.libraryPdfSha256ByFilename,
             )
@@ -1986,10 +1993,19 @@ class HomeActivity : AppCompatActivity(), HomeItemFunctions {
                 .filter(String::isNotBlank)
                 .joinToString("\n\n")
                 .ifBlank { getString(R.string.home_no_local_changes) }
+            val refusedChanges = withContext(Dispatchers.IO) {
+                runCatching { com.gitlab.mudlej.MjPdfReader.data.sync.refusedChangeNotices(applicationContext).size }.getOrDefault(0)
+            }
             val builder = MaterialAlertDialogBuilder(this@HomeActivity)
                 .setTitle(R.string.home_local_changes)
                 .setMessage(message)
             val actions = sourceAttentionActions(sourceAttention)
+            // Changes the server refused are retried or discarded from here; a merge comes first.
+            if (refusedChanges > 0 && !(actions.resolveConflicts && actions.retryFailures)) {
+                builder.setNeutralButton(R.string.sync_refused_changes_review) { _, _ ->
+                    com.gitlab.mudlej.MjPdfReader.ui.sync.RefusedChangesDialog(this@HomeActivity).show()
+                }
+            }
             if (actions.resolveConflicts) {
                 builder
                     .setNegativeButton(R.string.close, null)
@@ -2093,11 +2109,32 @@ class HomeActivity : AppCompatActivity(), HomeItemFunctions {
         }
     }
 
+    /**
+     * While nothing runs, Home read the whole status again every 10 seconds: every queued change,
+     * every review card record, every PDF of the Library. Every writer of those already asks for a
+     * refresh when it writes; this check now only looks whether the files and the database behind
+     * the status were written since the last read ([renderStatusInputStamp]) and reads again when
+     * they were, or after [RENDER_STATUS_IDLE_BACKSTOP_MS]. With jobs running it reads every
+     * second, as before.
+     */
     private fun startRenderStatusPolling() {
         renderStatusPollJob?.cancel()
+        // The first check after Home comes up reads everything, as before.
+        renderStatusIdleGate.reset()
         renderStatusPollJob = lifecycleScope.launch {
+            var skipped = 0
             while (isActive) {
-                refreshRenderStatus()
+                val stamp = withContext(Dispatchers.IO) { renderStatusInputStamp() }
+                val now = android.os.SystemClock.elapsedRealtime()
+                if (renderStatusSnapshot.activeJobs.isNotEmpty() || renderStatusIdleGate.shouldRefresh(stamp, now)) {
+                    refreshRenderStatus()
+                    renderStatusIdleGate.refreshed(stamp, now)
+                    Log.d(TAG, "Status poll read everything in ${android.os.SystemClock.elapsedRealtime() - now} ms " +
+                        "after $skipped unchanged checks")
+                    skipped = 0
+                } else {
+                    skipped++
+                }
                 delay(
                     if (renderStatusSnapshot.activeJobs.isNotEmpty()) {
                         RENDER_STATUS_ACTIVE_POLL_MS
@@ -2108,6 +2145,33 @@ class HomeActivity : AppCompatActivity(), HomeItemFunctions {
             }
         }
     }
+
+    /** What [refreshRenderStatusOnce] reads from disk, as a stamp ([pathsStamp]); blank when it cannot be taken. */
+    private fun renderStatusInputStamp(): String = runCatching {
+        val pdfs = PhoneRenderQueue.defaultCanonicalPdfDirectory()
+        val database = AppDatabase.getInstance(applicationContext).openHelper.writableDatabase.path?.let(::File)
+        com.gitlab.mudlej.MjPdfReader.data.pathsStamp(
+            paths = listOfNotNull(
+                pdfs,
+                File(pdfs, SourceLinkedPdfIndex.GENERATION_FILENAME),
+                File(pdfs, SourceLinkedPdfIndex.LIBRARY_INDEX_FILENAME),
+                File(pdfs, SourceLinkedPdfIndex.INDEX_FILENAME),
+                File(noBackupFilesDir, "thoughts-sync/library-head.json"),
+                PhoneRenderQueue.defaultRequestDirectory(),
+                PhoneRenderQueue.defaultReceiptDirectory(),
+                com.gitlab.mudlej.MjPdfReader.data.source.SourceEditQueue.defaultRequestDirectory(),
+                com.gitlab.mudlej.MjPdfReader.data.sync.ThoughtsLocalStore.sourceReceipts(),
+                com.gitlab.mudlej.MjPdfReader.data.sync.ThoughtsLocalStore.comments(),
+                // Every write to the database changes one of these two files.
+                database,
+                database?.let { File(it.path + "-wal") },
+            ),
+            extra = listOf(
+                "pending:${PendingChangesSignal.generation.value}",
+                "status:${com.gitlab.mudlej.MjPdfReader.data.render.PhoneRenderStatusSignal.generation.value}",
+            ),
+        )
+    }.getOrDefault("")
 
     private fun scheduleRenderStatusRefresh() {
         lifecycleScope.launch {
@@ -2236,6 +2300,10 @@ class HomeActivity : AppCompatActivity(), HomeItemFunctions {
         }
     }
 
+    /** As of the last list of local changes ([pendingDocumentSyncStatuses]), which the status follows. */
+    @Volatile private var refusedLocalChangeCount = 0
+    @Volatile private var otherBlockedLocalChanges = false
+
     private fun applyCachedFedoraStatus(snapshot: PhoneRenderStatusSnapshot) {
         val presentation = librarySyncStatusPresentation(
             operation = latestGlobalOperationSnapshot,
@@ -2245,6 +2313,9 @@ class HomeActivity : AppCompatActivity(), HomeItemFunctions {
                 it.requestId.startsWith("local-sync:") && it.stage == PhoneRenderStage.BLOCKED
             },
             mergeFileCount = sourceMergeFileCount,
+            pdfsStillBuilding = PendingFedoraBuildStore(this).pdfCount(),
+            refusedChangeCount = refusedLocalChangeCount,
+            hasOtherBlockedLocalChanges = otherBlockedLocalChanges,
         )
         bindTopSyncStatus(presentation)
         val startedAt = presentation.elapsedStartedAtEpochMillis
@@ -2265,6 +2336,9 @@ class HomeActivity : AppCompatActivity(), HomeItemFunctions {
                 it.requestId.startsWith("local-sync:") && it.stage == PhoneRenderStage.BLOCKED
             },
             mergeFileCount = sourceMergeFileCount,
+            pdfsStillBuilding = PendingFedoraBuildStore(this).pdfCount(),
+            refusedChangeCount = refusedLocalChangeCount,
+            hasOtherBlockedLocalChanges = otherBlockedLocalChanges,
         )
 
     private fun bindTopSyncStatus(presentation: LibrarySyncStatusPresentation) {
@@ -2471,7 +2545,20 @@ class HomeActivity : AppCompatActivity(), HomeItemFunctions {
         val projectChanges = com.gitlab.mudlej.MjPdfReader.data.sync.LibraryProjectStore(applicationContext).pendingCount()
         if (projectChanges > 0) countsByFilename.getOrPut(OTHER_PENDING_CHANGES_TARGET) { PendingDocumentSyncCounts() }.other += projectChanges
 
-        LibraryRemovalStore(applicationContext).pending().forEach { removal ->
+        // A change the server refused is not sent again by itself. It stays in this list as a
+        // blocked change, so the Sync button keeps its issue mark until the user has retried or
+        // discarded it (Local changes, or the Sync details): a refused PDF import cannot go unnoticed.
+        com.gitlab.mudlej.MjPdfReader.data.sync.refusedChangeNotices(applicationContext).forEach { notice ->
+            val counts = countsByFilename.getOrPut(notice.pdfFilename ?: OTHER_PENDING_CHANGES_TARGET) {
+                PendingDocumentSyncCounts()
+            }
+            counts.refused += 1
+            if (notice.removal) counts.libraryRemoval = true
+            counts.failures += getString(R.string.sync_refused_change_notice, notice.description, notice.detail)
+            counts.latestEpochMillis = maxOf(counts.latestEpochMillis, notice.refusedAtEpochMillis)
+        }
+
+        LibraryRemovalStore(applicationContext).toSend().forEach { removal ->
             val counts = countsByFilename.getOrPut(removal.filename) {
                 PendingDocumentSyncCounts()
             }
@@ -2506,6 +2593,9 @@ class HomeActivity : AppCompatActivity(), HomeItemFunctions {
                 }
             }
 
+        // For the Sync status: refused changes alone do not make it "Sync failed".
+        refusedLocalChangeCount = countsByFilename.values.sumOf(PendingDocumentSyncCounts::refused)
+        otherBlockedLocalChanges = countsByFilename.values.any(PendingDocumentSyncCounts::blocked)
         val pendingSync = countsByFilename.map { (filename, counts) ->
             val details = buildList {
                 if (counts.libraryRemoval) {
@@ -2546,7 +2636,7 @@ class HomeActivity : AppCompatActivity(), HomeItemFunctions {
             PhoneRenderJobStatus(
                 requestId = "local-sync:$filename",
                 target = filename,
-                stage = if (counts.blocked) {
+                stage = if (counts.blocked || counts.refused > 0) {
                     PhoneRenderStage.BLOCKED
                 } else {
                     PhoneRenderStage.SYNC_NEEDED
@@ -2675,12 +2765,7 @@ class HomeActivity : AppCompatActivity(), HomeItemFunctions {
 
     private fun renderStatusStage(status: PhoneRenderJobStatus): String {
         return getString(
-            when (documentStatusPresentation(status.stage, status.verifiedAtEpochMillis).code) {
-                DocumentStatusCode.SYNC_NEEDED -> R.string.document_status_sync_needed
-                DocumentStatusCode.SYNCING -> R.string.document_status_syncing
-                DocumentStatusCode.SYNCED -> R.string.document_status_synced
-                DocumentStatusCode.ERROR -> R.string.document_status_error
-            },
+            documentStatusLabelRes(status.stage, status.verifiedAtEpochMillis),
         )
     }
 
@@ -2971,6 +3056,8 @@ class HomeActivity : AppCompatActivity(), HomeItemFunctions {
         private const val PENDING_CHANGES_DEBOUNCE_MS = 100L
         private const val RENDER_STATUS_ACTIVE_POLL_MS = 1_000L
         private const val RENDER_STATUS_IDLE_POLL_MS = 10_000L
+        /** With nothing written, Home still reads its whole status once in this time. */
+        private const val RENDER_STATUS_IDLE_BACKSTOP_MS = 5 * 60_000L
         private const val OTHER_PENDING_CHANGES_TARGET = "Other changes"
         private const val STATE_REVIEW_QA_EXPORT_PDF_STEM = "reviewQaExportPdfStem"
         private const val STATE_REVIEW_QA_EXPORT_APPEND_SOURCE = "reviewQaExportAppendSource"
@@ -2988,6 +3075,8 @@ private data class PendingDocumentSyncCounts(
     val proposalDetails: MutableList<String> = mutableListOf(),
     var latestEpochMillis: Long = 0,
     var blocked: Boolean = false,
+    /** Changes the server refused; they block the row like [blocked], under their own Sync status. */
+    var refused: Int = 0,
     val failures: MutableList<String> = mutableListOf(),
 )
 

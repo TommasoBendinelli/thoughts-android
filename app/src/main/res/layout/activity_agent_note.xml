@@ -35,6 +35,56 @@
         app:tabTextAppearance="@style/TextAppearance.Material3.LabelLarge"
         app:tabTextColor="?attr/colorOnSurfaceVariant" />
 
+    <!-- Who answers a reply to this note, always in view under its title: a state mark, whether an
+         agent listens and which, and Change to choose another (server agent_note_answer_by_v1).
+         While nobody listens it has the warning look, and Open conversation continues the
+         conversation that sent the note. -->
+    <LinearLayout
+        android:id="@+id/agentNoteAnswerLine"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:gravity="center_vertical"
+        android:minHeight="40dp"
+        android:orientation="horizontal"
+        android:paddingStart="16dp"
+        android:paddingEnd="12dp"
+        android:visibility="gone">
+
+        <ImageView
+            android:id="@+id/agentNoteAnswerMark"
+            android:layout_width="18dp"
+            android:layout_height="18dp"
+            android:layout_marginEnd="8dp"
+            android:src="@drawable/ic_overview_filter_check" />
+
+        <TextView
+            android:id="@+id/agentNoteAnswerText"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:paddingVertical="6dp"
+            android:textAppearance="?attr/textAppearanceBodyMedium"
+            android:textColor="?attr/colorOnSurface" />
+
+        <Button
+            android:id="@+id/agentNoteOpenConversation"
+            style="@style/Widget.Material3.Button.TextButton"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="8dp"
+            android:text="@string/proposal_open_conversation"
+            android:visibility="gone" />
+
+        <Button
+            android:id="@+id/agentNoteAnswerChange"
+            style="@style/Widget.Material3.Button.TextButton"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="8dp"
+            android:text="@string/agent_note_answer_change"
+            android:visibility="gone" />
+    </LinearLayout>
+
     <!-- The note's message: one line while collapsed, all of it while expanded; a tap on it or on the
          chevron switches, and the choice holds for the next notes, so the picture keeps the room. -->
     <LinearLayout
@@ -99,40 +149,6 @@
             android:textAppearance="?attr/textAppearanceBodyLarge"
             android:visibility="gone" />
     </FrameLayout>
-
-    <!-- While no agent listens for a reply to this note (protocol "Who hears a reply"): the reply would
-         be stored, but nobody acts on it. Open conversation continues the conversation that sent it. -->
-    <LinearLayout
-        android:id="@+id/agentNoteNotListening"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:background="?attr/colorErrorContainer"
-        android:gravity="center_vertical"
-        android:minHeight="48dp"
-        android:orientation="horizontal"
-        android:paddingStart="16dp"
-        android:paddingEnd="4dp"
-        android:visibility="gone">
-
-        <TextView
-            android:id="@+id/agentNoteNotListeningText"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:paddingVertical="8dp"
-            android:text="@string/agent_note_not_listening"
-            android:textAppearance="?attr/textAppearanceBodyMedium"
-            android:textColor="?attr/colorOnErrorContainer" />
-
-        <Button
-            android:id="@+id/agentNoteOpenConversation"
-            style="@style/Widget.Material3.Button.TextButton"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="@string/proposal_open_conversation"
-            android:textColor="?attr/colorOnErrorContainer"
-            android:visibility="gone" />
-    </LinearLayout>
 
     <LinearLayout
         android:id="@+id/agentNoteTools"

@@ -113,11 +113,6 @@ class SyncStatusDialog(
     }
 
     private fun stageLabel(status: PhoneRenderJobStatus): String = activity.getString(
-        when (documentStatusPresentation(status.stage, status.verifiedAtEpochMillis).code) {
-            DocumentStatusCode.SYNC_NEEDED -> R.string.document_status_sync_needed
-            DocumentStatusCode.SYNCING -> R.string.document_status_syncing
-            DocumentStatusCode.SYNCED -> R.string.document_status_synced
-            DocumentStatusCode.ERROR -> R.string.document_status_error
-        },
+        documentStatusLabelRes(status.stage, status.verifiedAtEpochMillis),
     )
 }

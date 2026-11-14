@@ -28,4 +28,13 @@ internal object SyncStatusLabels {
 
     /** Detail under PDF_BUILD_FAILED when the changes themselves reached the server. */
     const val CHANGES_SYNCED_DETAIL = "Your changes are synced"
+
+    /**
+     * The server refused a change of this device, which is kept until the user retries or discards
+     * it. Syncs themselves succeed, so this is not SYNC_FAILED.
+     */
+    const val CHANGE_REFUSED = "Change refused"
+
+    fun changesRefused(changes: Int): String =
+        if (changes == 1) "1 change was refused by the server" else "$changes changes were refused by the server"
 }

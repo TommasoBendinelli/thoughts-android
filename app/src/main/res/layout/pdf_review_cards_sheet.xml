@@ -64,4 +64,12 @@
         android:clipToPadding="false"
         android:paddingBottom="8dp"
         android:scrollbars="vertical" />
+    <!-- Retired (N): the cards retired on this document, listed apart; back to the PDF's cards. -->
+    <com.google.android.material.button.MaterialButton
+        android:id="@+id/reviewCardsRetired"
+        style="@style/Widget.Material3.Button.TextButton"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="8dp"
+        android:visibility="gone" />
 </LinearLayout>

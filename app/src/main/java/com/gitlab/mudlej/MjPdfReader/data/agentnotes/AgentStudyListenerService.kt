@@ -7,8 +7,10 @@ import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
 import android.app.Service
+import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
+import android.content.IntentFilter
 import android.content.pm.ServiceInfo
 import android.os.Build
 import android.os.Handler
@@ -26,11 +28,14 @@ import com.gitlab.mudlej.MjPdfReader.ui.agentnotes.AgentNotesListActivity
  * Keeps the agent-notes long-poll running while Thoughts is in the background (the user is
  * reading the agent's answer on the Mac). Started only by user actions in the foreground (Copy for
  * agent, opening a note, sending a reply), never while [AgentNotesReceiving] is off; stops itself [LISTEN_MILLIS] after the last of them, or
- * from its notification's Stop action. In [AgentStudyMode] it has no time limit.
+ * from its notification's Stop action. In [AgentStudyMode] it goes on for [STUDY_MODE_IDLE_MILLIS]
+ * after Study mode was last used (those actions, a note from the agent, the screen coming on),
+ * stops then with Study mode still on, and starts again when Thoughts is opened or a capture is taken.
  */
 class AgentStudyListenerService : Service() {
     private val handler = Handler(Looper.getMainLooper())
     private val expiryCheck = Runnable { checkExpiry() }
+    private var screenOnReceiver: BroadcastReceiver? = null
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         // Android requires startForeground after startForegroundService, even when stopping at once.
@@ -53,20 +58,66 @@ class AgentStudyListenerService : Service() {
         AgentNoteInbox.setListening(true)
         handler.removeCallbacks(expiryCheck)
         if (studyMode) {
+            // The time left follows the last use ([AgentStudyUse]); a restart by Android keeps it.
             listenUntilElapsed = Long.MAX_VALUE
+            watchScreenOn()
+            handler.postDelayed(expiryCheck, nextExpiryCheckMillis(remainingMillis().coerceAtLeast(1_000L)))
             return START_STICKY
         }
+        unwatchScreenOn()
         handler.postDelayed(expiryCheck, (listenUntilElapsed - SystemClock.elapsedRealtime()).coerceAtLeast(1_000L))
         return START_NOT_STICKY
     }
 
+    private fun remainingMillis(): Long =
+        if (AgentStudyMode.isOn(this)) {
+            studyListenerRemainingMillis(AgentStudyUse.lastUseAtEpochMillis(this), System.currentTimeMillis())
+        } else {
+            listenUntilElapsed - SystemClock.elapsedRealtime()
+        }
+
     private fun checkExpiry() {
-        val remaining = listenUntilElapsed - SystemClock.elapsedRealtime()
-        if (remaining <= 0) stop() else handler.postDelayed(expiryCheck, remaining)
+        val remaining = remainingMillis()
+        if (remaining <= 0) {
+            if (AgentStudyMode.isOn(this)) {
+                Log.i(AgentNotes.TAG, "study listener paused: Study mode was not used for ${STUDY_MODE_IDLE_MILLIS / 60_000} minutes")
+            }
+            stop()
+        } else {
+            handler.postDelayed(expiryCheck, nextExpiryCheckMillis(remaining))
+        }
+    }
+
+    /**
+     * The handler's clock stands still while the phone sleeps, so a long wait could end late: in
+     * Study mode the time left is looked at again at least every [EXPIRY_RECHECK_MILLIS].
+     */
+    private fun nextExpiryCheckMillis(remaining: Long): Long =
+        if (AgentStudyMode.isOn(this)) remaining.coerceAtMost(EXPIRY_RECHECK_MILLIS) else remaining
+
+    /** The screen coming on is a sign that Study mode is in use; Android sends it only to a running receiver. */
+    private fun watchScreenOn() {
+        if (screenOnReceiver != null) return
+        val receiver = object : BroadcastReceiver() {
+            override fun onReceive(context: Context, intent: Intent?) {
+                if (intent?.action == Intent.ACTION_SCREEN_ON && AgentStudyMode.isOn(context)) AgentStudyUse.record(context)
+            }
+        }
+        runCatching {
+            ContextCompat.registerReceiver(
+                this, receiver, IntentFilter(Intent.ACTION_SCREEN_ON), ContextCompat.RECEIVER_NOT_EXPORTED,
+            )
+        }.onSuccess { screenOnReceiver = receiver }
+    }
+
+    private fun unwatchScreenOn() {
+        screenOnReceiver?.let { runCatching { unregisterReceiver(it) } }
+        screenOnReceiver = null
     }
 
     private fun stop() {
         handler.removeCallbacks(expiryCheck)
+        unwatchScreenOn()
         AgentNoteInbox.setListening(false)
         ServiceCompat.stopForeground(this, ServiceCompat.STOP_FOREGROUND_REMOVE)
         stopSelf()
@@ -80,6 +131,7 @@ class AgentStudyListenerService : Service() {
 
     override fun onDestroy() {
         handler.removeCallbacks(expiryCheck)
+        unwatchScreenOn()
         AgentNoteInbox.setListening(false)
         super.onDestroy()
     }
@@ -104,12 +156,17 @@ class AgentStudyListenerService : Service() {
             AgentNotesListActivity.intent(this).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
         )
+        val detail = if (AgentStudyMode.isOn(this)) {
+            getString(R.string.agent_notes_study_mode_listening_detail, (STUDY_MODE_IDLE_MILLIS / 60_000).toInt())
+        } else {
+            getString(R.string.agent_notes_listening_detail)
+        }
         return NotificationCompat.Builder(this, CHANNEL)
             .setSmallIcon(R.drawable.ic_agent_note)
             .setContentTitle(getString(R.string.agent_notes_listening))
-            .setContentText(getString(
-                if (AgentStudyMode.isOn(this)) R.string.agent_notes_study_mode_listening_detail else R.string.agent_notes_listening_detail,
-            ))
+            .setContentText(detail)
+            // One line cuts the text off; expanded, the notification shows all of it.
+            .setStyle(NotificationCompat.BigTextStyle().bigText(detail))
             .setContentIntent(open)
             .setOngoing(true)
             .setOnlyAlertOnce(true)
@@ -124,8 +181,17 @@ class AgentStudyListenerService : Service() {
         private const val NOTIFICATION_ID = 7151
         private const val ACTION_STOP = "org.tbend.thoughts.agentnotes.STOP_LISTENING"
         const val LISTEN_MILLIS = 30 * 60 * 1000L
+        private const val EXPIRY_RECHECK_MILLIS = 5 * 60 * 1000L
 
         @Volatile private var listenUntilElapsed = 0L
+
+        /**
+         * Study mode was used (a note arrived, Thoughts came to the front): the listener, if it
+         * runs, goes on for [STUDY_MODE_IDLE_MILLIS] from now. Starts nothing.
+         */
+        fun studyModeUsed(context: Context) {
+            if (AgentStudyMode.isOn(context)) AgentStudyUse.record(context)
+        }
 
         /**
          * Starts listening, or extends it to [LISTEN_MILLIS] from now. Call only from a user action
@@ -136,7 +202,13 @@ class AgentStudyListenerService : Service() {
                 Log.i(AgentNotes.TAG, "study listener not started: this phone does not receive agent notes")
                 return
             }
-            listenUntilElapsed = if (AgentStudyMode.isOn(context)) Long.MAX_VALUE else SystemClock.elapsedRealtime() + LISTEN_MILLIS
+            if (AgentStudyMode.isOn(context)) {
+                // Every start is a use of Study mode: the listener goes on for the idle time from now.
+                AgentStudyUse.record(context)
+                listenUntilElapsed = Long.MAX_VALUE
+            } else {
+                listenUntilElapsed = SystemClock.elapsedRealtime() + LISTEN_MILLIS
+            }
             try {
                 ContextCompat.startForegroundService(context, Intent(context, AgentStudyListenerService::class.java))
             } catch (error: IllegalStateException) {

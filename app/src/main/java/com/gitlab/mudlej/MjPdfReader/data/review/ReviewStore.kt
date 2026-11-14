@@ -639,6 +639,8 @@ private class ReviewSnapshotSlot {
     var locationRevision = -1L
     var databaseSnapshot: ReviewSnapshot? = null
     val databaseCards = linkedMapOf<String, ReviewSnapshot>()
+    val stateWriteCount = AtomicLong()
+    val stateWritesSkipped = AtomicLong()
     val dailyOrderKeys = ConcurrentHashMap<String, String>()
     var orderDay = ""
     val buildCount = AtomicLong()
@@ -1100,9 +1102,13 @@ class ReviewStore(
     }
 
     /** Cards the server is still placing on a PDF version this device already shows. */
+    /**
+     * Cards whose place on the shown PDF is still coming. A retired card stays on the version it
+     * was retired on and is never placed again while retired, so it never waits.
+     */
     internal fun cardsAwaitingPlacement(canonicalPdfSha256ByFilename: Map<String, String>): Set<String> =
         snapshot().cards.filter { card ->
-            card.schedule?.deleted != true && card.approved && card.reanchorState != "needs_attention" &&
+            card.schedule?.deleted != true && !card.retired && card.approved && card.reanchorState != "needs_attention" &&
                 (card.reanchorState in REPAIRING_STATES ||
                     canonicalPdfSha256ByFilename["${card.pdfStem}.pdf"]?.equals(card.pdfSha256, ignoreCase = true) == false)
         }.mapTo(hashSetOf()) { it.id }
@@ -1156,6 +1162,8 @@ class ReviewStore(
     private fun summarize(snapshot: ReviewSnapshot, now: Instant, canonicalPdfSha256ByFilename: Map<String, String>?): ReviewLibrarySummary {
         // Deletion lives in folded review history, not the retained card payload.
         val allCards = snapshot.cards.filter { it.schedule?.deleted != true }
+        // A retired card stays on the PDF version it was retired on: neither repairing nor a problem.
+        val placedCards = allCards.filterNot(ReviewCard::retired)
         val activeCards = activeCards(
             snapshot = snapshot,
             canonicalPdfSha256ByFilename = canonicalPdfSha256ByFilename,
@@ -1179,12 +1187,12 @@ class ReviewStore(
             activeCount = activeCards.size,
             nextDueAt = nextDueAt(activeCards, now),
             decks = decks,
-            repairingCount = allCards.count { card ->
+            repairingCount = placedCards.count { card ->
                 card.reanchorState in setOf("queued", "retry", "running") ||
                     (card.approved && card.reanchorState != "needs_attention" &&
                         !card.matchesCanonical(canonicalPdfSha256ByFilename))
             },
-            needsAttentionCount = allCards.count { it.reanchorState == "needs_attention" },
+            needsAttentionCount = placedCards.count { it.reanchorState == "needs_attention" },
             unavailableCount = snapshot.cards.count(::countsAsUnavailable),
             markerRemovalPendingCount = snapshot.cards.count(ReviewCard::markerRemovalPending),
         )
@@ -2250,6 +2258,8 @@ class ReviewStore(
             }
             // Location changes affect eligibility, not history; never replay every event for a source scan.
             val stateIds = if (full || snapshotSlot.locationRevision != locationRevision) snapshotSlot.databaseCards.keys else ids
+            val everyCard = stateIds.size > ids.size
+            val rows = linkedMapOf<String, ReviewStateRow>()
             for (id in stateIds) {
                 val part = withCurrentSourceLocations(snapshotSlot.databaseCards.getValue(id))
                 val card = part.cardsById[id]
@@ -2259,9 +2269,17 @@ class ReviewStore(
                         schedule.dueAt.minus(LEARN_AHEAD_LIMIT_MINUTES, ChronoUnit.MINUTES) else schedule.dueAt
                 } ?: card?.initialDueAt
                 fun millis(value: Instant?) = value?.let { runCatching { it.toEpochMilli() }.getOrDefault(if (it < Instant.EPOCH) Long.MIN_VALUE else Long.MAX_VALUE) } ?: Long.MIN_VALUE
-                db.saveState(id, card, active, maxOf(millis(due), millis(card?.skippedUntil)),
+                rows[id] = reviewStateRow(card, active, maxOf(millis(due), millis(card?.skippedUntil)),
                     part.histories[id]?.reviewCount ?: 0, reviewCurrentMark(part.histories[id]?.entries.orEmpty()).orEmpty())
             }
+            // After a source change every card's row is computed again, but a source scan moves few
+            // cards: writing all of them was one statement per card of the Library. The stored rows
+            // are read in one query, in this transaction, and only the others are written
+            // ([reviewStatesToWrite]). A few changed cards are written without reading.
+            val toWrite = reviewStatesToWrite(rows, ids.toHashSet(), if (everyCard) db.cleanStateRows() else emptyMap())
+            for (id in toWrite) db.saveState(id, rows.getValue(id))
+            snapshotSlot.stateWriteCount.addAndGet(toWrite.size.toLong())
+            snapshotSlot.stateWritesSkipped.addAndGet((rows.size - toWrite.size).toLong())
             val parts = snapshotSlot.databaseCards.values
             val cards = parts.flatMap { it.cards }.map(::withCurrentSourceLocation)
             val result = ReviewSnapshot(parts.flatMap { it.queueEvents }, parts.flatMap { it.selectedCardRecords.entries }.associate { it.toPair() },
@@ -2382,6 +2400,9 @@ class ReviewStore(
     internal fun loadedFullCardCountForTesting(): Int = synchronized(snapshotSlot.monitor) { snapshotSlot.databaseCards.size }
 
     internal fun snapshotBuildCountForTesting(): Long = snapshotSlot.buildCount.get()
+
+    /** Card state rows written and left as they were since the process started, for the Sync timing log. */
+    internal fun stateWriteCounts(): Pair<Long, Long> = snapshotSlot.stateWriteCount.get() to snapshotSlot.stateWritesSkipped.get()
 
     internal fun indexSyncedRecord(file: File, payload: JsonObject) { projectIndex.record(file, payload) }
     internal fun persistProjectIndex() { projectIndex.persist() }

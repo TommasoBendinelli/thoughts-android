@@ -335,7 +335,7 @@ class LibraryAdapter(
             return
         }
         view.setBackgroundResource(R.drawable.home_meta_badge_accent_background)
-        view.text = documentStatusLabel(view, presentation.code)
+        view.text = view.context.getString(documentStatusLabelRes(status.stage, status.verifiedAtEpochMillis))
         val backgroundAttr: Int
         val foregroundAttr: Int
         when (status.stage) {
@@ -362,16 +362,6 @@ class LibraryAdapter(
         view.contentDescription = view.text
         view.setOnClickListener { functions.onRenderStatusClicked(status) }
     }
-
-    private fun documentStatusLabel(view: View, code: DocumentStatusCode): String =
-        view.context.getString(
-            when (code) {
-                DocumentStatusCode.SYNC_NEEDED -> R.string.document_status_sync_needed
-                DocumentStatusCode.SYNCING -> R.string.document_status_syncing
-                DocumentStatusCode.SYNCED -> R.string.document_status_synced
-                DocumentStatusCode.ERROR -> R.string.document_status_error
-            }
-        )
 
     private fun relativeTimestamp(epochMillis: Long): CharSequence {
         return DateUtils.getRelativeTimeSpanString(

@@ -19,6 +19,9 @@ import com.gitlab.mudlej.MjPdfReader.ui.links.EXTRA_REMOTE_PDF_LINK
 import com.gitlab.mudlej.MjPdfReader.ui.links.installedRemotePdf
 import com.gitlab.mudlej.MjPdfReader.ui.links.parseRemotePdfLink
 import com.gitlab.mudlej.MjPdfReader.ui.reader.MainActivity
+import com.gitlab.mudlej.MjPdfReader.ui.reader.navigation.AgentNotePlace
+import com.gitlab.mudlej.MjPdfReader.ui.reader.navigation.EXTRA_AGENT_NOTE_PLACE
+import com.gitlab.mudlej.MjPdfReader.ui.reader.navigation.ReaderNoteHistory
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.os.Bundle
@@ -45,7 +48,14 @@ import com.gitlab.mudlej.MjPdfReader.core.ui.AppSnackbar
 import com.gitlab.mudlej.MjPdfReader.data.agentnotes.AgentNote
 import com.gitlab.mudlej.MjPdfReader.data.agentnotes.AgentNoteDraft
 import com.gitlab.mudlej.MjPdfReader.data.agentnotes.AgentNoteInbox
+import com.gitlab.mudlej.MjPdfReader.data.agentnotes.AgentNoteCoverer
+import com.gitlab.mudlej.MjPdfReader.data.agentnotes.AGENT_NOTE_ANSWER_BY_CAPABILITY
+import com.gitlab.mudlej.MjPdfReader.data.agentnotes.AgentNoteAgent
 import com.gitlab.mudlej.MjPdfReader.data.agentnotes.AgentNoteListening
+import com.gitlab.mudlej.MjPdfReader.data.agentnotes.AgentNoteListeningAnswer
+import com.gitlab.mudlej.MjPdfReader.data.agentnotes.AgentNoteListeningCache
+import com.gitlab.mudlej.MjPdfReader.data.agentnotes.AgentNoteServerCapabilities
+import com.gitlab.mudlej.MjPdfReader.data.agentnotes.AgentNotesHttpException
 import com.gitlab.mudlej.MjPdfReader.data.agentnotes.AgentNoteNotifier
 import com.gitlab.mudlej.MjPdfReader.data.agentnotes.AgentNotes
 import com.gitlab.mudlej.MjPdfReader.data.agentnotes.AgentStudyListenerService
@@ -62,6 +72,7 @@ import com.gitlab.mudlej.MjPdfReader.data.agentnotes.agentNoteSampleSize
 import com.gitlab.mudlej.MjPdfReader.data.agentnotes.conversationNotes
 import com.gitlab.mudlej.MjPdfReader.databinding.ActivityAgentNoteBinding
 import com.gitlab.mudlej.MjPdfReader.ui.agents.AgentConversationLinks
+import com.google.android.material.color.MaterialColors
 import com.google.android.material.snackbar.Snackbar
 import java.io.ByteArrayOutputStream
 import java.io.File
@@ -69,11 +80,9 @@ import java.io.IOException
 import java.util.UUID
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
@@ -100,6 +109,7 @@ sealed interface AgentNoteScreenState {
         val delivered: Boolean,
         val listening: AgentNoteListening = AgentNoteListening.UNKNOWN,
         val comment: String? = null,
+        val coverer: AgentNoteCoverer? = null,
     ) : AgentNoteScreenState
 }
 
@@ -129,13 +139,80 @@ class AgentNoteViewModel(application: Application) : AndroidViewModel(applicatio
     private val mutableListening = MutableStateFlow(AgentNoteListening.UNKNOWN)
     /** Whether the agent that sent the note listens for the reply (last answer; UNKNOWN until one, or offline). */
     val listening: StateFlow<AgentNoteListening> = mutableListening
+    private val mutableCoverer = MutableStateFlow<AgentNoteCoverer?>(null)
+    /** Who answers a reply while [listening] (the sender's agent, a topic owner or the reply agent); null when unnamed. */
+    val coverer: StateFlow<AgentNoteCoverer?> = mutableCoverer
+    private val mutableAnswer = MutableStateFlow<AgentNoteListeningAnswer?>(null)
+    /** The server's last answer about who listens, with the user's choice and the agents to choose from; null before any. */
+    val answer: StateFlow<AgentNoteListeningAnswer?> = mutableAnswer
+    private val mutableCanChangeAnswerer = MutableStateFlow(false)
+    /** Whether the server lets the user choose who answers ([AGENT_NOTE_ANSWER_BY_CAPABILITY]). */
+    val canChangeAnswerer: StateFlow<Boolean> = mutableCanChangeAnswerer
+    private val mutableServerReachable = MutableStateFlow(true)
+    /** False once a request about who listens did not reach the server, until one does; "Change" needs the server. */
+    val serverReachable: StateFlow<Boolean> = mutableServerReachable
 
-    /** Asks the server whether an agent listens for replies to [noteId]; keeps the last answer when offline. */
-    suspend fun checkListening(noteId: String) {
+    private fun showAnswer(answer: AgentNoteListeningAnswer) {
+        mutableCoverer.value = answer.coverer
+        mutableListening.value = answer.state
+        mutableAnswer.value = answer
+    }
+
+    /**
+     * Follows whether an agent listens for replies to [noteId] until the caller is cancelled (its
+     * screen is no longer visible): the answer kept for the note during the last minute or the
+     * server's at once, then the server's every minute ([AgentNoteListeningCache.follow]). Keeps
+     * the last answer when offline.
+     */
+    suspend fun followListening(noteId: String) {
         val app = getApplication<Application>()
-        withContext(Dispatchers.IO) { runCatching { AgentNotes.api(app).listening(noteId) } }
-            .onSuccess { mutableListening.value = it }
-            .onFailure { Log.i(AgentNotes.TAG, "listening check failed: ${it.javaClass.simpleName}") }
+        // Asked once per server and kept: an older server shows the line without "Change".
+        suspend fun learnWhetherTheChoiceIsOffered() = withContext(Dispatchers.IO) {
+            runCatching {
+                AgentNoteServerCapabilities.shared.has(AGENT_NOTE_ANSWER_BY_CAPABILITY, AgentNotes.api(app)::capabilities)
+            }.onSuccess { mutableCanChangeAnswerer.value = it }
+        }
+        kotlinx.coroutines.coroutineScope {
+            // Beside the first answer, which may be a kept one that asks the server nothing.
+            launch { learnWhetherTheChoiceIsOffered() }
+            AgentNoteListeningCache.shared.follow(
+                noteId,
+                ask = {
+                    withContext(Dispatchers.IO) { AgentNotes.api(app).listeningAnswer(noteId) }.also {
+                        mutableServerReachable.value = true
+                        if (!mutableCanChangeAnswerer.value) learnWhetherTheChoiceIsOffered()
+                    }
+                },
+                show = ::showAnswer,
+                failed = {
+                    if (it !is AgentNotesHttpException) mutableServerReachable.value = false
+                    Log.i(AgentNotes.TAG, "listening check failed: ${it.javaClass.simpleName}")
+                },
+            )
+        }
+    }
+
+    /**
+     * Sends the user's choice of who answers replies to [noteId] ([agent]; null is automatic). The
+     * line and the answer kept for the note follow the server's answer. Returns the failure, or
+     * null: after a failure the choice is as it was.
+     */
+    suspend fun chooseAnswerer(noteId: String, agent: AgentNoteAgent?): Exception? {
+        val app = getApplication<Application>()
+        return try {
+            showAnswer(withContext(Dispatchers.IO) {
+                AgentNoteListeningCache.shared.choose(noteId, agent) { AgentNotes.api(app).setAnswerBy(noteId, it) }
+            })
+            mutableServerReachable.value = true
+            null
+        } catch (error: kotlinx.coroutines.CancellationException) {
+            throw error
+        } catch (error: Exception) {
+            Log.i(AgentNotes.TAG, "answer-by choice failed: ${error.javaClass.simpleName}")
+            // A transport failure means the server cannot be reached now; a refusal does not.
+            if (error !is AgentNotesHttpException) mutableServerReachable.value = false
+            error
+        }
     }
 
     var message = ""
@@ -322,8 +399,15 @@ class AgentNoteViewModel(application: Application) : AndroidViewModel(applicatio
                 Log.i(AgentNotes.TAG, "agent note reply queued bytes=${png.size} strokes=$strokeCount markers=$markerCount " +
                     "photo=${photo?.bytes?.size ?: 0}")
                 val server = AgentNotes.sync(app).sendReply(local)
-                if (server != null && server.listening != AgentNoteListening.UNKNOWN) mutableListening.value = server.listening
-                AgentNoteScreenState.Sent(ready, server != null, server?.listening ?: AgentNoteListening.UNKNOWN, comment)
+                if (server != null && server.listening != AgentNoteListening.UNKNOWN) {
+                    mutableCoverer.value = server.coverer
+                    mutableListening.value = server.listening
+                    // What the server said when it took the reply is the newest answer for this note.
+                    AgentNoteListeningCache.shared.keepAfterReply(ready.note.noteId, server.listening, server.coverer)
+                        ?.let { mutableAnswer.value = it }
+                }
+                AgentNoteScreenState.Sent(ready, server != null, server?.listening ?: AgentNoteListening.UNKNOWN, comment,
+                    server?.coverer)
             } catch (error: Exception) {
                 // Rendering or saving failed (memory, disk): nothing was queued; stay on the note.
                 Log.w(AgentNotes.TAG, "agent note reply could not be saved: ${error.javaClass.simpleName}")
@@ -436,6 +520,7 @@ class AgentNoteActivity : AppCompatActivity(), AnnotationCanvasView.Listener, Do
             CurrentDocumentSnapshot(uri = intent.data?.toString(), title = noteTitle ?: getString(R.string.agent_note))
         }
         binding.agentNoteCanvas.listener = this
+        if (savedInstanceState == null && !intent.hasExtra(EXTRA_AGENT_NOTE_PLACE)) ReaderNoteHistory.forget()
         binding.agentNoteMessageRow.setOnClickListener {
             if (!messageLong) return@setOnClickListener
             messageCollapsed = !messageCollapsed
@@ -466,7 +551,13 @@ class AgentNoteActivity : AppCompatActivity(), AnnotationCanvasView.Listener, Do
 
     /** Puts the note of [next] on screen in place of the current one, whose draft is kept. */
     private fun switchTo(next: Intent) {
-        if (next.getStringExtra(EXTRA_NOTE_ID) == noteId && next.getStringExtra(EXTRA_REPLY_ID) == replyId) return
+        // Anything but a reader's Back or Forward is a new way here: no arrow leads back into the reader.
+        if (!next.hasExtra(EXTRA_AGENT_NOTE_PLACE)) ReaderNoteHistory.forget()
+        if (next.getStringExtra(EXTRA_NOTE_ID) == noteId && next.getStringExtra(EXTRA_REPLY_ID) == replyId) {
+            // The note is on screen as it was left; only the arrows change.
+            invalidateOptionsMenu()
+            return
+        }
         hideKeyboard()
         viewModel.saveDraft()
         setIntent(next)
@@ -500,10 +591,14 @@ class AgentNoteActivity : AppCompatActivity(), AnnotationCanvasView.Listener, Do
         stateJob = lifecycleScope.launch {
             repeatOnLifecycle(Lifecycle.State.STARTED) {
                 launch { shown.state.collect(::render) }
-                launch { shown.listening.collect { updateListeningBar() } }
+                launch { shown.answer.collect { updateAnswerLine() } }
+                launch { shown.canChangeAnswerer.collect { updateAnswerLine() } }
+                launch { shown.serverReachable.collect { updateAnswerLine() } }
                 launch {
-                    // An agent's note (not a page, not a past reply): ask now and every 20 s while on screen,
-                    // so the bar appears when the agent stops listening and goes once it listens again.
+                    // An agent's note (not a page, not a past reply): ask once each time its screen
+                    // comes up, unless the note was asked about in the last minute, and then every
+                    // minute while it stays on screen, so the line under the title follows an agent
+                    // that starts or stops listening. Leaving the screen ends it (repeatOnLifecycle).
                     val loaded = when (val first = shown.state.first { it !is AgentNoteScreenState.Loading }) {
                         is AgentNoteScreenState.Ready -> first
                         is AgentNoteScreenState.Sending -> first.ready
@@ -511,10 +606,7 @@ class AgentNoteActivity : AppCompatActivity(), AnnotationCanvasView.Listener, Do
                         is AgentNoteScreenState.Failed, AgentNoteScreenState.Loading -> null
                     } ?: return@launch
                     if (loaded.readOnly || loaded.note.isPhonePage) return@launch
-                    while (isActive) {
-                        shown.checkListening(loaded.note.noteId)
-                        delay(LISTENING_CHECK_MILLIS)
-                    }
+                    shown.followListening(loaded.note.noteId)
                 }
                 launch {
                     shown.pageSendFailure.collect { failed ->
@@ -614,6 +706,7 @@ class AgentNoteActivity : AppCompatActivity(), AnnotationCanvasView.Listener, Do
         binding.agentNoteOpenConversation.setOnClickListener {
             boundReady?.note?.let { openConversation(it, viewModel.message, replied = false) }
         }
+        binding.agentNoteAnswerChange.setOnClickListener { showAnswerChoice() }
     }
 
     private fun applyTool() {
@@ -651,7 +744,7 @@ class AgentNoteActivity : AppCompatActivity(), AnnotationCanvasView.Listener, Do
             is AgentNoteScreenState.Sent -> {
                 // The note stays open with the drawing until the agent answers (a new note opens on top).
                 bind(state.ready, sending = false)
-                statusText = getString(agentNoteSentStatus(state.delivered, state.listening))
+                statusText = agentNoteSentText(state.delivered, state.listening, state.coverer, ::getString)
                 updateSubtitle()
                 if (announcedSent !== state) {
                     announcedSent = state
@@ -702,6 +795,12 @@ class AgentNoteActivity : AppCompatActivity(), AnnotationCanvasView.Listener, Do
             binding.agentNoteMessage.post { updateMessageToggle() }
             binding.agentNoteCanvas.readOnly = ready.readOnly
             binding.agentNoteCanvas.setContent(ready.bitmap, ready.document)
+            // Shown again by a reader's Back: zoomed and scrolled as when its link was followed.
+            AgentNotePlace.fromJson(intent.getStringExtra(EXTRA_AGENT_NOTE_PLACE))
+                ?.takeIf { it.noteId == ready.note.noteId && it.replyId == replyId }?.let { place ->
+                    place.zoom?.let { binding.agentNoteCanvas.viewport = AnnotationCanvasView.Viewport(it, place.left, place.top) }
+                }
+            intent.removeExtra(EXTRA_AGENT_NOTE_PLACE)
             // Links are fractions of the picture, so they hold at any decoded size; a reply is drawn on the
             // note's picture, so they hold there too while its shape is the note's.
             binding.agentNoteCanvas.links = ready.note.links.takeIf {
@@ -710,12 +809,11 @@ class AgentNoteActivity : AppCompatActivity(), AnnotationCanvasView.Listener, Do
                         ready.note.imageHeight.toFloat() / ready.note.imageWidth) < 0.01f
             }.orEmpty()
             binding.agentNoteTools.visibility = if (ready.readOnly) View.GONE else View.VISIBLE
-            binding.agentNoteOpenConversation.visibility = if (ready.note.hasConversation) View.VISIBLE else View.GONE
             // A page from the reader is the picture already; an agent's note can get one from the glasses.
             binding.agentNoteSendWithPicture.visibility = if (ready.note.isPhonePage) View.GONE else View.VISIBLE
             fillComment(viewModel.message)
             applyTool()
-            updateListeningBar()
+            updateAnswerLine()
         }
         binding.agentNoteCanvas.isEnabled = !sending
         binding.agentNoteCommentField.isEnabled = !sending
@@ -759,12 +857,87 @@ class AgentNoteActivity : AppCompatActivity(), AnnotationCanvasView.Listener, Do
         updateSubtitle()
     }
 
-    /** The bar over the comment field while no agent listens for a reply to the agent note on screen. */
-    private fun updateListeningBar() {
+    /**
+     * The line under the title of an agent's note (not a page, not a past reply): whether an agent
+     * listens for a reply, which one, and "Change" ([agentNoteAnswerLine]). No line while the
+     * server has not said, or cannot tell.
+     */
+    private fun updateAnswerLine() {
         val ready = boundReady
-        val show = ready != null && !ready.readOnly && !ready.note.isPhonePage &&
-            viewModel.listening.value == AgentNoteListening.NOT_LISTENING
-        binding.agentNoteNotListening.visibility = if (show) View.VISIBLE else View.GONE
+        val line = if (ready == null || ready.readOnly || ready.note.isPhonePage) null else agentNoteAnswerLine(
+            viewModel.answer.value, viewModel.canChangeAnswerer.value, viewModel.serverReachable.value, ::getString,
+        )
+        binding.agentNoteAnswerLine.visibility = if (line == null) View.GONE else View.VISIBLE
+        if (line == null || ready == null) return
+        val foreground = MaterialColors.getColor(
+            binding.agentNoteAnswerLine,
+            if (line.warning) com.google.android.material.R.attr.colorOnErrorContainer else com.google.android.material.R.attr.colorOnSurface,
+        )
+        binding.agentNoteAnswerLine.setBackgroundColor(
+            if (line.warning) MaterialColors.getColor(binding.agentNoteAnswerLine, com.google.android.material.R.attr.colorErrorContainer)
+            else android.graphics.Color.TRANSPARENT,
+        )
+        binding.agentNoteAnswerText.text = line.text
+        binding.agentNoteAnswerText.setTextColor(foreground)
+        binding.agentNoteAnswerMark.setImageResource(
+            if (line.mark == AgentNoteAnswerMark.LISTENING) R.drawable.ic_overview_filter_check else R.drawable.ic_warning,
+        )
+        binding.agentNoteAnswerMark.imageTintList = android.content.res.ColorStateList.valueOf(
+            when (line.mark) {
+                AgentNoteAnswerMark.LISTENING -> MaterialColors.getColor(binding.agentNoteAnswerLine, androidx.appcompat.R.attr.colorPrimary)
+                AgentNoteAnswerMark.WAITING ->
+                    MaterialColors.getColor(binding.agentNoteAnswerLine, com.google.android.material.R.attr.colorOnSurfaceVariant)
+                AgentNoteAnswerMark.NOBODY -> foreground
+            },
+        )
+        binding.agentNoteAnswerMark.contentDescription = getString(
+            if (line.mark == AgentNoteAnswerMark.LISTENING) R.string.agent_note_answer_mark_listening
+            else R.string.agent_note_answer_mark_not_listening,
+        )
+        // While nobody listens, the conversation that sent the note is one tap away, as on the old bar.
+        binding.agentNoteOpenConversation.visibility = if (line.warning && ready.note.hasConversation) View.VISIBLE else View.GONE
+        binding.agentNoteOpenConversation.setTextColor(foreground)
+        binding.agentNoteAnswerChange.visibility = if (line.changeOffered) View.VISIBLE else View.GONE
+        binding.agentNoteAnswerChange.isEnabled = line.changeEnabled
+        binding.agentNoteAnswerChange.setTextColor(if (line.changeEnabled) foreground else androidx.core.graphics.ColorUtils.setAlphaComponent(foreground, 97))
+        // Offline the choice cannot be sent: the button says why it is off.
+        binding.agentNoteAnswerChange.contentDescription = getString(
+            if (line.changeEnabled) R.string.agent_note_answer_change else R.string.agent_note_answer_change_needs_server,
+        )
+    }
+
+    /**
+     * "Change": Automatic and the agents that could answer now, the current choice checked. A
+     * choice goes to the server; the line follows its answer, and on failure a Snackbar says so and
+     * the choice stays as it was.
+     */
+    private fun showAnswerChoice() {
+        val ready = boundReady ?: return
+        val answer = viewModel.answer.value ?: return
+        val choices = agentNoteAnswerChoices(answer, ::getString)
+        val entries = choices.map { choice ->
+            if (choice.detail == null) choice.title else android.text.SpannableStringBuilder(choice.title).apply {
+                append("\n")
+                val start = length
+                append(choice.detail)
+                setSpan(android.text.style.RelativeSizeSpan(0.8f), start, length, android.text.Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
+            }
+        }
+        val shown = viewModel
+        com.google.android.material.dialog.MaterialAlertDialogBuilder(this)
+            .setTitle(R.string.agent_note_answer_choice_title)
+            .setSingleChoiceItems(entries.toTypedArray<CharSequence>(), choices.indexOfFirst { it.checked }) { dialog, index ->
+                dialog.dismiss()
+                val choice = choices[index]
+                if (choice.checked) return@setSingleChoiceItems
+                lifecycleScope.launch {
+                    val failure = shown.chooseAnswerer(ready.note.noteId, choice.agent) ?: return@launch
+                    if (isFinishing || isDestroyed) return@launch
+                    AppSnackbar.make(binding.root, agentNoteAnswerChangeFailure(failure), Snackbar.LENGTH_LONG).show()
+                }
+            }
+            .setNegativeButton(android.R.string.cancel, null)
+            .show()
     }
 
     /**
@@ -791,7 +964,10 @@ class AgentNoteActivity : AppCompatActivity(), AnnotationCanvasView.Listener, Do
 
     override fun onDocumentChanged() = updateUndoRedo()
 
-    /** A tapped link of the note: a Library PDF page opens in the reader, a web page in the browser. */
+    /**
+     * A tapped link of the note: a Library PDF page opens in the reader, a web page in the browser.
+     * The reader keeps this note in its history, so its Back arrow comes back here.
+     */
     override fun onLinkTapped(link: AgentNoteLink) {
         val remote = parseRemotePdfLink(link.href)
         if (remote != null) {
@@ -800,10 +976,14 @@ class AgentNoteActivity : AppCompatActivity(), AnnotationCanvasView.Listener, Do
                 AppSnackbar.make(binding.root, R.string.remote_pdf_link_unavailable, Snackbar.LENGTH_LONG).show()
                 return
             }
+            // Following a link starts a new way on from this note.
+            ReaderNoteHistory.forget()
+            invalidateOptionsMenu()
             startActivity(Intent(this, MainActivity::class.java).apply {
                 action = Intent.ACTION_VIEW
                 data = Uri.fromFile(file)
                 putExtra(EXTRA_REMOTE_PDF_LINK, link.href)
+                putExtra(EXTRA_AGENT_NOTE_PLACE, placeOnScreen().toJson())
             })
             return
         }
@@ -814,6 +994,43 @@ class AgentNoteActivity : AppCompatActivity(), AnnotationCanvasView.Listener, Do
             AppSnackbar.make(binding.root, R.string.agent_note_link_no_app, Snackbar.LENGTH_LONG).show()
         }
     }
+
+    /** This note as a place of the reader's history: which note, and how its picture is zoomed and scrolled. */
+    private fun placeOnScreen(): AgentNotePlace {
+        val viewport = binding.agentNoteCanvas.viewport
+        return AgentNotePlace(noteId, replyId, noteTitle, viewport?.zoom, viewport?.left ?: 0f, viewport?.top ?: 0f)
+    }
+
+    /**
+     * Back or Forward on a note that a reader tab's arrow showed: that tab comes to the front and
+     * takes the step from the note's place in its history.
+     */
+    private fun stepReaderHistory(back: Boolean) {
+        val shown = ReaderNoteHistory.shownFor(noteId, replyId) ?: return
+        val task = runCatching {
+            getSystemService(ActivityManager::class.java).appTasks.firstOrNull { appTaskId(it) == shown.readerTaskId }
+        }.getOrNull()
+        if (task != null) {
+            hideKeyboard()
+            ReaderNoteHistory.request(shown.readerTaskId, back)
+            try {
+                task.moveToFront()
+                return
+            } catch (error: RuntimeException) {
+                Log.w(AgentNotes.TAG, "reader tab not shown: ${error.javaClass.simpleName}")
+                ReaderNoteHistory.returned(shown.readerTaskId)
+            }
+        }
+        // The tab was closed: its history went with it.
+        ReaderNoteHistory.forget()
+        invalidateOptionsMenu()
+    }
+
+    @Suppress("DEPRECATION")
+    private fun appTaskId(task: ActivityManager.AppTask): Int? = runCatching {
+        val info = task.taskInfo
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q) info.taskId else info.id
+    }.getOrNull()
 
     override fun onLimitReached() {
         AppSnackbar.make(binding.root, R.string.agent_note_too_many_strokes, Snackbar.LENGTH_LONG).show()
@@ -828,6 +1045,21 @@ class AgentNoteActivity : AppCompatActivity(), AnnotationCanvasView.Listener, Do
                 actionView = layoutInflater.inflate(R.layout.view_agent_note_new, binding.agentNoteToolbar, false).also { button ->
                     (button as TextView).text = label
                     button.setOnClickListener { openWaitingNote() }
+                }
+            }
+        }
+        // Back and Forward of the reader tab whose arrow showed this note, as in the reader: straight arrows.
+        ReaderNoteHistory.shownFor(noteId, replyId)?.let { shown ->
+            if (shown.canGoBack) {
+                menu.add(Menu.NONE, MENU_HISTORY_BACK, Menu.NONE, R.string.nav_back).apply {
+                    setIcon(R.drawable.ic_nav_back)
+                    setShowAsAction(MenuItem.SHOW_AS_ACTION_ALWAYS)
+                }
+            }
+            if (shown.canGoForward) {
+                menu.add(Menu.NONE, MENU_HISTORY_FORWARD, Menu.NONE, R.string.nav_forward).apply {
+                    setIcon(R.drawable.ic_nav_forward)
+                    setShowAsAction(MenuItem.SHOW_AS_ACTION_ALWAYS)
                 }
             }
         }
@@ -857,6 +1089,14 @@ class AgentNoteActivity : AppCompatActivity(), AnnotationCanvasView.Listener, Do
     override fun onOptionsItemSelected(item: MenuItem): Boolean = when (item.itemId) {
         android.R.id.home -> {
             startActivity(Intent(this, HomeActivity::class.java))
+            true
+        }
+        MENU_HISTORY_BACK -> {
+            stepReaderHistory(back = true)
+            true
+        }
+        MENU_HISTORY_FORWARD -> {
+            stepReaderHistory(back = false)
             true
         }
         MENU_PREVIOUS -> {
@@ -893,6 +1133,8 @@ class AgentNoteActivity : AppCompatActivity(), AnnotationCanvasView.Listener, Do
     override fun onResume() {
         super.onResume()
         tabs?.refresh(isFullscreen = false)
+        // The reader may have taken its step back since: the arrows follow.
+        invalidateOptionsMenu()
     }
 
     override fun onPause() {
@@ -914,9 +1156,8 @@ class AgentNoteActivity : AppCompatActivity(), AnnotationCanvasView.Listener, Do
         private const val MENU_PREVIOUS = 2
         private const val MENU_NEXT = 3
         private const val MENU_NEW_NOTE = 4
-        /** How often the note screen asks whether the agent still listens. */
-        private const val LISTENING_CHECK_MILLIS = 20_000L
-
+        private const val MENU_HISTORY_BACK = 5
+        private const val MENU_HISTORY_FORWARD = 6
         // Every note opens in the one notes window (launchMode singleTask); the data tells notes and replies apart.
         fun intent(context: Context, noteId: String): Intent =
             Intent(context, AgentNoteActivity::class.java)
@@ -928,6 +1169,11 @@ class AgentNoteActivity : AppCompatActivity(), AnnotationCanvasView.Listener, Do
             intent(context, noteId)
                 .putExtra(EXTRA_START_TOOL, tool.name)
                 .putExtra(EXTRA_START_MESSAGE, message)
+
+        /** The note (or reply) of [place], shown by a reader's Back or Forward as it was when its link was followed. */
+        fun historyIntent(context: Context, place: AgentNotePlace): Intent =
+            (place.replyId?.let { replyIntent(context, place.noteId, it) } ?: intent(context, place.noteId))
+                .putExtra(EXTRA_AGENT_NOTE_PLACE, place.toJson())
 
         fun replyIntent(context: Context, noteId: String, replyId: String): Intent =
             Intent(context, AgentNoteActivity::class.java)

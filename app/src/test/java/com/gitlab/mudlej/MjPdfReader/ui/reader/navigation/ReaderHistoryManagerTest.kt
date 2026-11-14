@@ -18,17 +18,53 @@ class ReaderHistoryManagerTest {
         ReaderHistoryManager.Viewport {
         var cancelNextOpen = false
         var opens = 0
-        val history = ReaderHistoryManager(this, {}, { document }) { entry, commit ->
-            if (cancelNextOpen) {
-                cancelNextOpen = false
-            } else {
-                opens++
-                commit()
-                replaceDocument(entry.document!!)
-                // The loader restores the saved view state, or the page without one.
-                page = entry.viewState?.pageIndex ?: entry.pageIndex
-                view = entry.viewState
+        /** The agent notes the notes window was asked to show, with the arrows it offered there. */
+        val notesShown = mutableListOf<Triple<AgentNotePlace, Boolean, Boolean>>()
+        var notesWindowRefuses = false
+        val history = ReaderHistoryManager(
+            this,
+            {},
+            { document },
+            openOtherDocument = { entry, commit ->
+                if (cancelNextOpen) {
+                    cancelNextOpen = false
+                } else {
+                    opens++
+                    commit()
+                    replaceDocument(entry.document!!)
+                    // The loader restores the saved view state, or the page without one.
+                    page = entry.viewState?.pageIndex ?: entry.pageIndex
+                    view = entry.viewState
+                }
+            },
+            openAgentNote = { entry, canGoBack, canGoForward ->
+                if (!notesWindowRefuses) notesShown += Triple(entry.note!!, canGoBack, canGoForward)
+                !notesWindowRefuses
+            },
+        )
+
+        /** The last note shown in the notes window and its arrows: Back, Forward. */
+        fun noteOnScreen() = notesShown.lastOrNull()?.let { Triple(it.first.noteId, it.second, it.third) }
+
+        /**
+         * A link of an agent note followed into this tab (MainActivity: a new tab, or onNewIntent
+         * of the tab already showing [target]).
+         */
+        fun followNoteLink(note: AgentNotePlace, target: String, targetPage: Int) {
+            when (document) {
+                null -> {
+                    history.onDocumentReset()
+                    document = target
+                    history.recordAgentNote(note)
+                }
+                target -> history.recordAgentNoteLink(note, sameDocument = true, targetPage)
+                else -> {
+                    history.recordAgentNoteLink(note, sameDocument = false, null)
+                    replaceDocument(target)
+                }
             }
+            page = targetPage
+            view = state(targetPage)
         }
 
         override val currentPage get() = page
@@ -220,7 +256,228 @@ class ReaderHistoryManagerTest {
         assertNull(ReaderHistoryManager.decodeEntries("not json"))
     }
 
+    @Test
+    fun backFromANoteLinkInANewTabShowsTheNoteAndForwardThereComesBack() {
+        val tab = Tab(null)
+        tab.followNoteLink(NOTE, GRPO, 52)
+        assertTrue("Back leads to the note", tab.history.canGoBack())
+        assertFalse(tab.history.canGoForward())
+
+        tab.history.goBack()
+        assertEquals("The note, with only Forward from it", Triple(NOTE.noteId, false, true), tab.noteOnScreen())
+        assertEquals("The tab stays on the linked page", Triple(GRPO, 52, 1f), tab.place())
+        assertEquals(0, tab.opens)
+
+        // Forward on the note: the tab comes to the front where it was.
+        tab.history.returnFromAgentNote(back = false)
+        assertEquals(Triple(GRPO, 52, 1f), tab.place())
+        assertTrue("Back still leads to the note", tab.history.canGoBack())
+        assertFalse(tab.history.canGoForward())
+
+        tab.history.goBack()
+        assertEquals(2, tab.notesShown.size)
+        assertEquals(NOTE, tab.notesShown.last().first)
+    }
+
+    @Test
+    fun theNoteKeepsItsZoomAndScrollThroughTheHistory() {
+        val tab = Tab(null)
+        val scrolled = NOTE.copy(zoom = 2.5f, left = 0.1f, top = 0.6f)
+        tab.followNoteLink(scrolled, GRPO, 52)
+        tab.history.goBack()
+        assertEquals(scrolled, tab.notesShown.single().first)
+
+        val saved = ReaderHistoryManager.decodeEntries(ReaderHistoryManager.encodeEntries(tab.history.backEntries()))!!
+        assertEquals(scrolled, saved.single().note)
+        assertEquals(Origin.AGENT_NOTE, saved.single().origin)
+        assertEquals(scrolled.uri, saved.single().document)
+    }
+
+    @Test
+    fun comingBackWithoutAnArrowLeavesTheTabAsItWas() {
+        val tab = Tab(null)
+        tab.followNoteLink(NOTE, GRPO, 52)
+        tab.moveTo(55, zoom = 2f)
+        tab.history.goBack()
+
+        // e.g. the tab strip or Recents
+        tab.history.returnFromAgentNote(back = null)
+        assertEquals(Triple(GRPO, 55, 2f), tab.place())
+        assertTrue(tab.history.canGoBack())
+        assertFalse(tab.history.canGoForward())
+        // Already back: an arrow pressed later is not carried out again.
+        tab.history.returnFromAgentNote(back = false)
+        assertEquals(Triple(GRPO, 55, 2f), tab.place())
+    }
+
+    @Test
+    fun linksInsideTheReaderAfterTheNoteWalkBackToTheNoteAndForwardAgain() {
+        val tab = Tab(null)
+        tab.followNoteLink(NOTE, SDPO, 52)
+        tab.followLink(GRPO, 7)
+        tab.followLink(GRPO, 20)
+
+        tab.history.goBack()
+        assertEquals(Triple(GRPO, 7, 1f), tab.place())
+        tab.history.goBack()
+        assertEquals(Triple(SDPO, 52, 1f), tab.place())
+        assertTrue(tab.notesShown.isEmpty())
+        tab.history.goBack()
+        assertEquals("Back from the linked page: the note", Triple(NOTE.noteId, false, true), tab.noteOnScreen())
+
+        // Forward on the note: the linked page (on screen already), then the reader's own steps.
+        tab.history.returnFromAgentNote(back = false)
+        assertEquals(Triple(SDPO, 52, 1f), tab.place())
+        tab.history.goForward()
+        assertEquals(Triple(GRPO, 7, 1f), tab.place())
+        tab.history.goForward()
+        assertEquals(Triple(GRPO, 20, 1f), tab.place())
+        assertFalse(tab.history.canGoForward())
+    }
+
+    @Test
+    fun aNoteLinkInATabAlreadyOpenKeepsTheOldPlaceBehindTheNote() {
+        val tab = Tab(SDPO).apply { moveTo(10, zoom = 1.5f) }
+        tab.followNoteLink(NOTE, SDPO, 52)
+
+        tab.history.goBack()
+        assertEquals("Back goes to the note, not to page 11", Triple(NOTE.noteId, true, true), tab.noteOnScreen())
+        assertEquals(Triple(SDPO, 52, 1f), tab.place())
+
+        // Back on the note: the place the tab showed before the link.
+        tab.history.returnFromAgentNote(back = true)
+        assertEquals(Triple(SDPO, 10, 1.5f), tab.place())
+        assertFalse(tab.history.canGoBack())
+        tab.history.goForward()
+        assertEquals("Forward from there is the note again", Triple(NOTE.noteId, true, true), tab.noteOnScreen())
+        assertEquals(2, tab.notesShown.size)
+        tab.history.returnFromAgentNote(back = false)
+        assertEquals(Triple(SDPO, 52, 1f), tab.place())
+        assertTrue(tab.history.canGoBack())
+        assertFalse(tab.history.canGoForward())
+    }
+
+    @Test
+    fun aNoteLinkToAnotherDocumentOfTheTabReturnsThroughTheNote() {
+        val tab = Tab(SDPO).apply { moveTo(3) }
+        tab.followNoteLink(NOTE, GRPO, 40)
+        assertEquals(Triple(GRPO, 40, 1f), tab.place())
+
+        tab.history.goBack()
+        assertEquals(Triple(NOTE.noteId, true, true), tab.noteOnScreen())
+        tab.history.returnFromAgentNote(back = true)
+        assertEquals(Triple(SDPO, 3, 1f), tab.place())
+        tab.history.goForward()
+        tab.history.returnFromAgentNote(back = false)
+        assertEquals(Triple(GRPO, 40, 1f), tab.place())
+    }
+
+    @Test
+    fun followingTheSameNoteLinkAgainKeepsOneNoteBehindTheLinkedPage() {
+        val tab = Tab(null)
+        tab.followNoteLink(NOTE, GRPO, 52)
+        tab.history.goBack()
+        // The link tapped again on the note: the tab is already on that page.
+        tab.followNoteLink(NOTE, GRPO, 52)
+        assertEquals(listOf(NOTE.uri), tab.history.backEntries().map { it.document })
+        tab.history.goBack()
+        assertEquals(Triple(NOTE.noteId, false, true), tab.noteOnScreen())
+    }
+
+    @Test
+    fun anotherLinkFromTheNoteReplacesWhatWasAheadOfIt() {
+        val tab = Tab(null)
+        tab.followNoteLink(NOTE, SDPO, 52)
+        tab.followLink(GRPO, 7)
+        tab.history.goBack()
+        tab.history.goBack()
+        assertEquals(Triple(NOTE.noteId, false, true), tab.noteOnScreen())
+
+        // On the note, another of its links: page 52 and grpo were ahead of the note, as in a browser they go.
+        tab.followNoteLink(NOTE, GRPO, 3)
+        assertEquals(Triple(GRPO, 3, 1f), tab.place())
+        assertEquals(listOf(NOTE.uri), tab.history.backEntries().map { it.document })
+        assertFalse(tab.history.canGoForward())
+        tab.history.goBack()
+        assertEquals(Triple(NOTE.noteId, false, true), tab.noteOnScreen())
+    }
+
+    @Test
+    fun aLinkOfAnotherNoteRightAfterComingBackFromANoteStartsAfterIt() {
+        val tab = Tab(null)
+        tab.followNoteLink(NOTE, GRPO, 52)
+        tab.history.goBack()
+        // The tab is started by the link of the next note (onStart, then the intent).
+        tab.history.returnFromAgentNote(back = null)
+        val other = AgentNotePlace("note-2", title = "Second note")
+        tab.followNoteLink(other, GRPO, 12)
+
+        assertEquals(listOf(NOTE.uri, other.uri), tab.history.backEntries().map { it.document })
+        tab.history.goBack()
+        assertEquals(Triple("note-2", true, true), tab.noteOnScreen())
+        tab.history.returnFromAgentNote(back = true)
+        assertEquals("Back on the second note: the first", Triple(NOTE.noteId, false, true), tab.noteOnScreen())
+        assertEquals(Triple(GRPO, 12, 1f), tab.place())
+        tab.history.returnFromAgentNote(back = false)
+        assertEquals(Triple("note-2", true, true), tab.noteOnScreen())
+        tab.history.returnFromAgentNote(back = false)
+        assertEquals(Triple(GRPO, 12, 1f), tab.place())
+    }
+
+    @Test
+    fun aNoteLinkAfterTheTabWasInUseKeepsItsPlaceBehindTheNote() {
+        val tab = Tab(null)
+        tab.followNoteLink(NOTE, GRPO, 52)
+        tab.history.goBack()
+        tab.history.returnFromAgentNote(back = null)
+        tab.history.settle() // the tab was on screen again (tab strip) before the next link
+        val other = AgentNotePlace("note-2", title = "Second note")
+        tab.followNoteLink(other, GRPO, 12)
+
+        tab.history.goBack()
+        assertEquals(Triple("note-2", true, true), tab.noteOnScreen())
+        tab.history.returnFromAgentNote(back = true)
+        assertEquals("Behind the second note: where the tab was", Triple(GRPO, 52, 1f), tab.place())
+        tab.history.goBack()
+        assertEquals(Triple(NOTE.noteId, false, true), tab.noteOnScreen())
+    }
+
+    @Test
+    fun aNoteThatCannotBeShownLeavesTheTabWhereItIs() {
+        val tab = Tab(null)
+        tab.followNoteLink(NOTE, GRPO, 52)
+        tab.notesWindowRefuses = true
+        tab.history.goBack()
+        assertEquals(Triple(GRPO, 52, 1f), tab.place())
+        tab.history.returnFromAgentNote(back = false)
+        assertEquals(Triple(GRPO, 52, 1f), tab.place())
+        assertTrue(tab.history.canGoBack())
+    }
+
+    @Test
+    fun historyListCanPickTheNote() {
+        val tab = Tab(null)
+        tab.followNoteLink(NOTE, SDPO, 52)
+        tab.followLink(GRPO, 7)
+        assertTrue(tab.history.goBackToBackStackIndex(0))
+        assertEquals("Picked from the list: the note, Back and Forward as it stands", Triple(NOTE.noteId, false, true), tab.noteOnScreen())
+        assertEquals("The tab is left as it was", Triple(GRPO, 7, 1f), tab.place())
+        tab.history.returnFromAgentNote(back = false)
+        assertEquals(Triple(SDPO, 52, 1f), tab.place())
+        assertEquals(GRPO, tab.history.forwardEntries().single().document)
+    }
+
+    @Test
+    fun anUnreadableSavedNoteIsDropped() {
+        val encoded = ReaderHistoryManager.encodeEntries(listOf(
+            ReaderHistoryManager.Entry(0, null, 1L, Origin.AGENT_NOTE, "thoughts-agent-note://note/x", null),
+            ReaderHistoryManager.Entry(3, null, 2L, Origin.LINK, SDPO),
+        ))
+        assertEquals(listOf(SDPO), ReaderHistoryManager.decodeEntries(encoded)!!.map { it.document })
+    }
+
     private companion object {
+        val NOTE = AgentNotePlace("00000000-0000-4000-8000-0000000000b1", title = "Links back test")
         const val SDPO = "file:///data/user/0/org.tbend.thoughts/files/thoughts/current-pdfs/concepts_sdpo.pdf"
         const val GRPO = "file:///data/user/0/org.tbend.thoughts/files/thoughts/current-pdfs/concepts_grpo.pdf"
         const val DISTILLATION = "file:///data/user/0/org.tbend.thoughts/files/thoughts/current-pdfs/concepts_distillation.pdf"

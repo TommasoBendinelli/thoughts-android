@@ -36,6 +36,12 @@
     <string name="review_feedback_not_found_count">(%1$d not found)</string>
     <string name="review_feedback_list_title">Answer feedback</string>
     <string name="review_feedback_not_found">Not found in the current answer</string>
+    <!-- Likes and dislikes given on another version of the PDF: listed apart, not drawn or counted. -->
+    <string name="review_feedback_earlier_versions">From earlier versions</string>
+    <plurals name="review_feedback_earlier_count">
+        <item quantity="one">%1$d from an earlier version</item>
+        <item quantity="other">%1$d from earlier versions</item>
+    </plurals>
     <string name="text_selection_more_actions">More actions</string>
     <string name="review_feedback_change_passage">Change passage</string>
     <string name="review_feedback_save_passage">Save passage</string>

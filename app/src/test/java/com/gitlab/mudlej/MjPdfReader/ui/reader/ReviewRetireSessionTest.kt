@@ -66,15 +66,36 @@ class ReviewRetireSessionTest {
             documentCardCounts(cards, "manual.pdf", dueCount = 1))
     }
 
-    @Test fun retiredCardsKeepTheirPdfHighlights() {
+    /**
+     * 13 Nov: retired cards stay on the PDF version they were retired on. The PDF shown neither
+     * lists nor draws them, even when it is that version; the sheet lists them apart.
+     */
+    @Test fun retiredCardsLeaveThePdfShownForTheirOwnList() {
         assertFalse(ReviewBrowserState.RETIRED.hidesPdfHighlight())
         assertTrue(ReviewBrowserState.DELETED.hidesPdfHighlight())
-        val retired = card("retired", ReviewBrowserState.RETIRED, retiredAt = Instant.parse("2026-10-27T10:00:00Z"))
-        assertEquals(listOf(retired), documentReviewCards(listOf(retired), "manual.pdf", null, "a".repeat(64)))
+        val active = card("active", ReviewBrowserState.REVIEW)
+        val onThisVersion = card("retired-here", ReviewBrowserState.RETIRED, retiredAt = Instant.parse("2026-10-27T10:00:00Z"))
+        val onOlderVersion = card("retired-before", ReviewBrowserState.RETIRED, retiredAt = Instant.parse("2026-11-12T10:00:00Z"),
+            pdfSha256 = "0".repeat(64))
+        val otherDocument = card("elsewhere", ReviewBrowserState.RETIRED, retiredAt = Instant.parse("2026-11-12T10:00:00Z"),
+            pdfStem = "notes")
+        val deleted = card("deleted", ReviewBrowserState.DELETED, retiredAt = Instant.parse("2026-11-01T10:00:00Z"))
+        val cards = listOf(active, onThisVersion, onOlderVersion, otherDocument, deleted)
+
+        assertEquals(listOf(active), documentReviewCards(cards, "manual.pdf", null, "a".repeat(64)))
+        assertEquals("Most recently retired first, whatever their version",
+            listOf(onOlderVersion, onThisVersion), retiredDocumentReviewCards(cards, "manual.pdf", null))
+        assertTrue(retiredDocumentReviewCards(listOf(active), "manual.pdf", null).isEmpty())
     }
 
-    private fun card(id: String, state: ReviewBrowserState, retiredAt: Instant? = null) = ReviewBrowserCard(
-        card = ReviewCard(id = id, status = "approved", pdfStem = "manual", pdfSha256 = "a".repeat(64), page = 1,
+    private fun card(
+        id: String,
+        state: ReviewBrowserState,
+        retiredAt: Instant? = null,
+        pdfSha256: String = "a".repeat(64),
+        pdfStem: String = "manual",
+    ) = ReviewBrowserCard(
+        card = ReviewCard(id = id, status = "approved", pdfStem = pdfStem, pdfSha256 = pdfSha256, page = 1,
             pageVisualSha256 = "b".repeat(64), question = "Q", rect = RectF(), schedule = null, reanchorState = "ok",
             retiredAt = retiredAt),
         state = state, dueAt = null, intervalDays = 0, reviewCount = 0, lapseCount = 0, lastRating = null,

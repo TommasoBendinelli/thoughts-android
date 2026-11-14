@@ -51,9 +51,10 @@ import com.gitlab.mudlej.MjPdfReader.data.source.OfflineSourceBundleStore
 import com.gitlab.mudlej.MjPdfReader.data.source.logicalReadScope
 import com.gitlab.mudlej.MjPdfReader.data.source.withLogicalPayloads
 import com.gitlab.mudlej.MjPdfReader.data.sync.ThoughtsServerSecretStore
-import com.gitlab.mudlej.MjPdfReader.data.sync.AGENT_PROPOSAL_RESOLUTION_ENTITY_TYPE
 import com.gitlab.mudlej.MjPdfReader.data.sync.ThoughtsOutboxEntity
 import com.gitlab.mudlej.MjPdfReader.data.sync.highlightedAgentProposals
+import com.gitlab.mudlej.MjPdfReader.data.sync.agentProposalDecisionStates
+import com.gitlab.mudlej.MjPdfReader.ui.usernotes.AgentProposalDecider
 import com.gitlab.mudlej.MjPdfReader.data.sync.locallyAcceptedProposalIds
 import com.gitlab.mudlej.MjPdfReader.data.source.SourceEditQueue
 import com.gitlab.mudlej.MjPdfReader.data.sync.FedoraRepository
@@ -94,6 +95,9 @@ import com.gitlab.mudlej.MjPdfReader.ui.share.thoughtsCitationContextFor
 import com.gitlab.mudlej.MjPdfReader.ui.links.ThoughtsCitationLinkActivity
 import com.gitlab.mudlej.MjPdfReader.ui.links.EXTRA_REMOTE_PDF_LINK
 import com.gitlab.mudlej.MjPdfReader.ui.links.parseRemotePdfLink
+import com.gitlab.mudlej.MjPdfReader.ui.reader.navigation.AgentNotePlace
+import com.gitlab.mudlej.MjPdfReader.ui.reader.navigation.EXTRA_AGENT_NOTE_PLACE
+import com.gitlab.mudlej.MjPdfReader.ui.reader.navigation.ReaderNoteHistory
 import com.gitlab.mudlej.MjPdfReader.ui.sync.showSyncTransferPrompt
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.google.android.material.snackbar.Snackbar
@@ -111,6 +115,9 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+
+/** How long Undo stays offered after a tap on a proposal's ✓ accepted it. */
+private const val MARKER_ACCEPT_UNDO_MS = 8_000
 
 class MainActivity : AppCompatActivity(), ReaderUi, DocumentTabsHost {
 
@@ -299,9 +306,10 @@ class MainActivity : AppCompatActivity(), ReaderUi, DocumentTabsHost {
 
         openInitialDocument(savedInstanceState)
         reader.wireViews()
+        describeAgentProposalMarkers()
         lifecycleScope.launch {
             AppDatabase.getInstance(applicationContext).thoughtsSyncDao()
-                .observeByEntityType(AGENT_PROPOSAL_RESOLUTION_ENTITY_TYPE).collect { rows ->
+                .observeAgentProposalDecisions().collect { rows ->
                     agentProposalDecisionRows = rows
                     loadedAgentProposalFilename?.let { renderAgentProposalOverlays(it, loadedAgentProposals) }
                 }
@@ -321,11 +329,17 @@ class MainActivity : AppCompatActivity(), ReaderUi, DocumentTabsHost {
                 }
             } else {
                 documentLoader.prepareNewDocument(intentUri)
+                // A new tab for an agent note's link: Back shows the note again.
+                takeAgentNotePlace(intent)?.let(readerHistory::recordAgentNote)
             }
         }
 
         displayFromUri(pdf.uri, true)
     }
+
+    /** The agent note an intent's link was followed from, taken off the intent so it counts once. */
+    private fun takeAgentNotePlace(intent: Intent): AgentNotePlace? =
+        AgentNotePlace.fromJson(intent.getStringExtra(EXTRA_AGENT_NOTE_PLACE)).also { intent.removeExtra(EXTRA_AGENT_NOTE_PLACE) }
 
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
@@ -345,8 +359,15 @@ class MainActivity : AppCompatActivity(), ReaderUi, DocumentTabsHost {
                 intent.hasExtra(com.gitlab.mudlej.MjPdfReader.ui.reader.links.EXTRA_LINK_OVERRIDE_TARGET)
         }
         if (citationUri != null) {
+            // A link of an agent note: the note goes in this tab's history, so Back shows it again.
+            val fromNote = takeAgentNotePlace(intent)
             if (pdf.uri == citationUri) {
-                readerHistory.recordJump(ReaderHistoryManager.Origin.LINK)
+                if (fromNote == null) {
+                    readerHistory.recordJump(ReaderHistoryManager.Origin.LINK)
+                } else {
+                    readerHistory.recordAgentNoteLink(fromNote, sameDocument = true,
+                        parseRemotePdfLink(intent.getStringExtra(EXTRA_REMOTE_PDF_LINK))?.pageIndex)
+                }
                 binding.root.post {
                     openCitationPageIfRequested()
                     openRemotePdfLinkIfRequested()
@@ -356,7 +377,11 @@ class MainActivity : AppCompatActivity(), ReaderUi, DocumentTabsHost {
             } else {
                 runAfterDirtyAnnotationPrompt {
                     // A link to another document is a history step: Back returns here, at the link.
-                    if (pdf.uri != null) readerHistory.recordLeavingDocument(ReaderHistoryManager.Origin.LINK)
+                    if (fromNote != null) {
+                        readerHistory.recordAgentNoteLink(fromNote, sameDocument = false, null)
+                    } else if (pdf.uri != null) {
+                        readerHistory.recordLeavingDocument(ReaderHistoryManager.Origin.LINK)
+                    }
                     readerHistory.keepingHistory { documentLoader.prepareNewDocument(citationUri) }
                     displayFromUri(citationUri, true)
                 }
@@ -410,6 +435,7 @@ class MainActivity : AppCompatActivity(), ReaderUi, DocumentTabsHost {
 
     override fun onStart() {
         super.onStart()
+        returnFromAgentNote()
         ContextCompat.registerReceiver(
             this,
             statusReceiver,
@@ -683,13 +709,29 @@ class MainActivity : AppCompatActivity(), ReaderUi, DocumentTabsHost {
         }
     }
 
-    /** The Review Cards sheet: this document's cards in page order. */
-    internal suspend fun loadDocumentReviewCards(): List<ReviewCardsSheetItem> {
+    /**
+     * The Review Cards sheet: this document's cards in page order, and apart its retired cards,
+     * which stay on the PDF version they were retired on.
+     */
+    internal suspend fun loadDocumentReviewCards(): ReviewCardsSheetContent {
         val filename = pdf.name
         val reading = pdf.projectReading
-        val hash = pdf.annotationPdfSha256 ?: return emptyList()
+        val hash = pdf.annotationPdfSha256 ?: return ReviewCardsSheetContent(emptyList())
         return withContext(Dispatchers.IO) {
-            documentReviewCards(ReviewStore(applicationContext).browserCards(), filename, reading, hash)
+            val all = ReviewStore(applicationContext).browserCards()
+            val retired = retiredDocumentReviewCards(all, filename, reading).map { item ->
+                ReviewCardsSheetItem(
+                    cardId = item.card.id,
+                    question = item.card.question,
+                    pageIndex = (item.card.pdfPage ?: 1) - 1 + documentReviewPageOffset(reading, item.card.pdfStem),
+                    metadata = reviewCardsSheetMetadata(this@MainActivity, 0, item.currentTags(), item.dueAt,
+                        item.reviewCount, retiredAt = item.card.retiredAt,
+                        place = getString(R.string.review_cards_sheet_retired_place)),
+                    reviewable = false,
+                    retired = true,
+                )
+            }
+            val cards = documentReviewCards(all, filename, reading, hash)
                 .map { item ->
                     // A card made in the HTML view has no page until Fedora links it: listed first.
                     val pageIndex = (item.card.pdfPage ?: 1) - 1 + documentReviewPageOffset(reading, item.card.pdfStem)
@@ -715,11 +757,16 @@ class MainActivity : AppCompatActivity(), ReaderUi, DocumentTabsHost {
                                 else if (attachmentCardStatus.isNotFound(item.card.id)) getString(R.string.html_attachment_answer_not_found)
                                 else getString(R.string.html_attachment_card_placement, anchor.path.substringAfterLast('/'))
                             }),
-                        // A retired card is only shown: it is not offered for review.
-                        reviewable = (attachment != null || item.card.pdfSha256.equals(hash, ignoreCase = true)) && !item.card.retired,
+                        reviewable = attachment != null || item.card.pdfSha256.equals(hash, ignoreCase = true),
                     )
                 }
+            ReviewCardsSheetContent(cards, retired)
         }
+    }
+
+    /** A retired card picked in the Review Cards sheet: it has no place on this PDF, so its details. */
+    internal fun openRetiredReviewCard(item: ReviewCardsSheetItem) {
+        startActivity(ReviewCardDetailsActivity.intent(this, item.cardId))
     }
 
     /**
@@ -1001,19 +1048,112 @@ class MainActivity : AppCompatActivity(), ReaderUi, DocumentTabsHost {
         binding.pdfView.setAgentProposalOverlays(overlays)
     }
 
+    /**
+     * A tap on a proposal's ✓ accepts it, as Accept in its sheet does; one that cannot be decided
+     * here opens in the sheet, which says why. Only the ✓ acts: highlighted text keeps normal text
+     * interaction.
+     */
     internal fun handleAgentProposalTap(event: MotionEvent): Boolean {
-        // Only the pencil opens a proposal; highlighted text keeps normal text interaction.
         val proposalId = binding.pdfView.agentProposalMarkerAt(event.x, event.y) ?: return false
-        val filename = pdf.name.takeIf { it.endsWith(".pdf", ignoreCase = true) || pdf.projectReading != null } ?: return false
-        if (loadedAgentProposalFilename != filename) return false
-        val proposal = loadedAgentProposals
-            .firstOrNull { it.id == proposalId }
-            ?: return false
+        val proposal = loadedAgentProposal(proposalId) ?: return false
         binding.pdfView.clearTextSelection()
-        selectedAgentProposalId = proposalId
+        // A tap that stopped the page while it still moved, or saw it move, only stops the page.
+        if (!binding.pdfView.isStillMarkerTap()) return true
+        acceptAgentProposalFromMarker(proposal)
+        return true
+    }
+
+    /** A long press on a proposal's ✓ opens it in the sheet, with all its options. */
+    internal fun handleAgentProposalLongPress(event: MotionEvent): Boolean {
+        val proposalId = binding.pdfView.agentProposalMarkerAt(event.x, event.y) ?: return false
+        val proposal = loadedAgentProposal(proposalId) ?: return false
+        binding.pdfView.clearTextSelection()
+        openAgentProposal(proposal)
+        return true
+    }
+
+    /** What the ✓ marks say to accessibility services, and what their actions do. */
+    private fun describeAgentProposalMarkers() {
+        binding.pdfView.setAgentProposalMarkerAccessibility(
+            getString(R.string.agent_proposal_marker_description),
+            object : com.github.barteksc.pdfviewer.PDFView.AgentProposalMarkerActions {
+                override fun onAgentProposalMarkerTap(proposalId: String): Boolean =
+                    loadedAgentProposal(proposalId)?.let { acceptAgentProposalFromMarker(it); true } ?: false
+
+                override fun onAgentProposalMarkerLongPress(proposalId: String): Boolean =
+                    loadedAgentProposal(proposalId)?.let { openAgentProposal(it); true } ?: false
+            },
+        )
+    }
+
+    private fun loadedAgentProposal(proposalId: String): OfflineAgentProposal? {
+        val filename = pdf.name.takeIf { it.endsWith(".pdf", ignoreCase = true) || pdf.projectReading != null } ?: return null
+        if (loadedAgentProposalFilename != filename) return null
+        return loadedAgentProposals.firstOrNull { it.id == proposalId }
+    }
+
+    private fun openAgentProposal(proposal: OfflineAgentProposal) {
+        val filename = loadedAgentProposalFilename ?: return
+        selectedAgentProposalId = proposal.id
         renderAgentProposalOverlays(filename, loadedAgentProposals)
         reader.readerNavigationController.showAgentProposal(proposal.id)
-        return true
+    }
+
+    /** Proposals whose ✓ was tapped and whose accept is being checked and queued (one at a time each). */
+    private val acceptingFromMarker = mutableSetOf<String>()
+
+    /**
+     * Accepts [proposal] the way its sheet's Accept does (the same checks, queued for Sync, which
+     * sends it to Fedora), then offers Undo; one that cannot be decided here opens in the sheet.
+     */
+    private fun acceptAgentProposalFromMarker(proposal: OfflineAgentProposal) {
+        if (!acceptingFromMarker.add(proposal.id)) return
+        val filename = loadedAgentProposalFilename
+        lifecycleScope.launch {
+            val operationId = try {
+                val check = withContext(Dispatchers.IO) {
+                    runCatching { AgentProposalDecider.checkSource(applicationContext, proposal) }.getOrNull()
+                }
+                val decision = agentProposalDecisionStates(agentProposalDecisionRows, proposal.bundleId)[proposal.id]
+                if (check != null && proposal.id !in locallyAcceptedAgentProposalIds &&
+                    AgentProposalDecider.decidable(proposal.objectSha256, check.excerpt != null, check.changed, decision)) {
+                    withContext(Dispatchers.IO) { AgentProposalDecider.decide(applicationContext, proposal, "accept") }
+                } else null
+            } catch (error: kotlinx.coroutines.CancellationException) {
+                throw error
+            } catch (error: Exception) {
+                Log.w(TAG, "Could not accept the proposal from its marker", error)
+                AppSnackbar.make(binding.root, getString(R.string.agent_proposal_failed, error.message.orEmpty()),
+                    Snackbar.LENGTH_LONG).show()
+                return@launch
+            } finally {
+                acceptingFromMarker.remove(proposal.id)
+            }
+            if (operationId == null) {
+                // Cannot be decided here (source changed or missing, a decision waiting): the sheet says why.
+                if (loadedAgentProposalFilename == filename && loadedAgentProposal(proposal.id) != null) openAgentProposal(proposal)
+                return@launch
+            }
+            // The decision rows update the page: the ✓ goes once the accept is queued.
+            // Long enough to reach Undo after seeing the ✓ go.
+            AppSnackbar.make(binding.root, R.string.agent_proposal_accepted_on_page, Snackbar.LENGTH_LONG)
+                .setDuration(MARKER_ACCEPT_UNDO_MS)
+                .setAction(R.string.overview_undo) { undoAgentProposalAccept(operationId) }
+                .show()
+        }
+    }
+
+    /** Undo after a ✓: the existing undo of a resolution, queued after the accept, so Fedora takes it back in order. */
+    private fun undoAgentProposalAccept(operationId: String) {
+        lifecycleScope.launch {
+            runCatching { withContext(Dispatchers.IO) { AgentProposalDecider.undo(applicationContext, operationId) } }
+                .onFailure { error ->
+                    if (error is kotlinx.coroutines.CancellationException) throw error
+                    Log.w(TAG, "Could not undo the proposal accept", error)
+                    AppSnackbar.make(binding.root, getString(R.string.agent_proposal_undo_failed, error.message.orEmpty()),
+                        Snackbar.LENGTH_LONG).show()
+                }
+        }
     }
 
     private fun selectAgentProposal(proposalId: String): Boolean {
@@ -1061,6 +1201,34 @@ class MainActivity : AppCompatActivity(), ReaderUi, DocumentTabsHost {
             vm.pendingViewState = entry.viewState
             displayFromUri(uri, true)
         }
+    }
+
+    /**
+     * A Back or Forward step reached the agent note a link was followed from: the notes window
+     * shows it as it was left, with the arrows that go on from it in this tab's history.
+     */
+    internal fun showAgentNoteFromHistory(entry: ReaderHistoryManager.Entry, canGoBack: Boolean, canGoForward: Boolean): Boolean {
+        val note = entry.note ?: return false
+        dismissPdfCommentSheet()
+        ReaderNoteHistory.show(ReaderNoteHistory.Shown(taskId, note, canGoBack, canGoForward))
+        return try {
+            startActivity(com.gitlab.mudlej.MjPdfReader.ui.agentnotes.AgentNoteActivity.historyIntent(this, note))
+            true
+        } catch (error: RuntimeException) {
+            Log.w(TAG, "Could not show the agent note of the history", error)
+            ReaderNoteHistory.returned(taskId)
+            false
+        }
+    }
+
+    /**
+     * This tab is shown again: if a history step had shown an agent note in its place, carry out
+     * the arrow pressed on the note (if any). Results of activities arrive after onStart, so a step
+     * made from the history list is not undone before the note shows.
+     */
+    private fun returnFromAgentNote() {
+        if (!::reader.isInitialized) return
+        readerHistory.returnFromAgentNote(ReaderNoteHistory.returned(taskId))
     }
 
     fun openRemotePdfLinkIfRequested() {
@@ -2092,6 +2260,10 @@ class MainActivity : AppCompatActivity(), ReaderUi, DocumentTabsHost {
 
     public override fun onResume() {
         super.onResume()
+        // An arrow pressed on the note while this tab stayed visible (split screen): no onStart came.
+        if (ReaderNoteHistory.hasRequest(taskId)) returnFromAgentNote()
+        // Intents come before onResume: a link from the note just left was recorded by now.
+        if (::reader.isInitialized) readerHistory.settle()
         if (::studyPageBar.isInitialized) studyPageBar.refresh()
         ReaderSessionNavigation.remember(this)
         com.gitlab.mudlej.MjPdfReader.ui.sync.SyncBatterySetup.offerOnFirstUse(this)
@@ -2365,6 +2537,8 @@ class MainActivity : AppCompatActivity(), ReaderUi, DocumentTabsHost {
     }
 
     override fun onDestroy() {
+        // A closed tab: the notes window no longer leads back into it.
+        if (isFinishing) ReaderNoteHistory.returned(taskId)
         if (::studyPageBar.isInitialized) studyPageBar.release()
         if (::openDocumentTabsController.isInitialized) {
             openDocumentTabsController.release()

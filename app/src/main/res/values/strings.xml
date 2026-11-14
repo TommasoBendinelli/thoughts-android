@@ -1209,6 +1209,8 @@
     <string name="document_status_sync_failed">Error</string>
     <string name="document_status_comments_attention">Error</string>
     <string name="document_status_syncing">Syncing…</string>
+    <!-- Fedora is building the document's new PDF; the previous PDF stays until it arrives. -->
+    <string name="document_status_updating">Updating…</string>
     <string name="document_sync_never">Never synced</string>
     <string name="document_status_error">Error</string>
     <string name="document_status_synced">Up to date</string>
@@ -1501,6 +1503,10 @@
     <string name="agent_proposal_queued">Decision saved locally — pending sync.</string>
     <string name="agent_proposal_failed">Could not save the proposal decision: %1$s</string>
     <string name="agent_proposal_pending_accept">Pending — Accept saved locally.</string>
+    <!-- The ✓ drawn on the page for a pending agent proposal: a tap accepts it, a long press opens it. -->
+    <string name="agent_proposal_marker_description">Accept proposal · long press for more</string>
+    <string name="agent_proposal_accepted_on_page">Proposal accepted — sent with the next Sync.</string>
+    <string name="agent_proposal_undo_failed">Could not undo the accept: %1$s</string>
     <string name="agent_proposal_pending_reject">Pending — Reject saved locally.</string>
     <string name="agent_proposal_resolution_failed">Failed — %1$s</string>
     <plurals name="document_status_pending_proposal_accept">
@@ -1769,6 +1775,19 @@
     <string name="sync_outside_change_uploaded">Queued for the next Sync.</string>
     <string name="sync_outside_change_discarded">The outside change was discarded.</string>
     <string name="sync_outside_change_changed">Nothing done: the file changed again. Look at it once more.</string>
+    <string name="sync_refused_changes_one">1 change was refused by the server</string>
+    <string name="sync_refused_changes_many">changes were refused by the server</string>
+    <string name="sync_refused_changes_title">Refused by the server</string>
+    <string name="sync_refused_changes_review">Retry or discard</string>
+    <string name="sync_refused_change_notice">Refused by the server: %1$s. The server answered: %2$s. Kept on this phone until you retry or discard it.</string>
+    <string name="sync_refused_changes_none">No refused change is waiting.</string>
+    <string name="sync_refused_project_change_message">%1$s\n\nThe server answered: %2$s\n\nThe change is kept on this phone and is not sent again by itself, so Sync goes on without it. Later changes to the same Project wait until you choose.\n\nRetry sends it again, on top of the Project as the server has it now. Discard drops the change. Either starts a Sync.</string>
+    <string name="sync_refused_removal_message">Remove %1$s from the Library\n\nThe server answered: %2$s\n\nThe removal is kept on this phone and is not sent again by itself, so Sync goes on without it.\n\nRetry sends it again. Discard gives the removal up: the PDF stays in the Library. Either starts a Sync.</string>
+    <string name="sync_refused_change_retry">Retry</string>
+    <string name="sync_refused_change_discard">Discard</string>
+    <string name="sync_refused_change_retried">Sending it again now.</string>
+    <string name="sync_refused_change_discarded">The change was discarded.</string>
+    <string name="sync_refused_change_gone">Nothing done: the change is no longer waiting.</string>
     <string name="thoughts_server_save_test">Save and test</string>
     <string name="thoughts_server_connected">Connected. Use Sync to exchange changes and refresh the private cache.</string>
     <string name="thoughts_server_connection_failed">Saved securely, but the server test failed. Check the server address, the internet connection and the device token.</string>
@@ -1947,11 +1966,11 @@
     <string name="agent_notes_listening" translatable="false">Listening for agent notes</string>
     <string name="agent_notes_listening_detail" translatable="false">You get a notification for each note from your agent. Stops 30 minutes after your last agent action.</string>
     <string name="agent_notes_listening_stop" translatable="false">Stop</string>
-    <string name="agent_notes_study_mode_listening_detail" translatable="false">Study mode: you get a notification for each note from your agent until you tap Stop.</string>
+    <string name="agent_notes_study_mode_listening_detail" translatable="false">Study mode. Pauses after %1$d minutes without a capture, reply or note; resumes when you open Thoughts.</string>
     <string name="agent_notes_study_mode" translatable="false">Study mode</string>
-    <string name="agent_notes_study_mode_detail" translatable="false">Listens for notes from your agent until you turn it off</string>
+    <string name="agent_notes_study_mode_detail" translatable="false">Listens for notes from your agent until you turn it off; pauses after an hour without use and resumes when you open Thoughts</string>
     <string name="agent_notes_study_mode_on_title" translatable="false">Study mode is on</string>
-    <string name="agent_notes_study_mode_ready_listening" translatable="false">Listening for notes from your agent until you turn study mode off</string>
+    <string name="agent_notes_study_mode_ready_listening" translatable="false">Listening for notes from your agent until you turn study mode off; it pauses after an hour without use and resumes when you open Thoughts</string>
     <string name="agent_notes_study_mode_ready_notifications" translatable="false">Notifications are allowed</string>
     <string name="agent_notes_study_mode_missing_notifications" translatable="false">Notifications are off, so notes arrive silently when Thoughts is not on screen</string>
     <string name="agent_notes_study_mode_prompt_copied" translatable="false">The study-mode prompt is on the clipboard: paste it into your agent conversation once, so it watches the glasses photos and answers with notes.</string>
@@ -1980,7 +1999,29 @@
     <string name="agent_note_sent_waiting" translatable="false">Sent ✓ · waiting for the agent</string>
     <string name="agent_note_sent_not_listening" translatable="false">Sent ✓ · no agent is listening</string>
     <string name="agent_note_sent_plain" translatable="false">Sent ✓</string>
+    <!-- Who answers a reply while a note is listening (server agent_note_owners_v1: listeners name their role). -->
+    <string name="agent_note_sent_answered_by" translatable="false">Sent ✓ · answered by %1$s</string>
+    <string name="agent_note_answered_by" translatable="false">Answered by: %1$s</string>
+    <string name="agent_note_coverer_reply_agent" translatable="false">Thoughts reply agent</string>
+    <string name="agent_note_coverer_sender" translatable="false">the agent that sent it</string>
+    <string name="agent_note_coverer_topic" translatable="false">%1$s agent</string>
+    <string name="agent_note_coverer_topic_unnamed" translatable="false">the topic\'s agent</string>
     <string name="agent_note_not_listening" translatable="false">No agent is listening for your reply right now</string>
+    <!-- The line under a note's title: whether an agent listens for a reply, which one, and Change (server agent_note_answer_by_v1). -->
+    <string name="agent_note_answer_listening" translatable="false">%1$s is listening</string>
+    <string name="agent_note_answer_listening_unnamed" translatable="false">An agent is listening</string>
+    <string name="agent_note_answer_nobody" translatable="false">No agent is listening right now</string>
+    <string name="agent_note_answer_chosen_not_listening" translatable="false">%1$s is not listening right now. The Thoughts reply agent answers after 10 minutes.</string>
+    <string name="agent_note_answer_change" translatable="false">Change</string>
+    <string name="agent_note_answer_change_needs_server" translatable="false">Change (needs the server)</string>
+    <string name="agent_note_answer_choice_title" translatable="false">Who answers your reply</string>
+    <string name="agent_note_answer_automatic" translatable="false">Automatic</string>
+    <string name="agent_note_answer_automatic_detail" translatable="false">The agent that sent the note answers first, then the Thoughts reply agent</string>
+    <string name="agent_note_answer_choice_not_listening" translatable="false">%1$s (not listening)</string>
+    <string name="agent_note_answer_change_failed" translatable="false">The server did not save the choice. It stays as it was.</string>
+    <string name="agent_note_answer_agent_unknown" translatable="false">The server no longer knows that agent. The choice stays as it was.</string>
+    <string name="agent_note_answer_mark_listening" translatable="false">Listening</string>
+    <string name="agent_note_answer_mark_not_listening" translatable="false">Not listening</string>
     <string name="agent_note_sent_nobody_listening" translatable="false">Saved with the note, but no agent is listening</string>
     <string name="agent_note_reply_copied" translatable="false">Reply copied: paste it in the conversation</string>
     <string name="agent_note_message_expand" translatable="false">Show the whole message</string>

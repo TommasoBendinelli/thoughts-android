@@ -255,6 +255,11 @@ internal fun recordSyncBuildProgress(
     )
 }
 
+/** How many PDFs were still building on the server when [record] ended (0 unless it ended synced). */
+internal fun pdfsStillBuildingAfter(record: SyncOperationRecord?): Int =
+    if (record == null || record.status != SyncOperationStore.STATUS_SYNCED) 0
+    else pendingFedoraPdfCount(pendingFedoraBuildsAfter(emptyList(), record.buildProgress, wholeLibrary = true))
+
 internal fun completeSyncBuildOperation(
     record: SyncOperationRecord,
     completedAtEpochMillis: Long,
@@ -417,15 +422,24 @@ class SyncOperationStore(
     databaseOverride: AppDatabase? = null,
 ) {
     private val appContext = context.applicationContext
-    private val preferences = appContext.getSharedPreferences(PREFERENCES, Context.MODE_PRIVATE)
+    // Read only by the one-time import below, never where the store is created.
+    private val preferences by lazy { appContext.getSharedPreferences(PREFERENCES, Context.MODE_PRIVATE) }
     private val gson = Gson()
     private val database = databaseOverride ?: AppDatabase.getInstance(appContext)
     private val dao = database.thoughtsSyncDao()
 
     init {
-        ensureLegacyImported()
-        ensureRoomEventsImported()
+        // Creating a store imported the Sync history of older versions on the spot: a preferences
+        // file and a database query on whichever thread created it, the main thread at start.
+        // The import now runs once per process and database on its own thread; the methods that
+        // read or change the history wait for it ([awaitLegacyImport]), so they see what they saw.
+        LEGACY_IMPORT.start(database) {
+            ensureLegacyImported()
+            ensureRoomEventsImported()
+        }
     }
+
+    private fun awaitLegacyImport() = LEGACY_IMPORT.await(database)
 
     @Synchronized
     fun begin(target: String?, building: Boolean): String {
@@ -444,6 +458,7 @@ class SyncOperationStore(
     }
 
     private fun beginRecord(target: String?, building: Boolean, retryOf: String?): String {
+        awaitLegacyImport()
         val now = System.currentTimeMillis()
         val id = UUID.randomUUID().toString()
         // The request is only syncing after its worker or JobService enters the
@@ -533,15 +548,13 @@ class SyncOperationStore(
                     status == STATUS_SYNCING &&
                     (record.kind == SyncOperationKind.BUILD || record.buildCheckedAtEpochMillis > 0)
                 ) {
-                    val serverBuildStillActive = record.buildProgress.any {
-                        it.serverStatus == "queued" || it.serverStatus == "running"
-                    }
+                    // A build still running on Fedora does not make the phone's work "Building":
+                    // Sync no longer waits for it (RemoteWorkWatch fetches its PDFs when it is done).
                     appendTimestampedSyncOperationEvent(record, safeEvent, now, MAX_EVENTS).copy(
-                        status = if (serverBuildStillActive) STATUS_BUILDING else STATUS_SYNCING,
+                        status = STATUS_SYNCING,
                         updatedAtEpochMillis = now,
                         displayMessage = "",
-                        phase = if (serverBuildStillActive) SyncRunPhase.BUILDING else
-                            nextSyncRunPhase(record, status, safeEvent),
+                        phase = nextSyncRunPhase(record, status, safeEvent),
                     )
                 } else if (
                     (record.kind == SyncOperationKind.BUILD || record.buildCheckedAtEpochMillis > 0) &&
@@ -586,6 +599,17 @@ class SyncOperationStore(
         if (changed == null) return
         broadcastChanged(id)
     }
+
+    /**
+     * Ends a Sync: "Completed", or "Completed; 2 PDFs still building on the server" when the server was still
+     * building [pdfsStillBuilding] PDFs; Sync does not wait for them.
+     */
+    fun completeSync(id: String?, pdfsStillBuilding: Int) = append(
+        id,
+        STATUS_SYNCED,
+        if (pdfsStillBuilding > 0) "$BUILD_COMPLETED_EVENT; ${pdfsStillBuildingMessage(pdfsStillBuilding)}"
+        else BUILD_COMPLETED_EVENT,
+    )
 
     @Synchronized
     fun recordTransientRetry(id: String?, attempt: Int, delayMillis: Long, detail: String) {
@@ -825,6 +849,7 @@ class SyncOperationStore(
     fun latestGlobalOperation(
         nowEpochMillis: Long = System.currentTimeMillis(),
     ): SyncOperationRecord? = runBlocking(Dispatchers.IO) {
+        awaitLegacyImport()
         dao.latestGlobalSyncRun(nowEpochMillis - RETENTION_MILLIS)?.let(::storedRunRecord)
     }
 
@@ -846,6 +871,7 @@ class SyncOperationStore(
         target: String,
         nowEpochMillis: Long = System.currentTimeMillis(),
     ): SyncOperationRecord? = runBlocking(Dispatchers.IO) {
+        awaitLegacyImport()
         dao.latestTargetSyncRun(nowEpochMillis - RETENTION_MILLIS, target)?.let(::storedRunRecord)
     }
 
@@ -861,6 +887,7 @@ class SyncOperationStore(
     fun pendingOperations(
         nowEpochMillis: Long = System.currentTimeMillis(),
     ): List<SyncOperationRecord> = runBlocking(Dispatchers.IO) {
+        awaitLegacyImport()
         dao.pendingSyncRuns(
             cutoff = nowEpochMillis - RETENTION_MILLIS,
             statuses = PENDING_STATUSES,
@@ -873,16 +900,19 @@ class SyncOperationStore(
         .distinctUntilChanged()
 
     fun operation(id: String): SyncOperationRecord? = runBlocking(Dispatchers.IO) {
+        awaitLegacyImport()
         dao.syncRun(id)?.let(::storedRunRecord)
     }
 
     fun operationWithEvents(id: String): SyncOperationRecord? = runBlocking(Dispatchers.IO) {
+        awaitLegacyImport()
         dao.syncRun(id)?.let { run -> storedRunRecord(run, dao.recentSyncEvents(id, MAX_EVENTS)) }
     }
 
     fun summaries(nowEpochMillis: Long = System.currentTimeMillis()): List<SyncOperationRecord> {
         val cutoff = nowEpochMillis - RETENTION_MILLIS
         return runBlocking(Dispatchers.IO) {
+            awaitLegacyImport()
             dao.syncRuns(cutoff, MAX_RECORDS).map(::storedRunRecord)
         }
     }
@@ -891,6 +921,7 @@ class SyncOperationStore(
     fun records(nowEpochMillis: Long = System.currentTimeMillis()): List<SyncOperationRecord> {
         val cutoff = nowEpochMillis - RETENTION_MILLIS
         return runBlocking(Dispatchers.IO) {
+            awaitLegacyImport()
             val runs = dao.syncRuns(cutoff, MAX_RECORDS)
             if (runs.isEmpty()) return@runBlocking emptyList()
             val eventsByRun = dao.syncEventsForRuns(runs.map(ThoughtsSyncRunEntity::id))
@@ -988,6 +1019,7 @@ class SyncOperationStore(
         transform: suspend (SyncOperationRecord) -> SyncOperationRecord,
         transition: (SyncOperationRecord) -> LocalSyncTransition?,
     ): SyncOperationRecord? = runBlocking(Dispatchers.IO) {
+        awaitLegacyImport()
         database.withTransaction {
             val current = dao.syncRun(id)?.let(::storedRunRecord)
                 ?: return@withTransaction null
@@ -1382,6 +1414,10 @@ class SyncOperationStore(
             STATUS_RETRYING,
         )
         private const val PREFERENCES = "thoughts-sync-operations-v1"
+        /** The one-time import of older versions' Sync history, once per process and database. */
+        private val LEGACY_IMPORT = com.gitlab.mudlej.MjPdfReader.data.BackgroundOnce("thoughts-sync-history-import") { error ->
+            runCatching { android.util.Log.w("ThoughtsSync", "Could not import the older Sync history", error) }
+        }
         private const val KEY_RECORDS = "records"
         private const val KEY_ROOM_IMPORTED = "room_v1_imported"
         private const val MAX_RECORDS = 500

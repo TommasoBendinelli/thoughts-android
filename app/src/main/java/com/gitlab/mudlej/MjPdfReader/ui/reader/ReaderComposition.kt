@@ -414,6 +414,7 @@ class ReaderComposition(
         ::onHistoryChanged,
         { doc.uri?.toString() },
         { entry, commit -> activity.openHistoryDocument(entry, commit) },
+        { entry, canGoBack, canGoForward -> activity.showAgentNoteFromHistory(entry, canGoBack, canGoForward) },
     )
     val userBookmarkController: UserBookmarkController = UserBookmarkController(
         binding,
@@ -447,6 +448,7 @@ class ReaderComposition(
         activity::highlightReviewCardFromSheet,
         activity::reviewCardFromSheet,
         activity::setReviewCardsSheetOpen,
+        activity::openRetiredReviewCard,
     )
     val pdfLinkOverrideController = com.gitlab.mudlej.MjPdfReader.ui.reader.links.PdfLinkOverrideController(
         activity,
@@ -512,6 +514,10 @@ class ReaderComposition(
             inlineAnnotationActionController.handleEmptyTap()
             true
         },
+    ))
+    /** Long presses that belong to a marker (a proposal's ✓ opens its sheet) instead of starting a text selection. */
+    val longPressDispatcher = TapDispatcher(listOf(
+        { event -> activity.handleAgentProposalLongPress(event) },
     ))
     val documentLoader: DocumentLoader = DocumentLoader(
         binding,
@@ -657,6 +663,7 @@ class ReaderComposition(
             .onDocumentInteraction { motionEvent -> autoScrollManager.handleUserInteraction(motionEvent) }
             .onTap { motionEvent -> tapDispatcher.dispatch(motionEvent) }
             .onTapUp { motionEvent -> inlineAnnotationActionController.handleImmediatePdfTap(motionEvent) }
+            .onLongPressFirst { motionEvent -> longPressDispatcher.dispatch(motionEvent) }
             .onLongPress { motionEvent -> inlineAnnotationActionController.handlePdfLongPress(motionEvent) }
             .linkHandler(readerNavigationController.createLinkHandler())
             .scrollHandle(createScrollHandle())

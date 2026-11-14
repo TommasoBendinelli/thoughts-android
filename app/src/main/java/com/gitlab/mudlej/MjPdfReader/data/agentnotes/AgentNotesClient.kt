@@ -51,7 +51,18 @@ interface AgentNotesApi {
         else throw UnsupportedOperationException("photo")
     fun delete(noteId: String)
     /** Whether an agent listens for replies to [noteId] right now; UNKNOWN on a server that cannot tell. */
-    fun listening(noteId: String): AgentNoteListening = AgentNoteListening.UNKNOWN
+    fun listening(noteId: String): AgentNoteListening = listeningAnswer(noteId).state
+    /** [listening] with who answers the reply (the sender's agent, a topic owner or the reply agent). */
+    fun listeningAnswer(noteId: String): AgentNoteListeningAnswer = AgentNoteListeningAnswer.UNKNOWN
+    /**
+     * Chooses the agent that answers replies to [noteId] ([agent]), or automatic (null), and
+     * returns the note's listening answer as it is then (server [AGENT_NOTE_ANSWER_BY_CAPABILITY]).
+     * An agent the server does not know is refused with 409 [AGENT_NOTE_ANSWERER_UNKNOWN].
+     */
+    fun setAnswerBy(noteId: String, agent: AgentNoteAgent?): AgentNoteListeningAnswer =
+        throw UnsupportedOperationException("setAnswerBy")
+    /** What the server can do (its capability names); empty when it does not say. */
+    fun capabilities(): Set<String> = emptySet()
     /** Creates a note from this phone (a page sent to the agent); the same [note] again is idempotent. */
     fun createNote(note: AgentNote, imageBytes: ByteArray, strokeCount: Int): AgentNote =
         throw UnsupportedOperationException("createNote")
@@ -206,12 +217,26 @@ class AgentNotesClient(
         request("DELETE", "$BASE_PATH/${segment(noteId)}", label = "delete", accept = { Unit })
     }
 
-    override fun listening(noteId: String): AgentNoteListening = try {
-        AgentNoteListening.fromJson(requestJson("GET", "$BASE_PATH/${segment(noteId)}/listening", label = "listening"))
+    override fun listeningAnswer(noteId: String): AgentNoteListeningAnswer = try {
+        AgentNoteListeningAnswer.fromJson(requestJson("GET", "$BASE_PATH/${segment(noteId)}/listening", label = "listening"))
     } catch (error: AgentNotesHttpException) {
         // A server before agent_note_listening_v1 has no such route: it cannot tell.
-        if (error.statusCode == 404) AgentNoteListening.UNKNOWN else throw error
+        if (error.statusCode == 404) AgentNoteListeningAnswer.UNKNOWN else throw error
     }
+
+    override fun setAnswerBy(noteId: String, agent: AgentNoteAgent?): AgentNoteListeningAnswer {
+        val body = JsonObject().apply { add("agent", agent?.toChoiceJson() ?: com.google.gson.JsonNull.INSTANCE) }
+            .toString().toByteArray(StandardCharsets.UTF_8)
+        return AgentNoteListeningAnswer.fromJson(
+            requestJson("PUT", "$BASE_PATH/${segment(noteId)}/answer-by", body = body, label = "answer-by"),
+        )
+    }
+
+    override fun capabilities(): Set<String> =
+        requestJson("GET", "/v1/health", label = "capabilities").get("capabilities")
+            ?.takeIf(JsonElement::isJsonArray)?.asJsonArray
+            ?.mapNotNullTo(linkedSetOf()) { it.takeIf(JsonElement::isJsonPrimitive)?.asString }
+            .orEmpty()
 
     override fun createNote(note: AgentNote, imageBytes: ByteArray, strokeCount: Int): AgentNote {
         // Streamed like a reply: the base64 of the page is written straight into the request.

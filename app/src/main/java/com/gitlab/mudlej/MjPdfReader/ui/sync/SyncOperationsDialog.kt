@@ -75,6 +75,8 @@ internal fun syncOperationStatusLabel(
     if (com.gitlab.mudlej.MjPdfReader.data.sync.isTerminalPdfBuildFailure(record)) return SyncStatusLabels.PDF_BUILD_FAILED
     return if (record.kind == SyncOperationKind.BUILD) {
         when {
+            record.status == SyncOperationStore.STATUS_SYNCED &&
+                com.gitlab.mudlej.MjPdfReader.data.sync.pdfsStillBuildingAfter(record) > 0 -> "Building on the server"
             record.status == SyncOperationStore.STATUS_SYNCED -> "Build complete"
             failed && interrupted -> "Build interrupted"
             failed -> SyncStatusLabels.PDF_BUILD_FAILED
@@ -536,6 +538,11 @@ internal class SyncOperationsDialog(
                     activity.getString(R.string.sync_outside_changes_many)) {
                     OutsideSourceChangesDialog(activity).show()
                 }
+                // Changes the server refused are kept aside: here the user retries or discards them.
+                addIssueLink(counts.refusedChanges, activity.getString(R.string.sync_refused_changes_one),
+                    activity.getString(R.string.sync_refused_changes_many)) {
+                    RefusedChangesDialog(activity).show()
+                }
             }
 
             val syncButton = dialog.getButton(DialogInterface.BUTTON_POSITIVE)
@@ -661,6 +668,8 @@ internal data class SyncIssueCounts(
     val sourceMerges: Int,
     /** Source files of the shared folder changed by another app, held until the user uploads or discards the change. */
     val outsideChanges: Int = 0,
+    /** Project changes and Library removals the server refused, kept until the user retries or discards them. */
+    val refusedChanges: Int = 0,
 )
 
 private suspend fun loadSyncIssueCounts(activity: AppCompatActivity): SyncIssueCounts {
@@ -679,7 +688,10 @@ private suspend fun loadSyncIssueCounts(activity: AppCompatActivity): SyncIssueC
         com.gitlab.mudlej.MjPdfReader.data.source.SourceEditQueue(activity.applicationContext, scheduleRequests = false)
             .heldOutsideChanges().size
     }.getOrDefault(0)
-    return SyncIssueCounts(comments, cards, mergeFiles, outsideChanges)
+    val refusedChanges = runCatching {
+        com.gitlab.mudlej.MjPdfReader.data.sync.refusedLocalChanges(activity.applicationContext).size
+    }.getOrDefault(0)
+    return SyncIssueCounts(comments, cards, mergeFiles, outsideChanges, refusedChanges)
 }
 
 private const val DIAGNOSTICS_LOG_TAG = "ThoughtsDiagnostics"

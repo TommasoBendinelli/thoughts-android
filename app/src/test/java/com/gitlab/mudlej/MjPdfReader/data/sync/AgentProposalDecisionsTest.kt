@@ -161,6 +161,51 @@ class AgentProposalDecisionsTest {
         assertTrue(!proposalDecisionAwaitsSync(waiting.copy(deliveryState = ThoughtsOutboxEntity.STATE_ACCEPTED), "concepts_sdpo.pdf"))
     }
 
+    @Test
+    fun anUndoneAcceptNoLongerDecidesItsProposal() {
+        // A ✓ tapped on the page, then Undo: the accept waits for Sync with its undo after it.
+        val one = proposal("one", "a".repeat(64))
+        val accept = row(1, one.bundleId, "accept", listOf(one.id))
+        assertTrue("Accepted: the ✓ goes", highlightedAgentProposals(listOf(one), listOf(accept)).isEmpty())
+
+        val undo = undoRow(2, accept.operationId)
+        val rows = listOf(accept, undo)
+        assertEquals(setOf(accept.operationId), undoneProposalDecisionIds(rows))
+        assertTrue(agentProposalDecisionStates(rows, listOf(one)).isEmpty())
+        assertEquals("Undone: the ✓ is back", listOf(one), highlightedAgentProposals(listOf(one), rows))
+        // Both applied by Fedora: the proposal is open again on this artifact.
+        val applied = listOf(accept.copy(deliveryState = ThoughtsOutboxEntity.STATE_ACCEPTED),
+            undo.copy(deliveryState = ThoughtsOutboxEntity.STATE_ACCEPTED))
+        assertEquals(listOf(one), activeAgentProposals(listOf(one), applied))
+    }
+
+    @Test
+    fun anUndoFedoraRefusedLeavesTheDecisionStanding() {
+        val one = proposal("one", "a".repeat(64))
+        val accept = row(1, one.bundleId, "accept", listOf(one.id), deliveryState = ThoughtsOutboxEntity.STATE_ACCEPTED)
+        val refused = undoRow(2, accept.operationId).copy(deliveryState = ThoughtsOutboxEntity.STATE_BLOCKED)
+        val superseded = undoRow(3, accept.operationId).copy(deliveryState = ThoughtsOutboxEntity.STATE_SUPERSEDED)
+        assertTrue(undoneProposalDecisionIds(listOf(accept, refused, superseded)).isEmpty())
+        assertEquals(AgentProposalDecisionPhase.APPLIED,
+            agentProposalDecisionStates(listOf(accept, refused, superseded), listOf(one)).getValue(one.id).phase)
+    }
+
+    @Test
+    fun aNewDecisionAfterAnUndoCountsAgain() {
+        val one = proposal("one", "a".repeat(64))
+        val accept = row(1, one.bundleId, "accept", listOf(one.id))
+        val again = row(3, one.bundleId, "disregard", listOf(one.id))
+        val states = agentProposalDecisionStates(listOf(accept, undoRow(2, accept.operationId), again), listOf(one))
+        assertEquals(again.operationId, states.getValue(one.id).operationId)
+    }
+
+    private fun undoRow(deviceSequence: Long, resolutionId: String) = ThoughtsOutboxEntity(
+        operationId = "undo-$deviceSequence", deviceSequence = deviceSequence, entityType = AGENT_PROPOSAL_UNDO_ENTITY_TYPE,
+        entityId = resolutionId, collection = "agent-proposals", baseRevision = null,
+        clientTimestamp = "2026-11-13T18:00:00Z", createdAtEpochMillis = deviceSequence,
+        payloadJson = "{\"resolution_id\":\"$resolutionId\"}",
+    )
+
     private fun proposal(id: String, artifact: String) =
         com.gitlab.mudlej.MjPdfReader.data.source.OfflineAgentProposal(
             bundleId = artifact, objectSha256 = "d".repeat(64), id = id, kind = "edit",

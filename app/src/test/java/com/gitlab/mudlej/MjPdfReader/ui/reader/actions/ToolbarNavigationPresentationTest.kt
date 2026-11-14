@@ -4,6 +4,7 @@ package com.gitlab.mudlej.MjPdfReader.ui.reader.actions
 
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class ToolbarNavigationPresentationTest {
@@ -30,6 +31,12 @@ class ToolbarNavigationPresentationTest {
             ToolbarNavigationPresentation(visible = false, backEnabled = false, forwardEnabled = false),
             toolbarNavigationPresentation(hasDocument = false, canGoBack = true, canGoForward = true),
         )
+    }
+
+    @Test
+    fun anArrowThatLeadsNowhereIsDrawnDimmed() {
+        assertEquals(255, navigationIconAlpha(enabled = true))
+        assertTrue(navigationIconAlpha(enabled = false) < 128)
     }
 
     @Test

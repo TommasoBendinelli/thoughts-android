@@ -100,14 +100,27 @@ internal fun ThoughtsOutboxEntity.agentProposalDecisionOrNull(): AgentProposalDe
     )
 }
 
+/**
+ * Decisions taken back with an undo (Undo after the ✓ on the page): queued or applied by Fedora.
+ * An undo Fedora refused, or one superseded, leaves its decision standing.
+ */
+internal fun undoneProposalDecisionIds(rows: List<ThoughtsOutboxEntity>): Set<String> = rows.asSequence()
+    .filter {
+        it.entityType == AGENT_PROPOSAL_UNDO_ENTITY_TYPE &&
+            it.deliveryState != ThoughtsOutboxEntity.STATE_SUPERSEDED &&
+            it.deliveryState != ThoughtsOutboxEntity.STATE_BLOCKED
+    }
+    .mapTo(hashSetOf()) { it.entityId }
+
 internal fun agentProposalDecisionStates(
     rows: List<ThoughtsOutboxEntity>,
     artifactSha256: String?,
 ): Map<String, AgentProposalDecision> {
     if (artifactSha256.isNullOrBlank()) return emptyMap()
     val states = linkedMapOf<String, AgentProposalDecision>()
+    val undone = undoneProposalDecisionIds(rows)
     rows.asSequence()
-        .filter { it.deliveryState != ThoughtsOutboxEntity.STATE_SUPERSEDED }
+        .filter { it.deliveryState != ThoughtsOutboxEntity.STATE_SUPERSEDED && it.operationId !in undone }
         .mapNotNull(ThoughtsOutboxEntity::agentProposalDecisionOrNull)
         .filter { it.artifactSha256 == artifactSha256 }
         .sortedBy(AgentProposalDecision::deviceSequence)
@@ -117,7 +130,7 @@ internal fun agentProposalDecisionStates(
     // The other half of a move pair is decided with its half (spec section 12), even when the
     // decision was made on another document's artifact: its ID exists only once in the Library.
     rows.asSequence()
-        .filter { it.deliveryState != ThoughtsOutboxEntity.STATE_SUPERSEDED }
+        .filter { it.deliveryState != ThoughtsOutboxEntity.STATE_SUPERSEDED && it.operationId !in undone }
         .mapNotNull(ThoughtsOutboxEntity::agentProposalDecisionOrNull)
         .sortedBy(AgentProposalDecision::deviceSequence)
         .forEach { decision ->

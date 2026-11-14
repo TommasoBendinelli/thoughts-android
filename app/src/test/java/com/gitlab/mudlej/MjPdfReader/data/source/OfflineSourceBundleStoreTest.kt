@@ -1376,6 +1376,35 @@ class OfflineSourceBundleStoreTest {
     }
 
     @Test
+    fun anAlreadyPrunedGenerationIsWalkedOnlyEveryFewSyncs() {
+        val sourcePath = "current/main.tex"
+        publishBundle(sourcePath, "current\n", "/workspace/current.tex", gzip(syncTex("/workspace/current.tex")))
+        val store = OfflineSourceBundleStore(staging, working, privateDirectory)
+        assertNotNull(store.importLatest())
+        val events = mutableListOf<com.gitlab.mudlej.MjPdfReader.data.sync.SyncDiagnosticEvent>()
+        val diagnostics = com.gitlab.mudlej.MjPdfReader.data.sync.SyncDiagnostics(write = { events.add(it) }, memory = { emptyMap() })
+        assertTrue(store.pruneActiveBundle(diagnostics = diagnostics, inventoryCheckEvery = 3))
+        val orphan = "unused cached object".toByteArray()
+        val orphanFile = File(privateDirectory, "objects/${sha256(orphan)}").apply { writeBytes(orphan) }
+        // Two Syncs skip the walk (the receipt counts them, across a restart) ...
+        assertTrue(store.pruneActiveBundle(diagnostics = diagnostics, inventoryCheckEvery = 3))
+        assertEquals("active_bundle_already_pruned", events.last { it.stage == "source_bundle_cleanup" }.values["reason"])
+        assertTrue(OfflineSourceBundleStore(staging, working, privateDirectory).pruneActiveBundle(diagnostics = diagnostics, inventoryCheckEvery = 3))
+        assertEquals("active_bundle_already_pruned", events.last { it.stage == "source_bundle_cleanup" }.values["reason"])
+        assertTrue(orphanFile.exists())
+        // ... the third walks every file and removes what was left behind.
+        assertTrue(store.pruneActiveBundle(diagnostics = diagnostics, inventoryCheckEvery = 3))
+        assertEquals("prune_active_bundle", events.last { it.stage == "source_bundle_cleanup" }.values["reason"])
+        assertTrue(!orphanFile.exists())
+        assertTrue(store.pruneActiveBundle(diagnostics = diagnostics, inventoryCheckEvery = 3))
+        assertEquals("active_bundle_already_pruned", events.last { it.stage == "source_bundle_cleanup" }.values["reason"])
+        // A new generation is pruned at once.
+        assertNull(store.installDownloaded("invalid index".toByteArray(), emptyMap()))
+        assertTrue(store.pruneActiveBundle(diagnostics = diagnostics, inventoryCheckEvery = 3))
+        assertEquals("prune_active_bundle", events.last { it.stage == "source_bundle_cleanup" }.values["reason"])
+    }
+
+    @Test
     fun cleanupReceiptSurvivesRestartAndInvalidatesForChangedFiles() {
         val sourcePath = "current/main.tex"
         publishBundle(sourcePath, "current\n", "/workspace/current.tex", gzip(syncTex("/workspace/current.tex")))
@@ -1383,26 +1412,26 @@ class OfflineSourceBundleStoreTest {
         assertNotNull(store.importLatest())
         val events = mutableListOf<com.gitlab.mudlej.MjPdfReader.data.sync.SyncDiagnosticEvent>()
         val diagnostics = com.gitlab.mudlej.MjPdfReader.data.sync.SyncDiagnostics(write = { events.add(it) }, memory = { emptyMap() })
-        assertTrue(store.pruneActiveBundle(diagnostics = diagnostics))
+        assertTrue(store.pruneActiveBundle(diagnostics = diagnostics, inventoryCheckEvery = 1))
         val restarted = OfflineSourceBundleStore(staging, working, privateDirectory)
-        assertTrue(restarted.pruneActiveBundle(diagnostics = diagnostics))
+        assertTrue(restarted.pruneActiveBundle(diagnostics = diagnostics, inventoryCheckEvery = 1))
         assertEquals("unchanged_cleanup_inventory", events.last { it.stage == "source_bundle_cleanup" }.values["reason"])
 
         File(working, sourcePath).writeText("unsynced local draft\n")
-        assertTrue(restarted.pruneActiveBundle(diagnostics = diagnostics))
+        assertTrue(restarted.pruneActiveBundle(diagnostics = diagnostics, inventoryCheckEvery = 1))
         assertEquals("prune_active_bundle", events.last { it.stage == "source_bundle_cleanup" }.values["reason"])
         assertEquals("unsynced local draft\n", File(working, sourcePath).readText())
 
         val orphan = "unused cached object".toByteArray()
         val orphanFile = File(privateDirectory, "objects/${sha256(orphan)}").apply { writeBytes(orphan) }
-        assertTrue(restarted.pruneActiveBundle(diagnostics = diagnostics))
+        assertTrue(restarted.pruneActiveBundle(diagnostics = diagnostics, inventoryCheckEvery = 1))
         assertEquals("prune_active_bundle", events.last { it.stage == "source_bundle_cleanup" }.values["reason"])
         assertTrue(!orphanFile.exists())
-        assertTrue(restarted.pruneActiveBundle(diagnostics = diagnostics))
+        assertTrue(restarted.pruneActiveBundle(diagnostics = diagnostics, inventoryCheckEvery = 1))
         assertEquals("unchanged_cleanup_inventory", events.last { it.stage == "source_bundle_cleanup" }.values["reason"])
 
         assertNull(restarted.installDownloaded("invalid index".toByteArray(), emptyMap()))
-        assertTrue(restarted.pruneActiveBundle(diagnostics = diagnostics))
+        assertTrue(restarted.pruneActiveBundle(diagnostics = diagnostics, inventoryCheckEvery = 1))
         assertEquals("prune_active_bundle", events.last { it.stage == "source_bundle_cleanup" }.values["reason"])
     }
 
@@ -2656,7 +2685,8 @@ class OfflineSourceBundleStoreTest {
         val diagnostics = com.gitlab.mudlej.MjPdfReader.data.sync.SyncDiagnostics(write = { events.add(it) }, memory = { emptyMap() })
         val allocated = allocatedBytes()
         val started = System.nanoTime()
-        assertTrue(store.pruneActiveBundle(diagnostics = diagnostics))
+        // Measures the walk itself, so every call takes it (see anAlreadyPrunedGenerationIsWalkedOnlyEveryFewSyncs).
+        assertTrue(store.pruneActiveBundle(diagnostics = diagnostics, inventoryCheckEvery = 1))
         return (System.nanoTime() - started) / 1_000_000 to (allocatedBytes() - allocated)
     }
 

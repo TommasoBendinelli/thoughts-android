@@ -681,6 +681,12 @@ object SyncTransferCoordinator {
     suspend fun refreshForTerminalBuildArtifacts(
         context: Context,
         artifactPlan: ArtifactSyncPlan,
+        /**
+         * True only for the hand-off from a Sync's own control pass: the plan that Sync got before
+         * it is kept when the Library and the phone's inventory are as it was computed for. A plan
+         * refreshed because a download found it superseded is always asked for again.
+         */
+        reuseControlPassPlan: Boolean = false,
     ): SyncTransferPlan {
         val operationId = requireNotNull(artifactPlan.operationId) {
             "A terminal-build artifact refresh requires its original sync operation"
@@ -691,6 +697,7 @@ object SyncTransferCoordinator {
             targetPdfFilename = target,
             operationId = operationId,
             artifactOnly = true,
+            reusePlanForLibraryRevision = artifactPlan.libraryRevision.takeIf { reuseControlPassPlan && target == null },
         )
         check(estimate.uploadBytes == 0L && !estimate.includeVoiceMedia) {
             "The server returned a non-artifact transfer plan for a terminal build"

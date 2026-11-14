@@ -63,6 +63,35 @@ class ReviewRetireStoreTest {
         assertTrue(store.pendingChanges().any { it.entityType == "review_event" && it.entityId == eventId })
     }
 
+    /**
+     * 13 Nov: Fedora no longer places a retired card on a newer PDF: it stays on the version it
+     * was retired on. It must not wait for placement (the follow-up after Sync would poll for it
+     * until its time ran out), nor count as being placed or as needing attention.
+     */
+    @Test fun aCardRetiredOnAnOlderPdfVersionNeitherWaitsForPlacementNorCountsAsAProblem() {
+        val fixture = fixture()
+        val retired = fixture.addCard("paper")
+        val stuck = fixture.addCard("paper", reanchor = "needs_attention")
+        val active = fixture.addCard("paper")
+        val retireEvent = fixture.store().retire(retired, now).getOrThrow()
+        fixture.store().retire(stuck, now).getOrThrow()
+        // The PDF on this phone is a newer version than the one the cards were placed on.
+        val current = mapOf("paper.pdf" to "c".repeat(64))
+
+        val store = fixture.store()
+        assertEquals(setOf(active), store.cardsAwaitingPlacement(current))
+        val summary = store.summary(now, current)
+        assertEquals("Only the active card is being placed", 1, summary.repairingCount)
+        assertEquals("A retired card is no problem to solve", 0, summary.needsAttentionCount)
+        assertEquals(0, summary.unavailableCount)
+        assertEquals(summary, store.fullSummaryForTesting(now, current))
+
+        // Restored, it waits for its place on the current version like any card.
+        store.undoRetire(retireEvent).getOrThrow()
+        assertEquals(setOf(retired, active), fixture.store().cardsAwaitingPlacement(current))
+        assertEquals(2, fixture.store().summary(now, current).repairingCount)
+    }
+
     @Test fun retireEventIsWrittenToTheOutboxAsTheProtocolSays() {
         val fixture = fixture()
         val id = fixture.addCard("paper")
@@ -180,11 +209,11 @@ class ReviewRetireStoreTest {
 
     private data class Fixture(val root: File, val incoming: File, val events: File, val outgoing: File) {
         fun store() = ReviewStore(null, root, incoming, events, outgoing)
-        fun addCard(stem: String): String {
+        fun addCard(stem: String, reanchor: String = "succeeded"): String {
             val id = UUID.randomUUID().toString()
             File(incoming, "cards/server/$id.json").apply {
                 parentFile.mkdirs()
-                writeText("""{"schema_version":3,"card_type":"visual_region","card_id":"$id","status":"approved","revision":1,"origin_id":"server","primary":{"pdf_stem":"$stem","pdf_sha256":"${"a".repeat(64)}","page":1,"rect":[0.1,0.2,0.8,0.4],"page_visual_sha256":"${"b".repeat(64)}","question":"Saved question"},"reanchor":{"state":"succeeded","strategy":"source_markers_v2"}}""")
+                writeText("""{"schema_version":3,"card_type":"visual_region","card_id":"$id","status":"approved","revision":1,"origin_id":"server","primary":{"pdf_stem":"$stem","pdf_sha256":"${"a".repeat(64)}","page":1,"rect":[0.1,0.2,0.8,0.4],"page_visual_sha256":"${"b".repeat(64)}","question":"Saved question"},"reanchor":{"state":"$reanchor","strategy":"source_markers_v2"}}""")
             }
             return id
         }

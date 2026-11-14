@@ -130,6 +130,7 @@ class PhoneRenderStatusHistory(context: Context) {
             }
             putString(FEDORA_STATUS_SNAPSHOT, gson.toJson(snapshot))
         }.apply()
+        PhoneRenderStatusSignal.notifyChanged()
         return true
     }
 
@@ -152,6 +153,7 @@ class PhoneRenderStatusHistory(context: Context) {
             }
             putString(FEDORA_STATUS_SNAPSHOT, gson.toJson(snapshot))
         }.apply()
+        PhoneRenderStatusSignal.notifyChanged()
     }
 
     fun savePdfRenderStatus(status: ExplicitPdfRenderStatus) {
@@ -159,6 +161,7 @@ class PhoneRenderStatusHistory(context: Context) {
         preferences.edit()
             .putString("$REMOTE_STATUS_PREFIX${status.filename}", gson.toJson(status))
             .apply()
+        PhoneRenderStatusSignal.notifyChanged()
     }
 
     fun saveDocumentSyncStatus(
@@ -204,15 +207,19 @@ class PhoneRenderStatusHistory(context: Context) {
                 putString("$REMOTE_STATUS_PREFIX${status.filename}", gson.toJson(status))
             }
         }.apply()
+        PhoneRenderStatusSignal.notifyChanged()
     }
 
     fun removePdfRenderStatuses(filenames: Collection<String>) {
         if (filenames.isEmpty()) return
+        // Told only when a status goes: the screen that removes superseded ones reads again when told.
+        val stored = filenames.filter { it.isNotBlank() && preferences.contains("$REMOTE_STATUS_PREFIX$it") }
         preferences.edit().apply {
             filenames.filter(String::isNotBlank).forEach { filename ->
                 remove("$REMOTE_STATUS_PREFIX$filename")
             }
         }.apply()
+        if (stored.isNotEmpty()) PhoneRenderStatusSignal.notifyChanged()
     }
 
     fun markPdfRenderRefreshFailed(

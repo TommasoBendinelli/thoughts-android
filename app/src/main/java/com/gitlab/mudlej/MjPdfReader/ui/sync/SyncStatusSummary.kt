@@ -60,7 +60,10 @@ internal fun syncStatusSummary(record: SyncOperationRecord, saved: SavedSyncDeta
     val synced = record.status == SyncOperationStore.STATUS_SYNCED ||
         isPdfBuildFailedSyncedDisplayMessage(record.displayMessage)
     val pdfFailure = failures.isNotEmpty() || isTerminalPdfBuildFailure(record)
+    val stillBuilding = pdfsStillBuildingAfter(record)
     val title = when {
+        record.kind == SyncOperationKind.BUILD && record.status == SyncOperationStore.STATUS_SYNCED && stillBuilding > 0 ->
+            "Building on the server"
         record.kind == SyncOperationKind.BUILD && record.status == SyncOperationStore.STATUS_SYNCED -> "Build complete"
         record.kind == SyncOperationKind.BUILD && pdfFailure -> SyncStatusLabels.PDF_BUILD_FAILED
         synced && pdfFailure -> SyncStatusLabels.PDF_BUILD_FAILED
@@ -92,6 +95,10 @@ internal fun syncStatusSummary(record: SyncOperationRecord, saved: SavedSyncDeta
         synced || isPendingSyncOperationStatus(record.status) -> null
         else -> "Your changes remain saved on this device. Run Sync to try again."
     }?.let { paragraphs += it }
+    // Sync does not wait for Fedora's builds; the PDFs arrive by themselves when they are built.
+    if (stillBuilding > 0) paragraphs += pdfsStillBuildingMessage(stillBuilding) +
+        ". Thoughts fetches ${if (stillBuilding == 1) "it" else "them"} when the server has built " +
+        "${if (stillBuilding == 1) "it" else "them"}; until then the previous ${if (stillBuilding == 1) "PDF stays" else "PDFs stay"}."
     // The title only says a PDF failed; say how much failed and that the changes themselves arrived.
     if (synced && pdfFailure && record.kind != SyncOperationKind.BUILD) paragraphs += SyncStatusLabels.CHANGES_SYNCED_DETAIL + when {
         allProjectsKnown -> " · ${knownProjects.size} ${if (knownProjects.size == 1) "project" else "projects"} failed to build."

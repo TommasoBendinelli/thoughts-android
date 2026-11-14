@@ -133,6 +133,11 @@ class AnimationManager {
         return flinging || pageFlinging;
     }
 
+    /** True while the page moves by itself: a fling, a page fling or snap, an animated scroll or zoom. */
+    public boolean isMoving() {
+        return isFlinging() || (animation != null && animation.isRunning());
+    }
+
     private void notifyFlingState() {
         pdfView.setRenderFlinging(isFlinging());
     }

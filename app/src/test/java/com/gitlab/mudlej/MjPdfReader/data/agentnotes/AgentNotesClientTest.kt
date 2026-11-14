@@ -291,6 +291,7 @@ class AgentNotesClientTest {
         }
         val client = client(server.baseUrl)
         assertEquals(AgentNoteListening.NOT_LISTENING, client.postReply("n-1", "r-1", byteArrayOf(1), "image/png", null, null).listening)
+        assertEquals(null, client.postReply("n-1", "r-1", byteArrayOf(1), "image/png", null, null).coverer)
         assertEquals(AgentNoteListening.UNKNOWN, client.postReply("n-2", "r-2", byteArrayOf(1), "image/png", null, null).listening)
         // Never kept: a stored reply record says nothing about who heard it.
         assertFalse(AgentNoteReply("r-1", "n-1", listening = AgentNoteListening.LISTENING).toJson().has("listening"))
@@ -310,6 +311,10 @@ class AgentNotesClientTest {
         }
         val client = client(server.baseUrl)
         assertEquals(AgentNoteListening.LISTENING, client.listening("n-1"))
+        // That listener has no role (a server before topic owners): the sender's agent answers.
+        assertEquals(AgentNoteListeningAnswer(AgentNoteListening.LISTENING, AgentNoteCoverer(AgentNoteCoverer.SENDER)),
+            client.listeningAnswer("n-1"))
+        assertEquals(AgentNoteListeningAnswer.UNKNOWN, client.listeningAnswer("n-3"))
         assertEquals(AgentNoteListening.NOT_LISTENING, client.listening("n-2"))
         assertEquals(AgentNoteListening.UNKNOWN, client.listening("n-3"))
         assertEquals(AgentNoteListening.UNKNOWN, client.listening("n-4"))
@@ -320,6 +325,79 @@ class AgentNotesClientTest {
         } catch (error: AgentNotesHttpException) {
             assertEquals(503, error.statusCode)
         }
+    }
+
+    @Test fun theChoiceOfWhoAnswersIsSentAndTheServersAnswerIsTheNotesListening() {
+        val sender = """{"role":"sender","device_id":"example-mac","conversation_id":"c-1","owner_id":null,"label":null,"live":true}"""
+        val owner = """{"role":"owner","device_id":"example-server","conversation_id":"c-2","owner_id":"o-1","label":"Course notes","live":true}"""
+        val server = server { request ->
+            when {
+                request.path == "/v1/agent-notes/n-1/answer-by" && request.text.contains("\"agent\":null") -> json(
+                    """{"note_id":"n-1","state":"listening","listeners":[$sender,$owner],"answer_by":null,"candidates":[$sender,$owner]}""")
+                request.path == "/v1/agent-notes/n-1/answer-by" -> json(
+                    """{"note_id":"n-1","state":"listening","listeners":[$sender,$owner],"answer_by":$owner,"candidates":[$sender,$owner]}""")
+                request.path == "/v1/agent-notes/n-2/answer-by" -> json(
+                    """{"detail":"That agent is not known","error_code":"agent_note_answerer_unknown"}""", 409)
+                else -> Reply(503, "text/html", "<html>busy</html>".toByteArray())
+            }
+        }
+        val client = client(server.baseUrl)
+        val chosen = AgentNoteAgent(AgentNoteCoverer.OWNER, "example-server", "c-2", "o-1", "Course notes", live = true)
+        val answer = client.setAnswerBy("n-1", chosen)
+        // The request names the agent by its identity only.
+        val sent = server.requests.single()
+        assertEquals("PUT", sent.method)
+        assertEquals("/v1/agent-notes/n-1/answer-by", sent.path)
+        assertEquals(
+            JsonParser.parseString("""{"agent":{"role":"owner","device_id":"example-server","conversation_id":"c-2","owner_id":"o-1"}}"""),
+            JsonParser.parseString(sent.text),
+        )
+        assertEquals("Bearer device-token", sent.headers["authorization"])
+        // The answer has the body of GET /listening: the state, the choice and who could answer.
+        assertEquals(AgentNoteListening.LISTENING, answer.state)
+        assertEquals(chosen, answer.answerBy)
+        assertEquals(2, answer.candidates.size)
+        assertEquals(AgentNoteAgent(AgentNoteCoverer.SENDER, "example-mac", "c-1", live = true), answer.candidates.first())
+        // Automatic is a null agent, and the answer says so.
+        assertNull(client.setAnswerBy("n-1", null).answerBy)
+        assertEquals(JsonParser.parseString("""{"agent":null}"""), JsonParser.parseString(server.requests.last().text))
+        // An agent the server does not know: a refusal the screen can name.
+        try {
+            client.setAnswerBy("n-2", chosen)
+            fail("409 must throw, so the choice stays as it was")
+        } catch (error: AgentNotesHttpException) {
+            assertEquals(409, error.statusCode)
+            assertEquals(AGENT_NOTE_ANSWERER_UNKNOWN, error.errorCode)
+        }
+    }
+
+    @Test fun theServersCapabilitiesAreReadAndAnOlderServerHasNone() {
+        val current = server { request ->
+            if (request.path == "/v1/health") json("""{"status":"ok","version":"1","capabilities":["agent_note_listening_v1","agent_note_answer_by_v1"]}""")
+            else json("""{"detail":"Not Found"}""", 404)
+        }
+        assertTrue(AGENT_NOTE_ANSWER_BY_CAPABILITY in client(current.baseUrl).capabilities())
+        assertEquals("GET", current.requests.single().method)
+        val older = server { json("""{"status":"ok","version":"0"}""") }
+        assertTrue(client(older.baseUrl).capabilities().isEmpty())
+    }
+
+    @Test fun anAnswerWithoutTheNewFieldsIsAutomaticWithNobodyToChooseFrom() {
+        val answer = AgentNoteListeningAnswer.fromJson(
+            JsonParser.parseString("""{"state":"not_listening","listeners":[]}""").asJsonObject)
+        assertNull(answer.answerBy)
+        assertTrue(answer.candidates.isEmpty())
+        // What is no agent the screen can name is left out, not shown as something else.
+        val odd = AgentNoteListeningAnswer.fromJson(JsonParser.parseString(
+            """{"state":"listening","listeners":[],"answer_by":{"role":"something new","device_id":"example-mac"},
+               "candidates":[{"role":"sender"},7,{"role":"responder","device_id":"example-server","live":true}]}""").asJsonObject)
+        assertNull(odd.answerBy)
+        assertEquals(listOf(AgentNoteAgent(AgentNoteCoverer.RESPONDER, "example-server", live = true)), odd.candidates)
+        // The same agent is the same whatever its label or whether it is live says.
+        val owner = AgentNoteAgent(AgentNoteCoverer.OWNER, "example-server", "c-2", "o-1", "Course notes", live = true)
+        assertTrue(owner.isSameAgent(owner.copy(label = null, live = false)))
+        assertFalse(owner.isSameAgent(owner.copy(ownerId = "o-2")))
+        assertFalse(owner.isSameAgent(null))
     }
 
     @Test fun replyWithoutStrokesOrMessageOmitsThem() {

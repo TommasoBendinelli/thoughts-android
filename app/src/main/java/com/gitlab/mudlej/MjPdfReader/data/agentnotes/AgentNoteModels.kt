@@ -27,6 +27,8 @@ data class AgentNoteReply(
     val message: String? = null,
     /** Whether an agent heard it when it was stored (the answer to the post only; never kept on disk). */
     val listening: AgentNoteListening = AgentNoteListening.UNKNOWN,
+    /** Who answers it, from the same answer (null when nobody listens or the server does not say). */
+    val coverer: AgentNoteCoverer? = null,
 ) {
     fun toJson(): JsonObject = JsonObject().apply {
         addProperty("reply_id", replyId)
@@ -62,6 +64,7 @@ data class AgentNoteReply(
             strokeCount = json.long("stroke_count").toInt(),
             message = json.string("message"),
             listening = AgentNoteListening.fromJson(json.getAsJsonObjectOrNull("listening")),
+            coverer = AgentNoteCoverer.fromListening(json.getAsJsonObjectOrNull("listening")),
         )
     }
 }
@@ -90,6 +93,120 @@ enum class AgentNoteListening {
         fun fromJson(json: JsonObject?): AgentNoteListening = fromState(json?.string("state"))
     }
 }
+
+/**
+ * The agent that answers the user's reply to a note while it is listening (protocol/agent-notes.md
+ * "Who answers"): an agent of the device that sent it ([SENDER]), a topic owner ([OWNER], with the
+ * topic's [label]) or the Thoughts reply agent ([RESPONDER]).
+ */
+data class AgentNoteCoverer(val role: String, val label: String? = null) {
+    companion object {
+        const val SENDER = "sender"
+        const val OWNER = "owner"
+        const val RESPONDER = "responder"
+
+        /**
+         * The live listener that answers first, from `GET /v1/agent-notes/{id}/listening` (or a
+         * reply's `listening`): the sender's agent, then a topic owner, then the reply agent, which
+         * waits for both. Null when nobody listens. A listener from a server before topic owners
+         * has no `role`: `responder: true` is the reply agent, anything else the sender's agent.
+         */
+        fun fromListening(json: JsonObject?): AgentNoteCoverer? {
+            if (json?.string("state") != "listening") return null
+            val listeners = json.get("listeners")?.takeIf(JsonElement::isJsonArray)?.asJsonArray ?: return null
+            val coverers = listeners.mapNotNull { element ->
+                val listener = element.takeIf(JsonElement::isJsonObject)?.asJsonObject ?: return@mapNotNull null
+                val responder = listener.get("responder")?.takeIf { it.isJsonPrimitive && it.asJsonPrimitive.isBoolean }
+                    ?.asBoolean == true
+                when (listener.string("role") ?: if (responder) RESPONDER else SENDER) {
+                    RESPONDER -> AgentNoteCoverer(RESPONDER)
+                    OWNER -> AgentNoteCoverer(OWNER, listener.string("label")?.trim()?.takeIf(String::isNotEmpty)?.take(120))
+                    SENDER -> AgentNoteCoverer(SENDER)
+                    else -> null
+                }
+            }
+            return listOf(SENDER, OWNER, RESPONDER).firstNotNullOfOrNull { role -> coverers.firstOrNull { it.role == role } }
+        }
+    }
+}
+
+/**
+ * An agent that can answer the user's reply to a note (server `agent_note_answer_by_v1`): the
+ * sender's agent, a topic owner or the Thoughts reply agent ([role], as [AgentNoteCoverer]), on
+ * [deviceId], in [conversationId] or for [ownerId]. [live]: it is listening right now.
+ */
+data class AgentNoteAgent(
+    val role: String,
+    val deviceId: String,
+    val conversationId: String? = null,
+    val ownerId: String? = null,
+    val label: String? = null,
+    val live: Boolean = false,
+) {
+    /** The same agent as [other], whatever its label or whether it is live says now. */
+    fun isSameAgent(other: AgentNoteAgent?): Boolean = other != null && role == other.role &&
+        deviceId == other.deviceId && conversationId == other.conversationId && ownerId == other.ownerId
+
+    /** How the screen names it. */
+    val coverer: AgentNoteCoverer get() = AgentNoteCoverer(role, label)
+
+    /** The agent as `PUT /v1/agent-notes/{id}/answer-by` names it: its identity only. */
+    fun toChoiceJson(): JsonObject = JsonObject().apply {
+        addProperty("role", role)
+        addProperty("device_id", deviceId)
+        addProperty("conversation_id", conversationId)
+        addProperty("owner_id", ownerId)
+    }
+
+    companion object {
+        /** Null for anything that is not an agent the screen can name (an unknown role, no device). */
+        fun fromJson(json: JsonObject?): AgentNoteAgent? {
+            val role = json?.string("role")?.takeIf { it in setOf(AgentNoteCoverer.SENDER, AgentNoteCoverer.OWNER, AgentNoteCoverer.RESPONDER) }
+                ?: return null
+            val deviceId = json.string("device_id")?.takeIf(String::isNotBlank) ?: return null
+            return AgentNoteAgent(
+                role = role,
+                deviceId = deviceId,
+                conversationId = json.string("conversation_id"),
+                ownerId = json.string("owner_id"),
+                label = json.string("label")?.trim()?.takeIf(String::isNotEmpty)?.take(120),
+                live = json.get("live")?.takeIf { it.isJsonPrimitive && it.asJsonPrimitive.isBoolean }?.asBoolean == true,
+            )
+        }
+    }
+}
+
+/**
+ * A note's listening state with who answers it. With `agent_note_answer_by_v1` the server also
+ * says which agent the user chose to answer ([answerBy]; null is automatic: the agent that sent
+ * the note first, then the Thoughts reply agent) and which agents could answer now
+ * ([candidates]); with a choice set, [state] is listening exactly while the chosen agent is live.
+ */
+data class AgentNoteListeningAnswer(
+    val state: AgentNoteListening,
+    val coverer: AgentNoteCoverer? = null,
+    val answerBy: AgentNoteAgent? = null,
+    val candidates: List<AgentNoteAgent> = emptyList(),
+) {
+    companion object {
+        val UNKNOWN = AgentNoteListeningAnswer(AgentNoteListening.UNKNOWN)
+
+        fun fromJson(json: JsonObject?): AgentNoteListeningAnswer = AgentNoteListeningAnswer(
+            state = AgentNoteListening.fromJson(json),
+            coverer = AgentNoteCoverer.fromListening(json),
+            answerBy = AgentNoteAgent.fromJson(json?.getAsJsonObjectOrNull("answer_by")),
+            candidates = json?.get("candidates")?.takeIf(JsonElement::isJsonArray)?.asJsonArray
+                ?.mapNotNull { AgentNoteAgent.fromJson(it.takeIf(JsonElement::isJsonObject)?.asJsonObject) }
+                .orEmpty(),
+        )
+    }
+}
+
+/** The server capability for choosing who answers a note (`answer_by`, `candidates`, the PUT). */
+const val AGENT_NOTE_ANSWER_BY_CAPABILITY = "agent_note_answer_by_v1"
+
+/** The `error_code` of the 409 for a chosen agent the server does not know (any more). */
+const val AGENT_NOTE_ANSWERER_UNKNOWN = "agent_note_answerer_unknown"
 
 /**
  * A tappable rectangle of a note's image (protocol/agent-notes.md "Links"): [left], [top], [width]

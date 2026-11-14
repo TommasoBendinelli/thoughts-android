@@ -285,6 +285,11 @@ class DragPinchManager implements GestureDetector.OnGestureListener, GestureDete
 
     @Override
     public void onLongPress(MotionEvent e) {
+        // A marker's own long press (an agent proposal's options) comes before a text selection.
+        if (pdfView.callbacks.callOnLongPressFirst(e)) {
+            pdfView.performHapticFeedback(android.view.HapticFeedbackConstants.LONG_PRESS);
+            return;
+        }
         pdfView.startTextSelectionAt(e.getX(), e.getY());
         pdfView.callbacks.callOnLongPress(e);
     }
@@ -411,6 +416,11 @@ class DragPinchManager implements GestureDetector.OnGestureListener, GestureDete
     public boolean onTouch(View v, MotionEvent event) {
         if (!enabled) {
             return false;
+        }
+
+        if (event.getActionMasked() == MotionEvent.ACTION_DOWN) {
+            // Before anything stops it: a press that stops a moving page is not a tap on a marker.
+            pdfView.onPressStarted(animationManager.isMoving());
         }
 
         if (isInteractionEvent(event)) {

@@ -18,6 +18,7 @@ import com.gitlab.mudlej.MjPdfReader.data.render.PendingCommentDelivery
 import com.gitlab.mudlej.MjPdfReader.data.render.PhoneRenderFailure
 import com.gitlab.mudlej.MjPdfReader.data.render.PhoneRenderQueue
 import com.gitlab.mudlej.MjPdfReader.data.render.PhoneRenderStatusHistory
+import com.gitlab.mudlej.MjPdfReader.data.render.PhoneRenderStatusSignal
 import com.gitlab.mudlej.MjPdfReader.data.render.PdfWarmCacheWorker
 import com.gitlab.mudlej.MjPdfReader.data.render.SourceLinkedPdfIndex
 import com.gitlab.mudlej.MjPdfReader.data.render.isCanonicalPublishedPdfFilename
@@ -46,6 +47,7 @@ import org.tbend.thoughts.sdk.LibrarySnapshot
 import org.tbend.thoughts.sdk.OperationInput
 import org.tbend.thoughts.sdk.ProjectionRecord
 import org.tbend.thoughts.sdk.ProposalObjectIdentity
+import org.tbend.thoughts.sdk.RenderDocumentState
 import org.tbend.thoughts.sdk.SourceApplyRequest
 import com.gitlab.mudlej.MjPdfReader.data.source.ProposalDecisionClaim
 import com.gitlab.mudlej.MjPdfReader.data.source.ProposalDecisionClaims
@@ -76,8 +78,6 @@ import java.util.concurrent.Executors
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.async
-import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
@@ -1299,14 +1299,8 @@ class FedoraRepository(
             val connection = connectionFactory(java.net.URI.create(config.baseUrl.trimEnd('/') + "/v2/sync/state").toURL())
                 as java.net.HttpURLConnection
             try {
-                connection.connectTimeout = 10_000
-                connection.readTimeout = 15_000
-                connection.setRequestProperty("Authorization", "Bearer ${config.token}")
-                connection.setRequestProperty("Accept", "application/json")
-                if (connection.responseCode !in 200..299) return@runCatching null
-                val body = connection.inputStream.use { it.readBytes() }
-                if (body.size > 64 * 1024) return@runCatching null
-                com.google.gson.JsonParser.parseString(body.toString(Charsets.UTF_8)).asJsonObject
+                // Unchanged since the last check: the server answers 304 and the kept answer stands.
+                readSyncState(connection, config.token, key = config.baseUrl, kept = SYNC_STATE_ANSWER)
             } finally {
                 connection.disconnect()
             }
@@ -1319,6 +1313,56 @@ class FedoraRepository(
         }
         RemoteWork(key = "$latest/$revision/$frontier", cursorBehind = (dao.state()?.serverCursor ?: 0L) < latest)
     }
+
+    /**
+     * Which of [buildIds] Fedora has finished (any terminal status, or no longer known), for
+     * [RemoteWorkWatch]: `GET /v2/builds/{id}` without waiting, as small as [remoteWork]. Nothing
+     * local changes. Null when no server is configured or Fedora cannot be asked.
+     */
+    internal suspend fun finishedBuilds(buildIds: Collection<String>): Set<String>? = withContext(Dispatchers.IO) {
+        val config = secretStore.config() ?: return@withContext null
+        val finished = linkedSetOf<String>()
+        for (buildId in buildIds.take(8)) {
+            val status = buildStatus(config, buildId, 0) ?: return@withContext null
+            if (status !in setOf("queued", "running")) finished += buildId
+        }
+        finished
+    }
+
+    /**
+     * Waits up to [waitMillis] for Fedora to finish [buildId] (`GET /v2/builds/{id}?wait_ms=`: the
+     * server answers as soon as the build ends, holding no thread meanwhile), so [RemoteWorkWatch]
+     * fetches a PDF the moment it is built instead of up to 20 s later. True when it has ended,
+     * false when it still runs, null when Fedora cannot be asked.
+     */
+    internal suspend fun awaitBuildEnd(buildId: String, waitMillis: Int): Boolean? = withContext(Dispatchers.IO) {
+        val config = secretStore.config() ?: return@withContext null
+        buildStatus(config, buildId, waitMillis.coerceIn(0, 30_000))?.let { it !in setOf("queued", "running") }
+    }
+
+    /** A build's status ("gone" when Fedora no longer knows it), or null when it cannot be read. */
+    private fun buildStatus(config: ThoughtsServerConfig, buildId: String, waitMillis: Int): String? = runCatching {
+        val url = config.baseUrl.trimEnd('/') + "/v2/builds/" + java.net.URLEncoder.encode(buildId, StandardCharsets.UTF_8) +
+            if (waitMillis > 0) "?wait_ms=$waitMillis" else ""
+        val connection = connectionFactory(java.net.URI.create(url).toURL()) as java.net.HttpURLConnection
+        try {
+            connection.connectTimeout = 10_000
+            connection.readTimeout = 15_000 + waitMillis
+            connection.setRequestProperty("Authorization", "Bearer ${config.token}")
+            connection.setRequestProperty("Accept", "application/json")
+            when (connection.responseCode) {
+                404 -> "gone"
+                in 200..299 -> {
+                    val body = connection.inputStream.use { it.readBytes() }
+                    if (body.size > 1024 * 1024) null
+                    else JsonParser.parseString(body.toString(Charsets.UTF_8)).asJsonObject.get("status")?.asString
+                }
+                else -> null
+            }
+        } finally {
+            connection.disconnect()
+        }
+    }.getOrNull()
 
     /**
      * The server side of HTML editions for [com.gitlab.mudlej.MjPdfReader.data.html.HtmlEditionSync]:
@@ -2000,9 +2044,6 @@ class FedoraRepository(
         activeTransferProgress = progress
         return try {
             val controlDiagnostics = SyncDiagnostics(appContext, operationId)
-            val traceEventsSupported = operationId != null && controlDiagnostics.measure("control_ready") {
-                TRACE_EVENTS_CAPABILITY in serverCapabilities(client)
-            }
             val result = RUN_MUTEX.withDiagnosticLock(controlDiagnostics, "control_run_mutex") {
                 controlDiagnostics.measureSuspending("control_publish_and_render") {
                     performUpdateFromFedora(
@@ -2010,9 +2051,16 @@ class FedoraRepository(
                         explicit,
                         effectiveTargetPdfFilename,
                         operationId,
-                        traceEventsSupported,
                     )
                 }
+            }
+            // RemoteWorkWatch fetches the PDFs still building once Fedora has finished them. A Sync
+            // stopped by a source conflict did not ask Fedora about its builds.
+            if (result.sourceAttention.isEmpty()) runCatching {
+                PendingFedoraBuildStore(appContext).recordObserved(
+                    result.buildProgress,
+                    wholeLibrary = effectiveTargetPdfFilename == null,
+                )
             }
             result.terminalBuildFailures
                 .takeIf(List<TerminalPdfBuildFailure>::isNotEmpty)
@@ -2042,7 +2090,9 @@ class FedoraRepository(
                                     measureSyncStage("Refreshing the post-build download plan", { message ->
                                         SyncOperationStore(appContext).append(artifact.operationId, SyncOperationStore.STATUS_SYNCING, message)
                                     }) {
-                                        SyncTransferCoordinator.refreshForTerminalBuildArtifacts(appContext, artifact)
+                                        SyncTransferCoordinator.refreshForTerminalBuildArtifacts(
+                                            appContext, artifact, reuseControlPassPlan = true,
+                                        )
                                     }
                                 }
                             },
@@ -2096,7 +2146,10 @@ class FedoraRepository(
             if (explicit) {
                 val history = PhoneRenderStatusHistory(appContext)
                 if (effectiveTargetPdfFilename == null) {
+                    // As when the Sync waited for the status: its failure is what is shown last.
+                    FEDORA_STATUS_REFRESH.supersede()
                     history.markFedoraStatusRefreshFailed(safeFailureDetail(error))
+                    PhoneRenderStatusSignal.notifyChanged()
                 } else {
                     history.markPdfRenderRefreshFailed(
                         effectiveTargetPdfFilename,
@@ -2128,6 +2181,12 @@ class FedoraRepository(
         artifactOnly: Boolean = false,
         deliverPendingLibraryRemovals: Boolean = false,
         libraryUploadBudgetBytes: Long = Long.MAX_VALUE,
+        /**
+         * For the download pass that follows this Sync's own control pass: the Library revision it
+         * will install. The plan this Sync already got is kept when it still holds
+         * ([reusableArtifactEstimate]) instead of sending every local object hash again.
+         */
+        reusePlanForLibraryRevision: String? = null,
     ): SyncTransferEstimate {
         require(targetPdfFilename == null || targetPdfFilename.isSafePdfFilename())
         val config = requireNotNull(secretStore.config()) { "The Thoughts server is not configured" }
@@ -2169,7 +2228,7 @@ class FedoraRepository(
             }
             // Removals keep their place after the changes that wait for mobile-data approval.
             if (libraryChanges.deferredIdentities.isEmpty()) {
-                diagnostics.measure("preflight_library_removals") { deliverPendingLibraryRemovals(client) }
+                diagnostics.measure("preflight_library_removals") { deliverPendingLibraryRemovals(client, operationId) }
             }
         }
 
@@ -2220,32 +2279,81 @@ class FedoraRepository(
             }
         }
 
-        val knownObjects = mutableSetOf<String>()
-        val pdfDeltaBases = mutableSetOf<String>()
-        diagnostics.measure("preflight_pdf_inventory") {
-            val generation = readGenerationManifest(PhoneRenderQueue.defaultCanonicalPdfDirectory())
-            val sourceIndex = File(
-                PhoneRenderQueue.defaultCanonicalPdfDirectory(),
-                SourceLinkedPdfIndex.INDEX_FILENAME,
-            )
-            generation.sourceIndexSha256.takeIf { digest ->
-                digest.matches(SHA256) && sourceIndex.isFile && fileSha256(sourceIndex) == digest
-            }?.let(knownObjects::add)
-            generation.publications.forEach { (filename, identity) ->
-                File(PhoneRenderQueue.defaultCanonicalPdfDirectory(), filename)
-                    .takeIf {
-                        it.isFile && it.length() == identity.second && fileSha256(it) == identity.first
-                    }
-                    ?.let {
-                        knownObjects += identity.first
-                        pdfDeltaBases += identity.first
-                    }
+        val allowPdfDelta = !PdfDeltaFallbackStore(appContext).isRejected(operationId)
+        val planCapabilities = buildList {
+            add(SOURCE_RESOURCE_CAPABILITY)
+            add("project_reading_v1")
+            add("component_package_v1")
+            add("compiler_review_placement_v3")
+            add("markdown_source_v1")
+            add("markdown_evidence_omitted_v1")
+            if (allowPdfDelta) add(PDF_DELTA_CAPABILITY)
+        }
+        // Taken before the stores are read, so a change made while reading them is not missed.
+        val inventoryStamp = diagnostics.measure("preflight_inventory_stamp") { syncInventoryStamp() }
+        if (artifactOnly && reusePlanForLibraryRevision != null) {
+            reusableArtifactEstimate(
+                planned = plannedTransfer,
+                operationId = operationId,
+                targetPdfFilename = scopedTargetPdfFilename,
+                libraryRevision = reusePlanForLibraryRevision,
+                inventoryStamp = inventoryStamp,
+                capabilities = planCapabilities,
+                artifactPlanId = { serverPlanId -> transferPlanId(serverPlanId, emptyList(), 0) },
+            )?.let { reused ->
+                diagnostics.decision(
+                    "preflight_server_plan", "first_plan_reused",
+                    "objects" to reused.remoteObjects.size.toLong(), "download_bytes" to reused.downloadBytes,
+                )
+                return reused
             }
         }
-        diagnostics.measure("preflight_library_object_inventory") {
-            knownObjects += LibraryObjectInventory(appContext.filesDir).verifiedHashes(diagnostics)
-            // PDFs added on this phone are not downloaded back once Fedora publishes them.
-            knownObjects += verifiedLocallyAddedPdfs().keys
+
+        val knownObjects = mutableSetOf<String>()
+        val pdfDeltaBases = mutableSetOf<String>()
+        // Only for the hand-off from this Sync's own control pass. A plan refreshed because a download
+        // found it superseded reads the stores again: the kept inventory may be what was wrong.
+        val keptInventory = localSyncInventory?.takeIf { (keptFor, inventory) ->
+            artifactOnly && reusePlanForLibraryRevision != null && operationId != null && keptFor == operationId &&
+                inventoryStamp.isNotBlank() && inventory.stamp == inventoryStamp
+        }?.second
+        if (keptInventory != null) {
+            // This Sync already read the stores, and they are as it left them.
+            knownObjects += keptInventory.knownObjects
+            pdfDeltaBases += keptInventory.pdfDeltaBases
+            diagnostics.decision(
+                "preflight_library_object_inventory", "inventory_of_this_sync_reused",
+                "known_objects" to knownObjects.size.toLong(), "pdf_delta_bases" to pdfDeltaBases.size.toLong(),
+            )
+        } else {
+            diagnostics.measure("preflight_pdf_inventory") {
+                val generation = readGenerationManifest(PhoneRenderQueue.defaultCanonicalPdfDirectory())
+                val sourceIndex = File(
+                    PhoneRenderQueue.defaultCanonicalPdfDirectory(),
+                    SourceLinkedPdfIndex.INDEX_FILENAME,
+                )
+                generation.sourceIndexSha256.takeIf { digest ->
+                    digest.matches(SHA256) && sourceIndex.isFile && fileSha256(sourceIndex) == digest
+                }?.let(knownObjects::add)
+                generation.publications.forEach { (filename, identity) ->
+                    File(PhoneRenderQueue.defaultCanonicalPdfDirectory(), filename)
+                        .takeIf {
+                            it.isFile && it.length() == identity.second && fileSha256(it) == identity.first
+                        }
+                        ?.let {
+                            knownObjects += identity.first
+                            pdfDeltaBases += identity.first
+                        }
+                }
+            }
+            diagnostics.measure("preflight_library_object_inventory") {
+                knownObjects += LibraryObjectInventory(appContext.filesDir).verifiedHashes(diagnostics)
+                // PDFs added on this phone are not downloaded back once Fedora publishes them.
+                knownObjects += verifiedLocallyAddedPdfs().keys
+            }
+            if (operationId != null) {
+                localSyncInventory = operationId to LocalSyncInventory(inventoryStamp, knownObjects.toSet(), pdfDeltaBases.toSet())
+            }
         }
 
         diagnostics.measureSuspending("preflight_attachment_inventory") {
@@ -2267,7 +2375,6 @@ class FedoraRepository(
         check(SYNC_PLAN_CAPABILITY in diagnostics.measure("preflight_server_ready") { serverCapabilities(client) }) {
             "The Thoughts server does not support the required sync transfer plan v2 contract"
         }
-        val allowPdfDelta = !PdfDeltaFallbackStore(appContext).isRejected(operationId)
         val advertisedPdfDeltaBases = if (allowPdfDelta) {
             pdfDeltaBases.sorted().take(20_000)
         } else {
@@ -2286,18 +2393,14 @@ class FedoraRepository(
                     knownObjectSha256s = advertisedKnownObjects,
                     pdfDeltaBaseSha256s = advertisedPdfDeltaBases,
                     targetPdfFilename = scopedTargetPdfFilename,
-                    capabilities = buildList {
-                        add(SOURCE_RESOURCE_CAPABILITY)
-                        add("project_reading_v1")
-                        add("component_package_v1")
-                        add("compiler_review_placement_v3")
-                        add("markdown_source_v1")
-                        add("markdown_evidence_omitted_v1")
-                        if (allowPdfDelta) add(PDF_DELTA_CAPABILITY)
-                    },
+                    capabilities = planCapabilities,
                 ),
             )
         }
+        diagnostics.count(
+            "preflight_server_plan", "advertised_objects" to advertisedKnownObjects.size.toLong(),
+            "advertised_pdf_delta_bases" to advertisedPdfDeltaBases.size.toLong(),
+        )
         check(
             remote.contractVersion == 2 && remote.sourceProfile == "reader-v1" &&
                 !remote.includeVoiceMedia && remote.planId.matches(SHA256) &&
@@ -2318,12 +2421,7 @@ class FedoraRepository(
         check(exactDownloadBytes == remote.downloadBytes) {
             "The server returned an inexact sync transfer byte total"
         }
-        val localIdentity = sha256(
-            uploadIdentities.sorted().joinToString("\n").toByteArray(StandardCharsets.UTF_8),
-        )
-        val planId = sha256(
-            "${remote.planId}\n$localIdentity\n$uploadBytes".toByteArray(StandardCharsets.UTF_8),
-        )
+        val planId = transferPlanId(remote.planId, uploadIdentities, uploadBytes)
         return SyncTransferEstimate(
             contractVersion = remote.contractVersion,
             sourceProfile = remote.sourceProfile,
@@ -2344,8 +2442,36 @@ class FedoraRepository(
             metadataDownloadBytes = remote.metadataDownloadBytes,
             uploadBytes = uploadBytes,
             downloadBytes = remote.downloadBytes,
-        )
+        ).also { estimate ->
+            // Kept for this Sync's own download pass ([reusableArtifactEstimate]).
+            if (!artifactOnly && operationId != null) {
+                plannedTransfer = PlannedTransfer(operationId, scopedTargetPdfFilename, inventoryStamp, planCapabilities, estimate)
+            }
+        }
     }
+
+    /** A transfer plan's identity on this phone: the server's plan and what the phone uploads. */
+    private fun transferPlanId(serverPlanId: String, uploadIdentities: List<String>, uploadBytes: Long): String {
+        val localIdentity = sha256(
+            uploadIdentities.sorted().joinToString("\n").toByteArray(StandardCharsets.UTF_8),
+        )
+        return sha256("$serverPlanId\n$localIdentity\n$uploadBytes".toByteArray(StandardCharsets.UTF_8))
+    }
+
+    /** The stores a transfer plan's inventory is read from ([localInventoryStamp]); blank when unreadable. */
+    private fun syncInventoryStamp(): String = runCatching {
+        val pdfs = PhoneRenderQueue.defaultCanonicalPdfDirectory()
+        localInventoryStamp(
+            paths = LibraryObjectInventory.OBJECT_STORES.map { File(appContext.filesDir, it) } + listOf(
+                pdfs,
+                File(pdfs, SourceLinkedPdfIndex.GENERATION_FILENAME),
+                File(pdfs, SourceLinkedPdfIndex.INDEX_FILENAME),
+            ),
+            extra = LibraryMutationStore(appContext).storedPdfs().entries
+                .map { (digest, file) -> "$digest:${file.length()}:${file.lastModified()}" }
+                .sorted(),
+        )
+    }.getOrDefault("")
 
     private fun deliverPendingLibraryMutations(
         client: SyncClient,
@@ -2371,22 +2497,30 @@ class FedoraRepository(
         runCatching { LibraryMutationStore(appContext).storedPdfs() }.getOrDefault(emptyMap())
             .filter { (digest, file) -> runCatching { fileSha256(file) == digest }.getOrDefault(false) }
 
-    private fun deliverPendingLibraryRemovals(client: SyncClient) {
+    private fun deliverPendingLibraryRemovals(client: SyncClient, operationId: String? = null) {
         val store = LibraryRemovalStore(appContext)
-        store.pending().forEach { removal ->
-            try {
+        // A removal the server refused earlier waits for the user; it is not sent again by itself.
+        deliverLibraryRemovals(
+            removals = store.toSend(),
+            remove = { removal ->
                 val result = client.removeLibraryPdf(removal.filename, removal.sha256)
                 check(
                     result.filename == removal.filename &&
                         result.sha256.equals(removal.sha256, ignoreCase = true) &&
                         result.status in setOf("removed", "already_removed"),
                 ) { "The server returned an invalid Library removal acknowledgement" }
-                store.clearFailure(removal.requestId)
-            } catch (error: Exception) {
-                store.recordFailure(removal.requestId, safeFailureDetail(error))
-                throw error
-            }
-        }
+            },
+            delivered = { removal -> store.clearFailure(removal.requestId) },
+            refused = { removal, error ->
+                store.recordRefusal(removal.requestId, safeFailureDetail(error))
+                SyncOperationStore(appContext).append(
+                    operationId, SyncOperationStore.STATUS_SYNCING,
+                    "The server refused removing ${removal.filename} from the Library; it is set aside until you " +
+                        "retry or discard it in the Sync details",
+                )
+            },
+            failed = { removal, error -> store.recordFailure(removal.requestId, safeFailureDetail(error)) },
+        )
     }
 
     /** Resolves one durable source-open request without waiting for the full Fedora sync. */
@@ -2543,6 +2677,11 @@ class FedoraRepository(
             val knownBuilds = SyncOperationStore(appContext).operation(operationId)?.buildProgress.orEmpty()
             val currentBuilds = knownBuilds.map { client.build(it.buildId) }
             buildsActive = currentBuilds.any { it.status in setOf("queued", "running") }
+            runCatching {
+                PendingFedoraBuildStore(appContext).recordObserved(
+                    currentBuilds.map(::syncBuildProgress), wholeLibrary = false,
+                )
+            }
             val target = supersededPlan.targetPdfFilenames.singleOrNull()
             if (target == null) {
                 val snapshot = requireNotNull(client.library(null)) {
@@ -2580,21 +2719,15 @@ class FedoraRepository(
             SyncTransferStateStore(appContext).clearForOperation(operationId)
             ArtifactSyncCoordinator.broadcast(appContext, null, showPrompt = false)
             if (!supersededPlan.postTerminalBuildRefresh) {
-                if (buildsActive) {
-                    ThoughtsSyncScheduler.enqueueExplicitContinuation(
-                        appContext, supersededPlan.targetPdfFilenames.singleOrNull(), operationId,
-                        building = true,
-                    )
+                // A build still running does not keep the Sync going: RemoteWorkWatch fetches it.
+                val sourceAttention = SourceEditQueue(appContext, scheduleRequests = false)
+                    .blockingSourceMutations(supersededPlan.targetPdfFilenames.singleOrNull())
+                val operations = SyncOperationStore(appContext)
+                val installationProblems = OfflineSourceBundleStore(appContext).materializationProblems()
+                if (sourceAttention.isNotEmpty() || installationProblems.isNotEmpty()) {
+                    operations.attention(operationId, sourceAttentionEvent(sourceAttention, installationProblems))
                 } else {
-                    val sourceAttention = SourceEditQueue(appContext, scheduleRequests = false)
-                        .blockingSourceMutations(supersededPlan.targetPdfFilenames.singleOrNull())
-                    val operations = SyncOperationStore(appContext)
-                    val installationProblems = OfflineSourceBundleStore(appContext).materializationProblems()
-                    if (sourceAttention.isNotEmpty() || installationProblems.isNotEmpty()) {
-                        operations.attention(operationId, sourceAttentionEvent(sourceAttention, installationProblems))
-                    } else {
-                        operations.append(operationId, SyncOperationStore.STATUS_SYNCED, "Completed")
-                    }
+                    completeSyncOperation(appContext, operationId)
                 }
             }
             return null
@@ -2758,7 +2891,6 @@ class FedoraRepository(
         explicit: Boolean,
         targetPdfFilename: String?,
         operationId: String?,
-        traceEventsSupported: Boolean,
     ): ControlSyncResult {
         val diagnostics = SyncDiagnostics(appContext, operationId)
         activeSyncTraceId = operationId
@@ -2771,7 +2903,6 @@ class FedoraRepository(
                     targetPdfFilename,
                     explicit,
                     operationId,
-                    traceEventsSupported,
                 )
             }
         }
@@ -2779,7 +2910,14 @@ class FedoraRepository(
         // frontier needs a PDF update. This keeps Sync as the single user action.
         val pass = SYNC_MUTEX.withLock {
             if (explicit) diagnostics.measure("control_library_projects") {
-                LibraryProjectStore(appContext).synchronize(client)
+                // A Project change the server refuses is set aside; the Sync goes on to pull.
+                LibraryProjectStore(appContext).synchronize(client).forEach { refused ->
+                    SyncOperationStore(appContext).append(
+                        operationId, SyncOperationStore.STATUS_SYNCING,
+                        "The server refused a Project change (${refused.description}): ${refused.detail}. It is set " +
+                            "aside until you retry or discard it in the Sync details",
+                    )
+                }
             }
             diagnostics.measureSuspending("control_delta_sync") {
                 performDeltaSync(
@@ -2806,7 +2944,6 @@ class FedoraRepository(
                         client,
                         targetPdfFilename = targetPdfFilename,
                         operationId = operationId,
-                        traceEventsSupported = traceEventsSupported,
                     )
                 }
             },
@@ -2816,19 +2953,16 @@ class FedoraRepository(
                         client,
                         targetPdfFilename,
                         operationId,
-                        traceEventsSupported,
                     )
                 }
             },
             refreshPublicationState = {
+                // The PDF status only feeds the status display (13 November 2026: waiting for it
+                // added about 0.9 s to every Sync). It is fetched beside the Sync and shown when
+                // it arrives; the Sync goes on with the Library.
+                startFedoraStatusRefresh(client, targetPdfFilename, diagnostics)
                 val snapshot = diagnostics.measureSuspending("control_refresh_publication_state") {
-                    coroutineScope {
-                        val library = async(Dispatchers.IO) { fetchLibrarySnapshot(client) }
-                        val status = async(Dispatchers.IO) {
-                            refreshFedoraStatusSnapshot(client, targetPdfFilename)
-                        }
-                        library.await().also { status.await() }
-                    }
+                    withContext(Dispatchers.IO) { fetchLibrarySnapshot(client) }
                 }
                 val cursor = diagnostics.measureSuspending("control_read_final_cursor") {
                     (dao.state() ?: ThoughtsSyncStateEntity()).serverCursor
@@ -2874,7 +3008,6 @@ class FedoraRepository(
         targetPdfFilename: String,
         explicit: Boolean,
         operationId: String?,
-        traceEventsSupported: Boolean,
     ): ControlSyncResult {
         migrateDefaultFolderIfNeeded()
         migrateSourceFolderNamesIfNeeded()
@@ -2912,7 +3045,6 @@ class FedoraRepository(
                     client,
                     targetPdfFilename = targetPdfFilename,
                     operationId = operationId,
-                    traceEventsSupported = traceEventsSupported,
                 )
             },
             syncConditionalRender = {
@@ -2920,7 +3052,6 @@ class FedoraRepository(
                     client,
                     targetPdfFilename,
                     operationId,
-                    traceEventsSupported,
                 )
             },
             refreshPublicationState = {
@@ -2996,24 +3127,53 @@ class FedoraRepository(
         )
     }
 
-    private fun refreshFedoraStatusSnapshot(client: SyncClient, targetPdfFilename: String?) {
-        runCatching {
-            val call = client.renderState(targetPdfFilename ?: "all")
-            check(
-                PhoneRenderStatusHistory(appContext).replaceFedoraStatusSnapshot(call.state),
-            ) { "The server returned an invalid global PDF status snapshot." }
-            Log.i(
-                "ThoughtsRenderVerify",
-                "status=${call.state.status} dnsMs=${call.timings.dnsMs} " +
-                    "connectMs=${call.timings.connectMs} tlsMs=${call.timings.tlsMs} " +
-                    "serverMs=${call.timings.serverMs} totalMs=${call.timings.totalMs}",
-            )
-        }.onFailure { error ->
-            PhoneRenderStatusHistory(appContext).markFedoraStatusRefreshFailed(
-                safeFailureDetail(error),
-            )
-            Log.w("ThoughtsRenderVerify", "Fedora status snapshot was not refreshed", error)
+    /**
+     * Starts fetching the server's PDF status without waiting for it ([DeferredRefresh]). The
+     * status is stored and the screens that show it are told ([PhoneRenderStatusSignal]) when it
+     * arrives, which may be after this Sync has ended.
+     */
+    private fun startFedoraStatusRefresh(client: SyncClient, targetPdfFilename: String?, diagnostics: SyncDiagnostics) {
+        FEDORA_STATUS_REFRESH.start(
+            fetch = {
+                withContext(Dispatchers.IO) {
+                    diagnostics.measure("status_render_state") { fetchFedoraStatus(client, targetPdfFilename) }
+                }
+            },
+            show = { result ->
+                result.mapCatching { state ->
+                    check(PhoneRenderStatusHistory(appContext).replaceFedoraStatusSnapshot(state)) {
+                        "The server returned an invalid global PDF status snapshot."
+                    }
+                }.onFailure { error ->
+                    // The next check asks for the whole state again.
+                    RENDER_STATE_ANSWER.clear()
+                    PhoneRenderStatusHistory(appContext).markFedoraStatusRefreshFailed(
+                        safeFailureDetail(error),
+                    )
+                    Log.w("ThoughtsRenderVerify", "Fedora status snapshot was not refreshed", error)
+                }
+                PhoneRenderStatusSignal.notifyChanged()
+            },
+        )
+    }
+
+    private fun fetchFedoraStatus(client: SyncClient, targetPdfFilename: String?): org.tbend.thoughts.sdk.RenderStateRecord {
+        val target = targetPdfFilename ?: "all"
+        val key = secretStore.config()?.baseUrl.orEmpty() + "\n" + target
+        // Over the Sync's own connections, and with the ETag of the state last shown: an
+        // unchanged state is answered 304 and the kept one is shown again as checked now.
+        val kept = RENDER_STATE_ANSWER.kept(key)
+        val call = client.renderStateIfChanged(target, kept?.first)
+        val state = checkNotNull(renderStateToShow(call, kept?.second, System.currentTimeMillis())) {
+            "The server answered that a PDF status it was not asked about is unchanged."
         }
+        call.state?.let { RENDER_STATE_ANSWER.keep(key, call.etag, it) }
+        Log.i(
+            "ThoughtsRenderVerify",
+            "status=${state.status} unchanged=${call.state == null} " +
+                "serverMs=${call.timings.serverMs} totalMs=${call.timings.totalMs}",
+        )
+        return state
     }
 
     private suspend fun performDeltaSync(
@@ -3227,8 +3387,19 @@ class FedoraRepository(
         val localGenerationCurrent = SourceLinkedPdfIndex().snapshot().generationCurrent
         val libraryChanges = LibraryMutationStore(appContext)
         val deliveredBeforeFetch = runCatching { libraryChanges.deliveredRequestIds() }.getOrDefault(emptySet())
+        val remembered = rememberedLibrarySnapshot
+        var answeredNotModified = false
         var snapshot = diagnostics.measure("fetch_library_snapshot") {
-            client.library(before.libraryRevision.takeIf { localGenerationCurrent })
+            librarySnapshotForDownloadPass(
+                remembered = remembered,
+                rememberedRevision = remembered?.libraryRevision,
+                expectedRevision = expectedPlan?.libraryRevision,
+                installedRevision = before.libraryRevision.takeIf { localGenerationCurrent },
+                fetch = { ifNoneMatch -> client.library(ifNoneMatch).also { answeredNotModified = it == null } },
+            )
+        }
+        if (snapshot != null && answeredNotModified) {
+            diagnostics.decision("fetch_library_snapshot", "control_pass_answer_reused")
         }
         if (expectedPlan != null) {
             val actualRevision = snapshot?.libraryRevision ?: before.libraryRevision
@@ -3283,6 +3454,10 @@ class FedoraRepository(
         // The active Library now reflects Fedora after these changes; they no longer need showing.
         runCatching { libraryChanges.retire(deliveredBeforeFetch) }
         scheduleSourceBundlePrune(installedAndPrunedBundleId)
+        // What this Sync kept for its own download pass describes the phone before that pass.
+        rememberedLibrarySnapshot = null
+        plannedTransfer = null
+        localSyncInventory = null
     }
 
     /**
@@ -3387,6 +3562,8 @@ class FedoraRepository(
         val snapshot = client.library(before.libraryRevision.takeIf { localGenerationCurrent })
         snapshot?.let(::recordMetadataPayload)
         snapshot?.let { LibraryHeadStateStore(appContext).publish(it) }
+        // The download pass of this Sync installs this very Library ([librarySnapshotForDownloadPass]).
+        rememberedLibrarySnapshot = snapshot
         return snapshot
     }
 
@@ -4887,11 +5064,15 @@ class FedoraRepository(
         }
     }
 
+    /**
+     * Asks Fedora whether the synchronized sources need a PDF build (POST /v1/render-checks). A build
+     * that runs is not waited for (13 November: a Sync spent 44 of its 63 s waiting): the Sync
+     * downloads what is built and ends, and [RemoteWorkWatch] fetches the new PDFs once it finishes.
+     */
     private fun syncConditionalRenderCheck(
         client: SyncClient,
         targetPdfFilename: String?,
         operationId: String?,
-        traceEventsSupported: Boolean,
     ): RenderRequestSyncResult {
         val target = targetPdfFilename ?: PhoneRenderQueue.ACTION_ALL
         val requestId = operationId ?: UUID.randomUUID().toString()
@@ -4956,19 +5137,15 @@ class FedoraRepository(
         } else {
             throw IOException(missingBuildDetail)
         }
-        val observed = if (
-            traceEventsSupported &&
-            operationId != null &&
-            initial.status in setOf("queued", "running")
-        ) {
-            // The check may report a build another request queued (an accept's deferred
-            // rebuild, a Desktop Sync). Its events reach this trace only once GET links it.
-            val linked = client.build(initial.id, 0)
-            if (linked.status in setOf("queued", "running")) awaitBuildFromTrace(client, operationId, linked) else linked
-        } else {
-            initial
+        val observed = initial
+        // The documents the check names as building are the ones whose new PDF is pending.
+        val progress = syncBuildProgress(observed).let { built ->
+            built.takeIf { it.documents.isNotEmpty() } ?: built.copy(documents = check.documents
+                .filter { it.state in setOf("queued", "building") }
+                .map(RenderDocumentState::filename)
+                .filter(::isCanonicalPublishedPdfFilename)
+                .distinct())
         }
-        val progress = syncBuildProgress(observed)
         return when (observed.status) {
             "queued", "running" -> RenderRequestSyncResult(
                 active = true,
@@ -5004,7 +5181,6 @@ class FedoraRepository(
         client: SyncClient,
         targetPdfFilename: String? = null,
         operationId: String? = null,
-        traceEventsSupported: Boolean = false,
     ): RenderRequestSyncResult {
         val requestRoot = PhoneRenderQueue.defaultRequestDirectory()
         val receiptRoot = PhoneRenderQueue.defaultReceiptDirectory()
@@ -5104,23 +5280,17 @@ class FedoraRepository(
             } else {
                 // GET also links this trace to the existing immutable build on Fedora.
                 // Resubmission can turn a scoped check into a new library rebuild.
-                client.build(
-                    existing.jobId,
-                    if (traceEventsSupported && operationId != null) 0 else 30_000,
-                )
+                // It does not wait: RemoteWorkWatch fetches the PDF once the build is done.
+                client.build(existing.jobId, 0)
             }
-            val observedBuild = if (
-                traceEventsSupported &&
-                operationId != null &&
-                build.status in setOf("queued", "running")
-            ) {
-                awaitBuildFromTrace(client, operationId, build)
-            } else {
-                build
+            val observedBuild = build
+            observedBuilds += syncBuildProgress(observedBuild).let { progress ->
+                progress.takeIf { it.documents.isNotEmpty() || !target.isSafePdfFilename() }
+                    ?: progress.copy(documents = listOf(target))
             }
-            observedBuilds += syncBuildProgress(observedBuild)
+            // A queued build has no heartbeat yet (it may wait behind another); a running one does.
             if (
-                observedBuild.status in setOf("queued", "running") &&
+                observedBuild.status == "running" &&
                 observedBuild.updatedAt.isNotBlank() &&
                 runCatching {
                     java.time.Instant.parse(observedBuild.updatedAt).isBefore(
@@ -5174,61 +5344,6 @@ class FedoraRepository(
             builds = observedBuilds.distinctBy(SyncBuildProgress::buildId),
             terminalFailures = terminalFailures.distinct(),
         )
-    }
-
-    private fun awaitBuildFromTrace(
-        client: SyncClient,
-        operationId: String,
-        initial: BuildRecord,
-    ): BuildRecord {
-        val store = SyncOperationStore(appContext)
-        var streamFailures = 0
-        while (true) {
-            try {
-                replayTraceEvents(client, operationId, store)
-                store.operation(operationId)?.let { record ->
-                    if (record.serverTerminal) {
-                        store.markStreamState(operationId, SyncOperationStore.STREAM_SAVED)
-                        return client.build(initial.id, 0)
-                    }
-                }
-                store.markStreamState(operationId, SyncOperationStore.STREAM_LIVE)
-                client.openTraceStream(operationId, store.serverCursor(operationId)).use { stream ->
-                    while (true) {
-                        val event = stream.nextEvent() ?: break
-                        store.persistServerEvent(operationId, event)
-                        if (event.terminal && event.buildId == initial.id) {
-                            store.markStreamState(operationId, SyncOperationStore.STREAM_SAVED)
-                            return client.build(initial.id, 0)
-                        }
-                    }
-                }
-                val snapshot = client.traceSnapshot(operationId)
-                if (snapshot.terminal) {
-                    store.markStreamState(operationId, SyncOperationStore.STREAM_SAVED)
-                    return client.build(initial.id, 0)
-                }
-                throw IOException("The server trace stream ended before the build completed")
-            } catch (_: Exception) {
-                store.markStreamState(operationId, SyncOperationStore.STREAM_RECONNECTING)
-                val backoffIndex = streamFailures.coerceAtMost(2)
-                Thread.sleep(
-                    (1L shl backoffIndex) * 1_000L +
-                        operationId.hashCode().toLong().and(255L),
-                )
-                streamFailures++
-                if (streamFailures < 3) continue
-
-                // The journal transport is optional for correctness.  A disconnected
-                // stream must never turn a still-running Fedora build into a failure.
-                val observed = runCatching { client.build(initial.id, 30_000) }.getOrNull()
-                if (observed != null && observed.status !in setOf("queued", "running")) {
-                    store.markStreamState(operationId, SyncOperationStore.STREAM_SAVED)
-                    return observed
-                }
-                streamFailures = 0
-            }
-        }
     }
 
     private fun replayTraceEvents(
@@ -5685,8 +5800,14 @@ class FedoraRepository(
             Triple(path, directory, JsonParser.parseString(projection.payloadJson).asJsonObject)
         }
         diagnostics?.count("review_projection_records", "installed" to records.size.toLong(), "retained" to retained.size.toLong())
+        val statesBefore = reviewStore.stateWriteCounts()
         check(diagnostics?.measure("install_review_server_records") { reviewStore.installServerRecords(records, retained) }
             ?: reviewStore.installServerRecords(records, retained))
+        val statesAfter = reviewStore.stateWriteCounts()
+        diagnostics?.count(
+            "review_state_rows", true, "written" to statesAfter.first - statesBefore.first,
+            "left_unchanged" to statesAfter.second - statesBefore.second,
+        )
     }
 
     private fun verifyProjectReadings(
@@ -5726,15 +5847,19 @@ class FedoraRepository(
                                       client: SyncClient, plan: SyncTransferPlan?): Set<String> {
         val objects = File(staging, "objects").apply { mkdirs() }
         // Every place the sync plan reported as known, including PDFs the new Library no longer lists.
-        val currentGeneration = readGenerationManifest(current).publications
+        val currentGeneration = GenerationFileIndex(readGenerationManifest(current).publications)
+        // Looked up per object below; filtering every publication for each object was quadratic.
+        val publicationsBySha256 = groupedInOrder(snapshot.publications, LibraryEntry::sha256)
         val reused = linkedSetOf<String>()
+        var obtained = 0L
         fun obtain(hash: String, size: Long?, role: String, destination: File) {
             check(hash.matches(SHA256))
+            obtained++
             val candidates = listOf(File(current, "objects/$hash")) +
                 LibraryObjectInventory.OBJECT_STORES.map { File(appContext.filesDir, "$it/$hash") } +
-                snapshot.publications.filter { it.sha256 == hash }.flatMap {
+                publicationsBySha256[hash].orEmpty().flatMap {
                     listOf(File(staging, it.filename), File(current, it.filename))
-                } + currentGeneration.filterValues { it.first == hash }.keys.map { File(current, it) }
+                } + currentGeneration.filenamesHolding(hash).map { File(current, it) }
             val source = candidates.firstOrNull { it.isFile && (size == null || it.length() == size) && fileSha256(it) == hash }
             if (source != null) linkOrCopy(source, destination)
             else {
@@ -5765,6 +5890,9 @@ class FedoraRepository(
             }
         }
         verifyProjectReadings(snapshot, staging, true, reused.associateWith { File(current, it) })
+        SyncDiagnostics(appContext, plan?.operationId).count(
+            "library_stage_reading_objects", "kept_in_place" to reused.size.toLong(), "copied_or_downloaded" to obtained,
+        )
         return reused
     }
 
@@ -5814,20 +5942,21 @@ class FedoraRepository(
         check(!staging.exists() || staging.deleteRecursively()) { "Could not clear stale Library staging" }
         check(staging.mkdirs()) { "Could not create Library staging" }
         val currentGeneration = readGenerationManifest(root)
-        val verifiedCurrentPdfFiles = verifiedGenerationPdfFiles(root, currentGeneration.publications)
+        // One index for both passes below, instead of walking the generation for every publication.
+        val currentFiles = GenerationFileIndex(currentGeneration.publications)
+        val verifiedCurrentPdfFiles = measureSyncDiagnostic("library_stage_verify_current_pdfs", progress) {
+            verifiedGenerationPdfFiles(root, currentGeneration.publications)
+        }
         val locallyAddedPdfs = verifiedLocallyAddedPdfs()
         val reusedPdfs = linkedSetOf<String>()
         var switched = false
         try {
             measureSyncStage("Preparing PDF files (reuse or download)", progress) {
                 val downloads = mutableListOf<Pair<LibraryEntry, File>>()
+                var copiedPdfs = 0L
                 snapshot.publications.forEach { publication ->
                     val destination = File(staging, publication.filename)
-                    val reusableFilename = currentGeneration.publications.entries
-                        .firstOrNull { (_, identity) ->
-                            identity.first == publication.sha256 && identity.second == publication.sizeBytes
-                        }
-                        ?.key
+                    val reusableFilename = currentFiles.filenameHolding(publication.sha256, publication.sizeBytes)
                     val source = reusableFilename?.let { File(root, it) }
                     val trustedCurrent = reusableFilename != null
                     if (
@@ -5837,16 +5966,21 @@ class FedoraRepository(
                         if (reusableFilename == publication.filename) {
                             reusedPdfs += publication.filename
                         } else {
+                            copiedPdfs++
                             linkOrCopy(source, destination)
                         }
                     } else {
                         // A PDF this phone added to the Library is copied from its verified local copy.
                         val added = locallyAddedPdfs[publication.sha256]
                             ?.takeIf { it.isFile && it.length() == publication.sizeBytes }
-                        if (added != null) linkOrCopy(added, destination)
+                        if (added != null) { copiedPdfs++; linkOrCopy(added, destination) }
                         else downloads += publication to destination
                     }
                 }
+                progress.diagnostics()?.count(
+                    "library_stage_pdfs", "kept_in_place" to reusedPdfs.size.toLong(),
+                    "copied" to copiedPdfs, "downloaded" to downloads.size.toLong(),
+                )
                 // Each download writes its own staging file; one at a time, 150 PDFs took 56 s.
                 val completedDownloads = java.util.concurrent.atomic.AtomicInteger()
                 val reportedAt = java.util.concurrent.atomic.AtomicLong()
@@ -5871,11 +6005,7 @@ class FedoraRepository(
                 }
                 snapshot.publications.forEach { publication ->
                     val destination = File(staging, publication.filename)
-                    val source = currentGeneration.publications.entries
-                        .firstOrNull { (_, identity) ->
-                            identity.first == publication.sha256 && identity.second == publication.sizeBytes
-                        }
-                        ?.key
+                    val source = currentFiles.filenameHolding(publication.sha256, publication.sizeBytes)
                         ?.let { File(root, it) }
                     val stagedPdf = if (publication.filename in reusedPdfs) requireNotNull(source) else destination
                     check(stagedPdf.length() == publication.sizeBytes) {
@@ -5960,7 +6090,16 @@ class FedoraRepository(
             measureSyncStage("Switching the active PDF generation", progress) {
                 if (root.exists()) Os.rename(root.absolutePath, previous.absolutePath)
                 try {
-                    moveReusedLibraryFiles(previous, staging, reusedPdfs + reusedObjects)
+                    // Every kept file is renamed into the new generation; their verification
+                    // records are written once for all of them, not appended file by file.
+                    measureSyncDiagnostic("library_switch_move_kept_files", progress) {
+                        verifiedFileCache.batchingJournal {
+                            moveReusedLibraryFiles(previous, staging, reusedPdfs + reusedObjects)
+                        }
+                    }
+                    progress.diagnostics()?.count(
+                        "library_switch_kept_files", "moved" to (reusedPdfs.size + reusedObjects.size).toLong(),
+                    )
                     Os.rename(staging.absolutePath, root.absolutePath)
                     switched = true
                 } catch (error: Throwable) {
@@ -7113,6 +7252,20 @@ class FedoraRepository(
         private const val PROJECTION_REVISION = RemovedProposalDismissal.PROJECTION_REVISION
         @Volatile private var pooledNetwork: android.net.Network? = null
         @Volatile private var cachedCapabilities: Triple<String, Long, Set<String>>? = null
+        /** The PDF status fetched beside a Sync; it outlives the Sync that started it. */
+        private val FEDORA_STATUS_REFRESH = DeferredRefresh(
+            kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.SupervisorJob() + Dispatchers.IO),
+        )
+        /** `/v2/sync/state` as last answered, for `If-None-Match` ([readSyncState]). */
+        private val SYNC_STATE_ANSWER = ConditionalAnswer<JsonObject>()
+        /** `/v1/render-state` as last answered, for `If-None-Match` ([renderStateToShow]). */
+        private val RENDER_STATE_ANSWER = ConditionalAnswer<org.tbend.thoughts.sdk.RenderStateRecord>()
+        /** The plan the running Sync got before its control pass, for its own download pass. */
+        @Volatile private var plannedTransfer: PlannedTransfer? = null
+        /** The inventory the Sync named by the first value read, while its stamp still holds. */
+        @Volatile private var localSyncInventory: Pair<String, LocalSyncInventory>? = null
+        /** The Library answer of the running Sync's control pass, for its own download pass. */
+        @Volatile private var rememberedLibrarySnapshot: LibrarySnapshot? = null
         private val COMMENT_CAPTURE_MUTEX = Mutex()
         private const val ANCHOR_CAPABILITY = "annotation_anchor_v1"
         private const val TRACE_EVENTS_CAPABILITY = "trace_events_v1"

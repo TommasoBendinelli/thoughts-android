@@ -34,6 +34,7 @@ import com.gitlab.mudlej.MjPdfReader.data.sync.activeAgentProposals
 import com.gitlab.mudlej.MjPdfReader.data.sync.agentProposalDecisionStates
 import com.gitlab.mudlej.MjPdfReader.ui.home.DocumentStatusCode
 import com.gitlab.mudlej.MjPdfReader.ui.home.OVERVIEW_ISSUE_STATUSES
+import com.gitlab.mudlej.MjPdfReader.ui.home.documentStatusLabelRes
 import com.gitlab.mudlej.MjPdfReader.ui.home.documentStatusPresentation
 import com.gitlab.mudlej.MjPdfReader.ui.sync.SyncBuildDialogState
 import com.gitlab.mudlej.MjPdfReader.ui.sync.SyncOperationsDialog
@@ -434,12 +435,7 @@ internal class DocumentStatusDialog(private val activity: MainActivity) {
     }
 
     private fun statusLabel(status: PhoneRenderJobStatus): String = activity.getString(
-        when (documentStatusPresentation(status.stage, status.verifiedAtEpochMillis).code) {
-            DocumentStatusCode.SYNC_NEEDED -> R.string.document_status_sync_needed
-            DocumentStatusCode.SYNCING -> R.string.document_status_syncing
-            DocumentStatusCode.SYNCED -> R.string.document_status_synced
-            DocumentStatusCode.ERROR -> R.string.document_status_error
-        },
+        documentStatusLabelRes(status.stage, status.verifiedAtEpochMillis),
     )
 }
 

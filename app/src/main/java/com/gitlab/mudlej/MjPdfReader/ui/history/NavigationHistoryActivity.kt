@@ -16,6 +16,7 @@ import com.gitlab.mudlej.MjPdfReader.core.ui.setupScreenChrome
 import com.gitlab.mudlej.MjPdfReader.pdf.PDF
 import com.gitlab.mudlej.MjPdfReader.databinding.ActivityNavigationHistoryBinding
 import com.gitlab.mudlej.MjPdfReader.ui.reader.documentTabTitle
+import com.gitlab.mudlej.MjPdfReader.ui.reader.navigation.AgentNotePlace
 import com.gitlab.mudlej.MjPdfReader.ui.reader.navigation.ReaderHistoryManager
 import com.gitlab.mudlej.MjPdfReader.ui.tableofcontents.TableOfContentsPathResolver
 import kotlinx.coroutines.launch
@@ -146,9 +147,12 @@ class NavigationHistoryActivity : AppCompatActivity() {
                 kind: NavigationHistoryRow.Kind,
                 stackIndex: Int,
                 document: String? = null,
+                note: AgentNotePlace? = null,
             ) {
-                documents.add(document?.takeIf { it != currentDocument }?.let(::documentTabTitle).orEmpty())
-                pages.add(pageIndex)
+                // An agent note a link was followed from: its title, and no page.
+                documents.add(note?.let { it.title ?: context.getString(R.string.agent_note) }
+                    ?: document?.takeIf { it != currentDocument }?.let(::documentTabTitle).orEmpty())
+                pages.add(if (note != null) NavigationHistoryRow.NO_PAGE else pageIndex)
                 origins.add(origin.name)
                 timestamps.add(timestamp)
                 kinds.add(kind.name)
@@ -156,11 +160,11 @@ class NavigationHistoryActivity : AppCompatActivity() {
             }
 
             forwardEntries.forEachIndexed { index, entry ->
-                addRow(entry.pageIndex, entry.origin, entry.timestamp, NavigationHistoryRow.Kind.FORWARD, index, entry.document)
+                addRow(entry.pageIndex, entry.origin, entry.timestamp, NavigationHistoryRow.Kind.FORWARD, index, entry.document, entry.note)
             }
             addRow(currentPageIndex, ReaderHistoryManager.Origin.HISTORY, 0L, NavigationHistoryRow.Kind.CURRENT, -1)
             backEntries.withIndex().toList().asReversed().forEach { (index, entry) ->
-                addRow(entry.pageIndex, entry.origin, entry.timestamp, NavigationHistoryRow.Kind.BACK, index, entry.document)
+                addRow(entry.pageIndex, entry.origin, entry.timestamp, NavigationHistoryRow.Kind.BACK, index, entry.document, entry.note)
             }
 
             return Intent(context, NavigationHistoryActivity::class.java).apply {
@@ -186,4 +190,11 @@ data class NavigationHistoryRow(
     val documentName: String? = null,
 ) {
     enum class Kind { BACK, CURRENT, FORWARD }
+
+    /** A place without pages (an agent note): [documentName] names it. */
+    val isNote: Boolean get() = pageIndex == NO_PAGE
+
+    companion object {
+        const val NO_PAGE = -1
+    }
 }

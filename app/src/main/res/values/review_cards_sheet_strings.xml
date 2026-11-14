@@ -11,4 +11,9 @@
     <string name="review_cards_sheet_new">new</string>
     <string name="review_cards_sheet_not_scheduled">not scheduled</string>
     <string name="review_cards_sheet_review">Review</string>
+    <!-- Retired cards stay on the PDF version they were retired on: listed apart, without a place here. -->
+    <string name="review_cards_sheet_retired_button">Retired (%1$d)</string>
+    <string name="review_cards_sheet_current_button">Cards on this PDF (%1$d)</string>
+    <string name="review_cards_sheet_retired_title">Retired cards (%1$d)</string>
+    <string name="review_cards_sheet_retired_place">On the PDF version it was retired on</string>
 </resources>

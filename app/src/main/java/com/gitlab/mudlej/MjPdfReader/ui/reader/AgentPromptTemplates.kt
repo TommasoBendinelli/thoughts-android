@@ -37,6 +37,53 @@ internal object AgentPromptTemplates {
             "{mentra_folder}/videos as VID_YYYYMMDD_HHMMSS_*.mp4. Watch both folders for the rest of this conversation (a background " +
             "loop that checks every few seconds; re-arm it when it expires) and react to each new photo or video as soon as it " +
             "appears, without waiting for me. Ignore files that are already there and unfinished *.partial files.\n" +
+            "- Right away, call own_topic with captures set to true, a label for what we are studying, and the document " +
+            "(document_ids) and card (review_card_ids) we are studying, so the Thoughts reply agent leaves my captures to you. " +
+            "Keep your reply watcher running (below), because the claim lasts only while you listen. When we move to another " +
+            "card or document, call own_topic again for it. Call release_topic when study mode ends.\n" +
+            "- Read every new photo at full resolution. For a video, take frames with ffmpeg (about one per second, plus the last " +
+            "frame) and read the sharpest ones. Also transcribe its audio with `~/.local/bin/transcribe <video>` (AssemblyAI; it " +
+            "prints the text, or \"(no audio)\") and treat what I say as part of the context. " +
+            "Treat each capture as a question: explain what is on it, or continue it (the next step, the missing piece). " +
+            "If something is unreadable, say so rather than guess. Anything underlined is where to focus.\n" +
+            "- Explain, never grade: no ✓/✗, no right/wrong lists, no colour marks, no scores. When a step does not hold, name it " +
+            "in one plain line and show the right step, in my notation, as part of the explanation.\n" +
+            "- If my phone is in the picture showing an open review card or document in Thoughts, that is what we are studying: " +
+            "read its question or title, find it in my library and explain from it. A different card on the phone means we " +
+            "moved on.\n" +
+            "- Ground every answer in my Library. Call knowledge_profile once for the topic before you explain (don't skip it), " +
+            "then find where the topic lives in my Library and read it. Link each claim to its page as " +
+            "[p. N](<Library filename>.pdf#page=N), my own notes first, then the other documents; these links become tappable " +
+            "in the note. Say plainly what is not in my Library.\n" +
+            "- Follow the shared answering rules: the Library note \"Answering rules for agent notes\" (get_note hands them " +
+            "to you).\n" +
+            "- After every capture, send a Thoughts note with send_note, attached to the card or document we are on (it opens " +
+            "on my phone by itself; I mark it up and tap Send), not only a chat answer.\n" +
+            "- One page, one series of notes: when I photograph the same page again, send the next version of that page's note " +
+            "in the same layout and style, so its notes read as versions of each other. A new page gets its own note.\n" +
+            "- To show me anything else (a derivation, a picture), send a note the same way.\n" +
+            "- Also watch my note replies for the rest of this conversation: run `~/.local/bin/thoughts-watch-replies` as a " +
+            "background monitor (one line per reply; re-arm it when it expires; where it cannot find this conversation by " +
+            "itself, add `--conversation <your conversation id>`, the id you pass to own_topic, send_note and get_note) and " +
+            "answer each reply to your own notes as soon " +
+            "as it arrives, reading it with get_note (get_note_reply in the local Thoughts tools): the picture with my marks, " +
+            "and my comment. When get_note says another agent has a reply, leave it; the Thoughts reply agent answers the " +
+            "replies no running agent covers. Answer with a new note when a picture helps.\n" +
+            "- The same monitor prints a PAGE line when I send you a page from my phone: the PDF page on my screen, marked " +
+            "up or not, with my comment. Open it with get_note and treat it like a capture: explain it and answer with a note " +
+            "attached to the same document (and card).\n"
+
+    /**
+     * The study-mode default until 2026-11-13, which graded each capture (right/wrong, colour marks).
+     * A phone that holds it unchanged gets the current default instead.
+     */
+    internal const val PREVIOUS_DEFAULT_STUDY_MODE_TEMPLATE =
+        "Agent study mode is on in Thoughts on my phone.\n" +
+            "- Physical studying: I study on paper and photograph or film the page with my smart glasses. New captures arrive on " +
+            "this computer within seconds: photos in {mentra_folder}/photos as IMG_YYYYMMDD_HHMMSS_*.jpg, videos in " +
+            "{mentra_folder}/videos as VID_YYYYMMDD_HHMMSS_*.mp4. Watch both folders for the rest of this conversation (a background " +
+            "loop that checks every few seconds; re-arm it when it expires) and react to each new photo or video as soon as it " +
+            "appears, without waiting for me. Ignore files that are already there and unfinished *.partial files.\n" +
             "- Read every new photo at full resolution. For a video, take frames with ffmpeg (about one per second, plus the last " +
             "frame) and read the sharpest ones. Also transcribe its audio with `~/.local/bin/transcribe <video>` (AssemblyAI; it " +
             "prints the text, or \"(no audio)\") and treat what I say as part of the context. " +

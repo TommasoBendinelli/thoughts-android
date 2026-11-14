@@ -25,6 +25,7 @@ import com.gitlab.mudlej.MjPdfReader.ui.home.BuiltTimeKind
 import com.gitlab.mudlej.MjPdfReader.ui.home.BuiltTimePresentation
 import com.gitlab.mudlej.MjPdfReader.ui.home.DocumentStatusCode
 import com.gitlab.mudlej.MjPdfReader.ui.home.builtTimePresentation
+import com.gitlab.mudlej.MjPdfReader.ui.home.documentStatusLabelRes
 import com.gitlab.mudlej.MjPdfReader.ui.home.documentStatusPresentation
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import java.text.DateFormat
@@ -453,12 +454,7 @@ internal class SyncBuildDialog(
     }
 
     private fun statusLabel(status: PhoneRenderJobStatus): String = activity.getString(
-        when (documentStatusPresentation(status.stage, status.verifiedAtEpochMillis).code) {
-            DocumentStatusCode.SYNC_NEEDED -> R.string.document_status_sync_needed
-            DocumentStatusCode.SYNCING -> R.string.document_status_syncing
-            DocumentStatusCode.SYNCED -> R.string.document_status_synced
-            DocumentStatusCode.ERROR -> R.string.document_status_error
-        },
+        documentStatusLabelRes(status.stage, status.verifiedAtEpochMillis),
     )
 }
 

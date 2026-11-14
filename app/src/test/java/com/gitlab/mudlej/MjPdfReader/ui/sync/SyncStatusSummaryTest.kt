@@ -125,4 +125,18 @@ class SyncStatusSummaryTest {
         assertFalse(summary.message.contains("import-opaque"))
     }
 
+
+    @Test fun aSyncThatLeftPdfsBuildingOnFedoraSaysSo() {
+        val synced = SyncOperationRecord("a", null, SyncOperationKind.SYNC, SyncOperationStore.STATUS_SYNCED, 1, 2,
+            listOf("Completed; 2 PDFs still building on the server"),
+            buildProgress = listOf(SyncBuildProgress("b", "all", "running", "", 0, 0, "", "", documents = listOf("a.pdf", "b.pdf"))))
+        val view = syncStatusSummary(synced, SavedSyncDetails())
+        assertEquals(SyncStatusLabels.UP_TO_DATE, view.title)
+        assertTrue(view.message, view.message.contains("2 PDFs still building on the server. Thoughts fetches them when " +
+            "the server has built them; until then the previous PDFs stay."))
+        // A Build that Fedora is still running is not "Build complete".
+        assertEquals("Building on the server", syncStatusSummary(synced.copy(kind = SyncOperationKind.BUILD), SavedSyncDetails()).title)
+        assertEquals("Build complete", syncStatusSummary(synced.copy(kind = SyncOperationKind.BUILD,
+            buildProgress = listOf(synced.buildProgress.single().copy(serverStatus = "succeeded"))), SavedSyncDetails()).title)
+    }
 }

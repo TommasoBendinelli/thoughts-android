@@ -40,3 +40,30 @@ internal fun restoreReusedLibraryFiles(root: File, staging: File, previous: File
         }
     }
 }
+
+/**
+ * The active generation's files by what they hold, built once for a staging pass. Staging looked
+ * each PDF and each reading object up by walking every publication again, so a pass over a Library
+ * of n PDFs made n × n comparisons.
+ */
+internal class GenerationFileIndex(publications: Map<String, Pair<String, Long>>) {
+    private val firstByIdentity = hashMapOf<Pair<String, Long>, String>()
+    private val allBySha256 = hashMapOf<String, MutableList<String>>()
+
+    init {
+        publications.forEach { (filename, identity) ->
+            firstByIdentity.putIfAbsent(identity, filename)
+            allBySha256.getOrPut(identity.first) { mutableListOf() } += filename
+        }
+    }
+
+    /** The first file (in the generation's own order) holding exactly this PDF, as the walk found it. */
+    fun filenameHolding(sha256: String, sizeBytes: Long): String? = firstByIdentity[sha256 to sizeBytes]
+
+    /** Every file holding these bytes, in the generation's own order. */
+    fun filenamesHolding(sha256: String): List<String> = allBySha256[sha256].orEmpty()
+}
+
+/** [items] by [key], each group in the order of [items]; built once instead of filtering per lookup. */
+internal fun <T> groupedInOrder(items: Iterable<T>, key: (T) -> String): Map<String, List<T>> =
+    items.groupByTo(hashMapOf(), key)

@@ -16,6 +16,10 @@ import com.google.gson.JsonParser
  * (page plus the exact zoom and scroll when known). A link to another document opens it in the
  * same tab, so following it is one history step like a jump inside the document: Back reopens
  * the linking document where the link was, Forward returns to the linked one.
+ *
+ * A link followed from an agent note puts the note in the history too. The note is shown by the
+ * notes window, not by this tab: a step onto it brings that window up and leaves the tab as it was,
+ * and the arrows on the note go on from the note's place here ([returnFromAgentNote]).
  */
 class ReaderHistoryManager(
     private val viewport: Viewport,
@@ -27,6 +31,12 @@ class ReaderHistoryManager(
      * document, while the one being left is still displayed; skip it if opening was cancelled.
      */
     private val openOtherDocument: (entry: Entry, commit: () -> Unit) -> Unit = { _, _ -> },
+    /**
+     * Shows the agent note of [Entry.note] in the notes window; the tab keeps its document.
+     * canGoBack/canGoForward: whether the note has places before or after it in this history.
+     * False when the note could not be shown.
+     */
+    private val openAgentNote: (entry: Entry, canGoBack: Boolean, canGoForward: Boolean) -> Boolean = { _, _, _ -> false },
 ) {
 
     /** What the history needs from the PDF view, so the model can be tested without one. */
@@ -42,7 +52,8 @@ class ReaderHistoryManager(
         onChanged: () -> Unit,
         currentDocument: () -> String? = { null },
         openOtherDocument: (entry: Entry, commit: () -> Unit) -> Unit = { _, _ -> },
-    ) : this(PdfViewViewport(pdfView), onChanged, currentDocument, openOtherDocument)
+        openAgentNote: (entry: Entry, canGoBack: Boolean, canGoForward: Boolean) -> Boolean = { _, _, _ -> false },
+    ) : this(PdfViewViewport(pdfView), onChanged, currentDocument, openOtherDocument, openAgentNote)
 
     private class PdfViewViewport(private val pdfView: () -> PDFView) : Viewport {
         override val currentPage get() = pdfView().currentPage
@@ -60,6 +71,7 @@ class ReaderHistoryManager(
         TEXT_MODE(R.string.text_mode),
         DWELL(R.string.history_origin_dwell),
         HISTORY(R.string.history_origin_visited),
+        AGENT_NOTE(R.string.agent_note),
     }
 
     data class Entry(
@@ -69,6 +81,8 @@ class ReaderHistoryManager(
         val origin: Origin,
         /** The document of this place; null means the document shown now (entries saved by older versions). */
         val document: String? = null,
+        /** Set for an agent note a link was followed from; [document] is then [AgentNotePlace.uri]. */
+        val note: AgentNotePlace? = null,
     )
 
     private val backStack = ArrayDeque<Entry>()
@@ -78,6 +92,10 @@ class ReaderHistoryManager(
     private var currentPageIndex = -1
     private var arrivedAtElapsed = 0L
     private var keepOnDocumentReset = false
+    /** The agent note a step showed in place of this tab's document; null while the tab shows it. */
+    private var shownNote: Entry? = null
+    /** The note the tab just came back from without an arrow, until the tab is in use again ([settle]). */
+    private var cameBackFrom: Entry? = null
 
     fun canGoBack() = backStack.isNotEmpty()
 
@@ -94,6 +112,8 @@ class ReaderHistoryManager(
     }
 
     fun recordJump(origin: Origin, targetPageIndex: Int? = null) {
+        shownNote = null
+        cameBackFrom = null
         if (targetPageIndex != null && targetPageIndex == viewport.currentPage) {
             return
         }
@@ -109,9 +129,76 @@ class ReaderHistoryManager(
      * The document change that follows keeps the history; see [keepingHistory].
      */
     fun recordLeavingDocument(origin: Origin) {
+        shownNote = null
+        cameBackFrom = null
         pushBack(currentEntry(origin))
         forwardStack.clear()
         onChanged()
+    }
+
+    /**
+     * Records the agent note a link was followed from, after the place this tab showed (if any):
+     * Back from the linked place shows the note again, and Forward on the note comes back.
+     */
+    fun recordAgentNote(note: AgentNotePlace) {
+        shownNote = null
+        cameBackFrom = null
+        pushBack(Entry(AGENT_NOTE_PAGE, null, System.currentTimeMillis(), Origin.AGENT_NOTE, note.uri, note))
+        forwardStack.clear()
+        onChanged()
+    }
+
+    /**
+     * The tab is shown again after a step showed an agent note in its place. It is where it was;
+     * [back] is the arrow pressed on the note (true Back, false Forward, null none), which goes on
+     * from the note's place in this history.
+     */
+    fun returnFromAgentNote(back: Boolean?) {
+        val note = shownNote ?: return
+        shownNote = null
+        if (back == null) {
+            cameBackFrom = note
+            return
+        }
+        val places = places()
+        val index = places.indexOfFirst { it === note }
+        if (index < 0) return
+        // Null: the place this tab shows, already on screen.
+        val target = places.getOrNull(if (back) index - 1 else index + 1) ?: return
+        if (backStack.any { it === target }) goBackTo(target) else goForwardTo(target)
+    }
+
+    /** The tab is in use again (on screen and resumed): a later link from a note starts from what it shows. */
+    fun settle() {
+        cameBackFrom = null
+    }
+
+    /**
+     * Records a link followed from the agent note [note] into this tab, to the document shown
+     * ([sameDocument], at [targetPageIndex]) or another. Back from the linked place shows the note.
+     * If the tab had just shown a note in its place, what it shows was ahead of that note and gives
+     * way to the new place, as in a browser; otherwise it stays in the history, behind the note.
+     */
+    fun recordAgentNoteLink(note: AgentNotePlace, sameDocument: Boolean, targetPageIndex: Int?) {
+        val atNote = shownNote ?: cameBackFrom
+        shownNote = null
+        cameBackFrom = null
+        val places = places()
+        val index = atNote?.let { shown -> places.indexOfFirst { it === shown } } ?: -1
+        when {
+            index >= 0 -> {
+                val kept = places.take(index + 1).map { it ?: currentEntry(Origin.LINK) }
+                backStack.clear()
+                backStack.addAll(kept)
+                forwardStack.clear()
+                // Reading time on the place left does not put it back between the note and the link.
+                suppressDwellOnce = true
+            }
+            currentDocument() == null -> Unit
+            sameDocument -> recordJump(Origin.LINK, targetPageIndex)
+            else -> recordLeavingDocument(Origin.LINK)
+        }
+        recordAgentNote(note)
     }
 
     /** Runs [replaceDocument] so that the document reset it causes keeps this tab's history. */
@@ -135,7 +222,13 @@ class ReaderHistoryManager(
     }
 
     fun goBack() {
+        shownNote = null
+        cameBackFrom = null
         val entry = backStack.lastOrNull() ?: return
+        if (entry.note != null) {
+            showNote(entry)
+            return
+        }
         step(entry) {
             if (!backStack.removeIdentical(entry)) return@step false
             pushForward(currentEntry(Origin.HISTORY))
@@ -144,7 +237,13 @@ class ReaderHistoryManager(
     }
 
     fun goForward() {
+        shownNote = null
+        cameBackFrom = null
         val entry = forwardStack.lastOrNull() ?: return
+        if (entry.note != null) {
+            showNote(entry)
+            return
+        }
         step(entry) {
             if (!forwardStack.removeIdentical(entry)) return@step false
             pushBack(currentEntry(Origin.HISTORY))
@@ -153,7 +252,13 @@ class ReaderHistoryManager(
     }
 
     fun goBackTo(entry: Entry) {
+        shownNote = null
+        cameBackFrom = null
         if (backStack.none { it === entry }) {
+            return
+        }
+        if (entry.note != null) {
+            showNote(entry)
             return
         }
         step(entry) {
@@ -175,7 +280,13 @@ class ReaderHistoryManager(
     }
 
     fun goForwardTo(entry: Entry) {
+        shownNote = null
+        cameBackFrom = null
         if (forwardStack.none { it === entry }) {
+            return
+        }
+        if (entry.note != null) {
+            showNote(entry)
             return
         }
         step(entry) {
@@ -221,6 +332,8 @@ class ReaderHistoryManager(
     }
 
     fun clear() {
+        shownNote = null
+        cameBackFrom = null
         backStack.clear()
         forwardStack.clear()
         resetPageTracking()
@@ -236,6 +349,20 @@ class ReaderHistoryManager(
         restoreEntries(savedState.getString(BACK_KEY), backStack)
         restoreEntries(savedState.getString(FORWARD_KEY), forwardStack)
         onChanged()
+    }
+
+    /** The places of this history in order, oldest first; null is the place on screen. */
+    private fun places(): List<Entry?> = backStack + listOf(null) + forwardStack.asReversed()
+
+    /**
+     * Shows the agent note of [entry] in the notes window. The tab and its history stay as they
+     * are, so coming back without an arrow finds the tab where it was; see [returnFromAgentNote].
+     */
+    private fun showNote(entry: Entry) {
+        val places = places()
+        val index = places.indexOfFirst { it === entry }
+        shownNote = entry
+        if (!openAgentNote(entry, index > 0, index in 0 until places.lastIndex)) shownNote = null
     }
 
     /** Applies [mutate] to the stacks and shows [entry]; for another document only once it opens. */
@@ -320,6 +447,8 @@ class ReaderHistoryManager(
         private const val MAX_ENTRIES = 50
         private const val BACK_KEY = "readerHistoryBack"
         private const val FORWARD_KEY = "readerHistoryForward"
+        /** An agent note is a place without pages. */
+        private const val AGENT_NOTE_PAGE = 0
 
         /** Entries as JSON with fixed names, so saved state survives R8 renaming the classes. */
         fun encodeEntries(entries: Collection<Entry>): String = JsonArray().apply {
@@ -329,6 +458,7 @@ class ReaderHistoryManager(
                     addProperty("time", entry.timestamp)
                     addProperty("origin", entry.origin.name)
                     entry.document?.let { addProperty("document", it) }
+                    entry.note?.let { addProperty("note", it.toJson()) }
                     entry.viewState?.let { state ->
                         add("view", JsonObject().apply {
                             addProperty("zoom", state.zoom)
@@ -361,12 +491,17 @@ class ReaderHistoryManager(
                             it.get("firstAlone").asBoolean,
                         )
                     }
+                    val origin = Origin.entries.firstOrNull { it.name == json.get("origin")?.asString } ?: Origin.HISTORY
+                    val note = json.get("note")?.takeIf { it.isJsonPrimitive }?.asString?.let(AgentNotePlace::fromJson)
+                    // A note that cannot be read back is no place this tab could open.
+                    if (origin == Origin.AGENT_NOTE && note == null) return@runCatching null
                     Entry(
                         json.get("page").asInt,
                         view,
                         json.get("time").asLong,
-                        Origin.entries.firstOrNull { it.name == json.get("origin")?.asString } ?: Origin.HISTORY,
-                        json.get("document")?.takeIf { it.isJsonPrimitive }?.asString,
+                        origin,
+                        note?.uri ?: json.get("document")?.takeIf { it.isJsonPrimitive }?.asString,
+                        note,
                     )
                 }.getOrNull()
             }

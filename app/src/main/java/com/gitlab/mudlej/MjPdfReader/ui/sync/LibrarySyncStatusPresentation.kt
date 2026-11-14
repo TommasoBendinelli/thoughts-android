@@ -33,6 +33,27 @@ internal fun mergeNeededStatus(mergeFileCount: Int): LibrarySyncStatusPresentati
         )
     }
 
+/**
+ * The state while the only blocked local changes are ones the server refused: the issue mark
+ * stays (the user must retry or discard them), but the label does not call a Sync failed.
+ * Null when nothing was refused or something else is blocked too.
+ */
+internal fun refusedChangesStatus(
+    refusedChangeCount: Int,
+    hasOtherBlockedLocalChanges: Boolean,
+    lastSync: String,
+): LibrarySyncStatusPresentation? =
+    if (refusedChangeCount <= 0 || hasOtherBlockedLocalChanges) {
+        null
+    } else {
+        LibrarySyncStatusPresentation(
+            label = SyncStatusLabels.CHANGE_REFUSED,
+            timestamp = "${SyncStatusLabels.changesRefused(refusedChangeCount)} · $lastSync",
+            hasSyncFailure = true,
+            hasPendingChanges = true,
+        )
+    }
+
 internal enum class LibrarySyncIconState {
     CURRENT,
     PENDING,
@@ -54,6 +75,12 @@ internal fun Context.librarySyncStatusPresentation(
     nowEpochMillis: Long = System.currentTimeMillis(),
     hasBlockedLocalChanges: Boolean = false,
     mergeFileCount: Int = 0,
+    /** PDFs Fedora was still building when Sync ended (Sync does not wait; they arrive by themselves). */
+    pdfsStillBuilding: Int = 0,
+    /** Changes the server refused, kept until the user retries or discards them. */
+    refusedChangeCount: Int = 0,
+    /** A local change is blocked for another reason than a refusal by the server. */
+    hasOtherBlockedLocalChanges: Boolean = hasBlockedLocalChanges,
 ): LibrarySyncStatusPresentation {
     if (
         operation?.status == SyncOperationStore.STATUS_SYNCING ||
@@ -114,15 +141,6 @@ internal fun Context.librarySyncStatusPresentation(
         )
     }
 
-    if (hasBlockedLocalChanges) {
-        return LibrarySyncStatusPresentation(
-            label = SyncStatusLabels.SYNC_FAILED,
-            timestamp = getString(R.string.sync_blocked_uploads_details),
-            hasSyncFailure = true,
-            hasPendingChanges = true,
-        )
-    }
-
     val lastSync = if (lastSuccessfulSyncAtEpochMillis > 0) {
         getString(
             R.string.home_last_sync,
@@ -132,13 +150,29 @@ internal fun Context.librarySyncStatusPresentation(
     } else {
         getString(R.string.home_last_sync_never)
     }
+
+    if (hasBlockedLocalChanges) {
+        // Only refused changes are blocked: the Syncs succeed, so the state is not "Sync failed".
+        refusedChangesStatus(refusedChangeCount, hasOtherBlockedLocalChanges, lastSync)?.let { return it }
+        return LibrarySyncStatusPresentation(
+            label = SyncStatusLabels.SYNC_FAILED,
+            timestamp = getString(R.string.sync_blocked_uploads_details),
+            hasSyncFailure = true,
+            hasPendingChanges = true,
+        )
+    }
+    val building = if (pdfsStillBuilding > 0) {
+        com.gitlab.mudlej.MjPdfReader.data.sync.pdfsStillBuildingMessage(pdfsStillBuilding) + " · "
+    } else {
+        ""
+    }
     return LibrarySyncStatusPresentation(
         label = when {
             pendingFileCount > 0 -> SyncStatusLabels.CHANGES_PENDING
             lastSuccessfulSyncAtEpochMillis > 0 -> SyncStatusLabels.UP_TO_DATE
             else -> pendingSummary
         },
-        timestamp = if (pendingFileCount > 0) "$pendingSummary · $lastSync" else lastSync,
+        timestamp = building + if (pendingFileCount > 0) "$pendingSummary · $lastSync" else lastSync,
         hasPendingChanges = pendingFileCount > 0,
     )
 }

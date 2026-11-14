@@ -24,7 +24,6 @@ import com.gitlab.mudlej.MjPdfReader.core.io.computeSha256
 import com.gitlab.mudlej.MjPdfReader.data.annotation.CommentCatalogue
 import com.gitlab.mudlej.MjPdfReader.data.annotation.OverviewComment
 import com.gitlab.mudlej.MjPdfReader.data.AppDatabase
-import com.gitlab.mudlej.MjPdfReader.data.sync.AGENT_PROPOSAL_RESOLUTION_ENTITY_TYPE
 import com.gitlab.mudlej.MjPdfReader.data.sync.AgentProposalDecisionPhase
 import com.gitlab.mudlej.MjPdfReader.data.sync.ThoughtsOutboxEntity
 import com.gitlab.mudlej.MjPdfReader.data.sync.activeAgentProposals
@@ -34,7 +33,6 @@ import com.gitlab.mudlej.MjPdfReader.data.source.OfflineAgentProposal
 import com.gitlab.mudlej.MjPdfReader.data.source.OfflineSourceBundleStore
 import com.gitlab.mudlej.MjPdfReader.data.source.logicalReadScope
 import com.gitlab.mudlej.MjPdfReader.data.source.withLogicalPayloads
-import com.gitlab.mudlej.MjPdfReader.data.sync.FedoraRepository
 import com.gitlab.mudlej.MjPdfReader.databinding.ActivityMainBinding
 import com.gitlab.mudlej.MjPdfReader.databinding.PdfCommentsSheetBinding
 import com.google.android.material.bottomsheet.BottomSheetBehavior
@@ -200,7 +198,7 @@ internal class CommentsSheetController(
         updateResizeButton()
         decisionsJob = scope.launch {
             AppDatabase.getInstance(activity.applicationContext).thoughtsSyncDao()
-                .observeByEntityType(AGENT_PROPOSAL_RESOLUTION_ENTITY_TYPE).collect { rows ->
+                .observeAgentProposalDecisions().collect { rows ->
                     decisionRows = rows
                     if (sheet === content) {
                         renderDecision()
@@ -425,17 +423,8 @@ internal class CommentsSheetController(
         sheet?.commentsTexDiff?.setText(R.string.proposal_source_loading)
         scope.launch {
             val loaded = withContext(Dispatchers.IO) {
-                runCatching {
-                    val queue = com.gitlab.mudlej.MjPdfReader.data.source.SourceEditQueue(activity, scheduleRequests = false)
-                    val snapshot = queue.openOfflineSource(proposal.sourceFile, proposal.line)?.cachedSnapshot
-                    val raw = snapshot?.let { queue.localDraftContents(it) ?: it.contents }
-                    val draft = com.gitlab.mudlej.MjPdfReader.ui.source.ProposalReviewJournal(
-                        java.io.File(activity.filesDir, "proposal-review"), proposal.sourceFile,
-                    ).read()
-                    val unsavedReview = draft != null && draft.get("source") != draft.get("savedSource")
-                    val changed = unsavedReview || (raw != null && com.gitlab.mudlej.MjPdfReader.ui.source.ProposalSourceActivity.digest(raw) != proposal.sourceSha256)
-                    raw?.let { com.gitlab.mudlej.MjPdfReader.ui.source.proposalTexExcerpt(proposal.sourceFile, it, proposal.id) } to changed
-                }.getOrNull()
+                runCatching { AgentProposalDecider.checkSource(activity, proposal) }.getOrNull()
+                    ?.let { it.excerpt to it.changed }
             }
             if (generation != texGeneration || !showingDetail || selectedId != proposal.id) return@launch
             val excerpt = loaded?.first
@@ -487,9 +476,8 @@ internal class CommentsSheetController(
             showList()
             return
         }
-        val enabled = showingDetail && proposal != null && sourceChecked && texAvailable && !sourceDraftChanged && proposal.id !in resolving &&
-            proposal.objectSha256.matches(Regex("[a-f0-9]{64}")) &&
-            decision?.phase !in setOf(AgentProposalDecisionPhase.PENDING, AgentProposalDecisionPhase.APPLIED)
+        val enabled = showingDetail && proposal != null && sourceChecked && proposal.id !in resolving &&
+            AgentProposalDecider.decidable(proposal.objectSha256, texAvailable, sourceDraftChanged, decision)
         content.commentsAcceptProposal.isEnabled = enabled
         content.commentsDisregardProposal.isEnabled = enabled
         val status = when (decision?.phase) {
@@ -509,12 +497,7 @@ internal class CommentsSheetController(
         renderDecision()
         scope.launch {
             try {
-                withContext(Dispatchers.IO) {
-                    FedoraRepository(activity.applicationContext).resolveAgentProposals(
-                        proposal.bundleId, action, mapOf(proposal.id to proposal.objectSha256),
-                        proposal.pdfFilenames + proposal.correspondence?.locations.orEmpty().map { it.pdfFilename },
-                    )
-                }
+                withContext(Dispatchers.IO) { AgentProposalDecider.decide(activity, proposal, action) }
                 // Wait for durable state before re-enabling; repeated taps cannot enqueue duplicates.
                 decisionRows = withContext(Dispatchers.IO) {
                     AppDatabase.getInstance(activity.applicationContext).thoughtsSyncDao().allOutbox()

@@ -62,6 +62,32 @@ class LibraryObjectInventoryTest {
         } finally { root.deleteRecursively() }
     }
 
+    @Test fun aStoredObjectIsCheckedByOneLookAtItsEntryNotByItsCanonicalPath() {
+        val root = Files.createTempDirectory("library-inventory").toFile().canonicalFile
+        val outside = Files.createTempFile("outside-inventory", ".bin").toFile()
+        try {
+            val store = File(root, LibraryObjectInventory.OBJECT_STORES.first()).apply { mkdirs() }
+            val plain = File(store, "a".repeat(64)).apply { writeText("object") }
+            val directory = File(store, "b".repeat(64)).apply { mkdirs() }
+            val link = File(store, "c".repeat(64))
+            Files.createSymbolicLink(link.toPath(), outside.toPath())
+            assertTrue(isPlainFileDirectlyIn(store, plain))
+            assertFalse(isPlainFileDirectlyIn(store, directory))
+            assertFalse(isPlainFileDirectlyIn(store, link))
+            // The inventory asks once per listed object and verifies only the plain files.
+            val asked = mutableListOf<String>()
+            val verified = mutableListOf<String>()
+            val inventory = LibraryObjectInventory(root) { verified += it.name; it.name }
+            inventory.isPlainFile = { parent, file ->
+                assertEquals(store, parent); asked += file.name; isPlainFileDirectlyIn(parent, file)
+            }
+            val result = inventory.verifiedHashes()
+            assertEquals(setOf(plain.name), result)
+            assertEquals(listOf(plain.name, directory.name, link.name), asked.sorted())
+            assertEquals(listOf(plain.name), verified)
+        } finally { root.deleteRecursively(); outside.delete() }
+    }
+
     @Test fun symlinkedFilesAndRedirectedStoresAreNotAdvertised() {
         val root = Files.createTempDirectory("library-inventory").toFile()
         val outside = Files.createTempFile("outside-inventory", ".bin").toFile()

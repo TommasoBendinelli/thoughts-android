@@ -218,6 +218,8 @@ object AgentNoteInbox : Application.ActivityLifecycleCallbacks {
 
     /** Announces new notes without leaving the screen the user is on. Main thread. */
     fun deliver(context: Context, notes: List<AgentNote>) {
+        // A note from the agent shows that Study mode is in use: the listener goes on from here.
+        if (notes.isNotEmpty()) AgentStudyListenerService.studyModeUsed(context)
         val activity = resumed?.get()?.takeUnless { it.isFinishing || it.isDestroyed }
         val noteScreen = activity as? AgentNoteActivity
         val arrival = agentNoteArrival(notes, onNoteScreen = noteScreen != null, shownNoteId = noteScreen?.shownNoteId)
@@ -237,8 +239,10 @@ object AgentNoteInbox : Application.ActivityLifecycleCallbacks {
 
     override fun onActivityStarted(activity: Activity) {
         startedActivities++
-        // Study mode outlives the process (reinstall, reboot): resume listening when Thoughts opens.
+        // Study mode outlives the process (reinstall, reboot) and pauses when unused: resume
+        // listening when Thoughts opens, and count the opening as a use while it listens.
         if (!listening && AgentStudyMode.isOn(activity)) AgentStudyListenerService.start(activity)
+        else AgentStudyListenerService.studyModeUsed(activity)
         update()
     }
 

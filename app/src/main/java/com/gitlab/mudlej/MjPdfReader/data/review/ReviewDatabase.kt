@@ -137,12 +137,30 @@ internal class ReviewDatabase(context: Context) {
     fun invalidateLocations() { db.execSQL("UPDATE ReviewState SET dirty=1") }
     fun dirtyCards(): List<String> = db.query("SELECT cardId FROM ReviewState WHERE dirty=1").use { c -> buildList { while(c.moveToNext()) add(c.getString(0)) } }
     fun cardIds(): List<String> = db.query("SELECT DISTINCT cardId FROM ReviewRecord WHERE kind='cards'").use { c -> buildList { while(c.moveToNext()) add(c.getString(0)) } }
-    fun saveState(id: String, card: ReviewCard?, active: Boolean, eligibleAt: Long, reviewCount: Int, mark: String) {
-        val schedule = card?.schedule
-        val dueAt = (if (schedule?.retained == true) null else schedule?.dueAt ?: card?.initialDueAt)
-            ?.let { runCatching { it.toEpochMilli() }.getOrNull() }
-        db.execSQL("INSERT OR REPLACE INTO ReviewState VALUES (?,?,?,?,0,?,?,?,?,?,?)", arrayOf<Any?>(id, card?.pdfStem.orEmpty(), if (active) 1 else 0, eligibleAt,
-            card?.documentId.orEmpty(), dueAt, reviewCount, mark, if (schedule?.deleted == true) 1 else 0, if (schedule?.retained == true) 1 else 0))
+    fun saveState(id: String, card: ReviewCard?, active: Boolean, eligibleAt: Long, reviewCount: Int, mark: String) =
+        saveState(id, reviewStateRow(card, active, eligibleAt, reviewCount, mark))
+
+    /** The stored state of every card whose records have not changed since it was written. */
+    fun cleanStateRows(): Map<String, ReviewStateRow> = db.query(
+        "SELECT cardId,pdfStem,active,eligibleAt,documentId,dueAt,reviewCount,currentMark,deleted,retained FROM ReviewState WHERE dirty=0",
+    ).use { c ->
+        buildMap {
+            while (c.moveToNext()) put(
+                c.getString(0),
+                ReviewStateRow(
+                    pdfStem = c.getString(1), active = c.getInt(2) != 0, eligibleAt = c.getLong(3),
+                    documentId = c.getString(4), dueAt = if (c.isNull(5)) null else c.getLong(5),
+                    reviewCount = c.getInt(6), currentMark = c.getString(7),
+                    deleted = c.getInt(8) != 0, retained = c.getInt(9) != 0,
+                ),
+            )
+        }
+    }
+
+    /** Writes the card's state and clears its dirty flag. */
+    fun saveState(id: String, row: ReviewStateRow) {
+        db.execSQL("INSERT OR REPLACE INTO ReviewState VALUES (?,?,?,?,0,?,?,?,?,?,?)", arrayOf<Any?>(id, row.pdfStem, if (row.active) 1 else 0, row.eligibleAt,
+            row.documentId, row.dueAt, row.reviewCount, row.currentMark, if (row.deleted) 1 else 0, if (row.retained) 1 else 0))
     }
     fun dueIds(now: Long, stem: String?): Set<String> {
         val sql = "SELECT cardId FROM ReviewState WHERE active=1 AND eligibleAt<=?" + if (stem == null) "" else " AND pdfStem=?"

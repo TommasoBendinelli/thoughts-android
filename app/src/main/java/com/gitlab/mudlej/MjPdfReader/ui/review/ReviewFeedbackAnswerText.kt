@@ -115,6 +115,11 @@ internal data class FeedbackPlacement(
      * whose passage lies inside this card's answer: that card's question ("" when it has none).
      */
     val sharedFrom: String? = null,
+    /**
+     * Made on another version of the PDF than the one shown: a like or dislike belongs to the
+     * version it was given on, so it is neither drawn nor counted here, only listed apart.
+     */
+    val earlierVersion: Boolean = false,
 ) {
     val shared: Boolean get() = sharedFrom != null
 }
@@ -161,6 +166,14 @@ internal fun sharedFeedbackCandidates(
     .toList()
 
 /**
+ * Whether [feedback] was given on another version of the PDF than [displayedPdfSha256]. Likes and
+ * dislikes belong to their version. Unknown versions (no PDF on screen, or
+ * feedback given in an HTML edition) are not compared.
+ */
+internal fun fromAnotherVersion(feedback: ReviewCardFeedback.Feedback, displayedPdfSha256: String): Boolean =
+    displayedPdfSha256.isNotEmpty() && feedback.pdfSha256.isNotEmpty() && !feedback.pdfSha256.equals(displayedPdfSha256, ignoreCase = true)
+
+/**
  * Where feedback of other cards is drawn on this card's answer, or nothing: on the PDF it was made
  * on, its line rectangles must qualify inside [answerRegions] as a new selection would (§6.2);
  * on another PDF its quote must be found in this card's [answer] text (§4.2). A record that is not
@@ -173,6 +186,8 @@ internal fun placeSharedFeedback(
     answerRegions: List<Region>,
 ): List<FeedbackPlacement> = records.mapNotNull { shared ->
     val feedback = shared.feedback
+    // Another card's like or dislike from another version stays with that version.
+    if (fromAnotherVersion(feedback, displayedPdfSha256)) return@mapNotNull null
     val samePdf = displayedPdfSha256.isNotEmpty() && feedback.pdfSha256.equals(displayedPdfSha256, ignoreCase = true)
     if (samePdf) {
         if (!feedbackSelectionQualifies(feedback.regions, answerRegions)) return@mapNotNull null
@@ -196,6 +211,9 @@ internal fun placeFeedback(
     displayedPdfSha256: String,
     answer: FeedbackAnswerText?,
 ): List<FeedbackPlacement> = records.map { feedback ->
+    if (fromAnotherVersion(feedback, displayedPdfSha256)) {
+        return@map FeedbackPlacement(feedback, ReviewFeedbackAnchoring.State.ORPHANED, emptyList(), null, earlierVersion = true)
+    }
     val samePdf = displayedPdfSha256.isNotEmpty() && feedback.pdfSha256.equals(displayedPdfSha256, ignoreCase = true)
     if (samePdf) {
         val start = answer?.let {
@@ -219,6 +237,7 @@ internal fun placeFeedback(
 /** The order of the card's feedback list (spec §6.3): by position in the answer, not found last. */
 internal fun feedbackListOrder(placements: List<FeedbackPlacement>): List<FeedbackPlacement> =
     placements.sortedWith(compareBy<FeedbackPlacement>(
+        { it.earlierVersion },
         { it.state == ReviewFeedbackAnchoring.State.ORPHANED },
         { it.position ?: Int.MAX_VALUE },
         { it.regions.firstOrNull()?.page ?: Int.MAX_VALUE },

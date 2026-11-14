@@ -17,6 +17,11 @@ data class PendingLibraryRemoval(
     val sha256: String,
     val createdAtEpochMillis: Long,
     val failureDetail: String = "",
+    /**
+     * The server refused this removal ([isRefusedByServer]): it is kept with [failureDetail] and
+     * not sent again until the user retries it, so it cannot fail every later Sync.
+     */
+    val refused: Boolean = false,
 )
 
 /** Durable, identity-scoped requests to remove unlinked PDFs from the shared Library. */
@@ -57,8 +62,8 @@ class LibraryRemovalStore internal constructor(
         current.firstOrNull {
             it.filename == filename && it.sha256 == normalizedSha256
         }?.let { existing ->
-            if (existing.failureDetail.isEmpty()) return existing
-            val cleared = existing.copy(failureDetail = "")
+            if (existing.failureDetail.isEmpty() && !existing.refused) return existing
+            val cleared = existing.copy(failureDetail = "", refused = false)
             current[current.indexOf(existing)] = cleared
             write(current)
             return cleared
@@ -83,6 +88,38 @@ class LibraryRemovalStore internal constructor(
     @Synchronized
     fun clearFailure(requestId: String) {
         update(requestId) { it.copy(failureDetail = "") }
+    }
+
+    /** The removals a Sync sends: all but those the server refused. */
+    @Synchronized
+    fun toSend(): List<PendingLibraryRemoval> = load().filterNot(PendingLibraryRemoval::refused)
+
+    /** The removals the server refused, for the Sync details. */
+    @Synchronized
+    fun refused(): List<PendingLibraryRemoval> = load().filter(PendingLibraryRemoval::refused)
+
+    /** Sets a removal the server refused aside, with the server's reason. */
+    @Synchronized
+    fun recordRefusal(requestId: String, detail: String) {
+        update(requestId) { it.copy(failureDetail = detail.trim().take(MAX_FAILURE_CHARS), refused = true) }
+    }
+
+    /** Sends a refused removal again with the next Sync. */
+    @Synchronized
+    fun retryRefused(requestId: String): Boolean {
+        val before = load()
+        update(requestId) { if (it.refused) it.copy(failureDetail = "", refused = false) else it }
+        return load() != before
+    }
+
+    /** Gives a refused removal up: the PDF stays in the Library. */
+    @Synchronized
+    fun discardRefused(requestId: String): Boolean {
+        val current = load()
+        val retained = current.filterNot { it.requestId == requestId && it.refused }
+        if (retained.size == current.size) return false
+        write(retained)
+        return true
     }
 
     /**
@@ -139,6 +176,7 @@ class LibraryRemovalStore internal constructor(
                     require(createdAt >= 0)
                 },
                 failureDetail = value.string("failure_detail").take(MAX_FAILURE_CHARS),
+                refused = value.get("refused")?.takeIf { it.isJsonPrimitive }?.asBoolean == true,
             )
         }.also { removals ->
             require(removals.distinctBy(PendingLibraryRemoval::requestId).size == removals.size)
@@ -163,6 +201,7 @@ class LibraryRemovalStore internal constructor(
                         removal.failureDetail.takeIf(String::isNotEmpty)?.let { detail ->
                             addProperty("failure_detail", detail)
                         }
+                        if (removal.refused) addProperty("refused", true)
                     })
                 }
             })

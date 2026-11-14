@@ -122,18 +122,24 @@ class ReviewSharedFeedbackTest {
         assertEquals(emptyList<FeedbackPlacement>(), placeSharedFeedback(shared, rebuilt, null, separateRegions))
     }
 
-    @Test fun sharedFeedbackIsRelocatedOnAnotherPdfVersion() {
-        val disliked = ReviewCardFeedback.create(homeCardId, Polarity.NEGATIVE, "Unclear", ReviewCardFeedback.NewAnchor(
+    @Test fun likesAndDislikesStayWithThePdfVersionTheyWereGivenOn() {
+        // Another card's dislike, given on the earlier build: not shown on the rebuilt PDF.
+        ReviewCardFeedback.create(homeCardId, Polarity.NEGATIVE, "Unclear", ReviewCardFeedback.NewAnchor(
             "line second", "first ", " line text", documentId, madeOn, listOf(Region(1, 0.3, 0.16, 0.52, 0.24))), "phone")
-        val shared = candidates()
-        // Card A's answer on the rebuilt PDF also covers both lines: found by its quote.
-        val placed = placeSharedFeedback(shared, rebuilt, answer(homeRegions), homeRegions).single()
-        assertEquals(disliked.id, placed.feedback.id)
-        assertEquals(State.RELOCATED, placed.state)
-        assertEquals(2, placed.regions.size)
-        assertEquals(answer(homeRegions).text.indexOf("line\nsecond"), placed.position)
-        // Card B holds only the first line: the passage is not inside its answer, so it is not shown.
-        assertEquals(emptyList<FeedbackPlacement>(), placeSharedFeedback(shared, rebuilt, answer(overlappingRegions), overlappingRegions))
+        assertEquals(emptyList<FeedbackPlacement>(), placeSharedFeedback(candidates(), rebuilt, answer(homeRegions), homeRegions))
+        // The card's own dislike from then: listed apart, not drawn and never relocated by its quote.
+        val own = ReviewCardFeedback.create("card-b", Polarity.NEGATIVE, "", ReviewCardFeedback.NewAnchor(
+            "line text", "", "", documentId, madeOn, listOf(Region(1, 0.4, 0.36, 0.9, 0.44))), "phone")
+        val earlier = placeFeedback(listOf(own), rebuilt, answer(homeRegions)).single()
+        assertTrue(earlier.earlierVersion)
+        assertEquals(emptyList<Region>(), earlier.regions)
+        // On the version it was given on it is drawn as before, and listed before earlier ones.
+        val current = placeFeedback(listOf(own), madeOn, answer(homeRegions)).single()
+        assertFalse(current.earlierVersion)
+        assertEquals(State.EXACT, current.state)
+        assertEquals(listOf(false, true), feedbackListOrder(listOf(earlier, current)).map { it.earlierVersion })
+        // A version that cannot be told (no PDF on screen) is not compared.
+        assertFalse(placeFeedback(listOf(own), "", answer(homeRegions)).single().earlierVersion)
     }
 
     @Test fun onlyLiveFeedbackOfOtherKnownCardsOfTheSameDocumentIsShared() {

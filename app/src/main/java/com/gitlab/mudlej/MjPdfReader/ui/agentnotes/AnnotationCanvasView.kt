@@ -91,6 +91,27 @@ class AnnotationCanvasView @JvmOverloads constructor(
     private var offsetX = 0f
     private var offsetY = 0f
     private var positioned = false
+    /** A [viewport] to take once the view has its size. */
+    private var pendingViewport: Viewport? = null
+
+    /** How the picture is shown: [zoom] over fitting the width, and the image point at the view's top left, in fractions of the image. */
+    data class Viewport(val zoom: Float, val left: Float, val top: Float)
+
+    /** The picture's zoom and scroll now; set it to show the picture that way (after [setContent]). */
+    var viewport: Viewport?
+        get() {
+            val image = bitmap ?: return null
+            if (!positioned || image.width <= 0 || image.height <= 0) return pendingViewport
+            val scale = totalScale()
+            return Viewport(userScale, -offsetX / scale / image.width, -offsetY / scale / image.height)
+        }
+        set(value) {
+            pendingViewport = value
+            if (value == null) return
+            positioned = false
+            positionContent()
+            invalidate()
+        }
     private val viewMatrix = Matrix()
     private val inverseMatrix = Matrix()
     private val mapped = FloatArray(2)
@@ -143,6 +164,7 @@ class AnnotationCanvasView @JvmOverloads constructor(
         pathCache.clear()
         cachedRevision = -1L
         positioned = false
+        pendingViewport = null
         userScale = 1f
         gesture = Gesture.NONE
         positionContent()
@@ -166,8 +188,17 @@ class AnnotationCanvasView @JvmOverloads constructor(
         val image = bitmap ?: return
         if (width == 0 || height == 0) return
         if (!positioned) {
-            offsetX = 0f
-            offsetY = 0f
+            val pending = pendingViewport
+            pendingViewport = null
+            if (pending == null) {
+                offsetX = 0f
+                offsetY = 0f
+            } else {
+                userScale = pending.zoom.takeIf(Float::isFinite)?.coerceIn(MIN_SCALE, MAX_SCALE) ?: 1f
+                val restored = totalScale()
+                offsetX = -pending.left * image.width * restored
+                offsetY = -pending.top * image.height * restored
+            }
             positioned = true
         }
         val scale = totalScale()

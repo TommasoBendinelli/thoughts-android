@@ -33,17 +33,40 @@ class LibraryProjectStore(private val context: Context, stateDirectory: File? = 
         val output = state.startWrite()
         try { output.write(value.toString().toByteArray()); state.finishWrite(output) }
         catch (error: Exception) { state.failWrite(output); throw error }
+        finally { PROJECTS.invalidate() }
         PendingChangesSignal.notifyChanged()
     }
 
+    /** What the next Sync uploads; a change the server refused is not sent again by itself. */
     fun pendingUploads(): List<Pair<String, Long>> = synchronized(lock) {
-        read().getAsJsonArray("pending").map { value ->
-            val op = value.asJsonObject
+        sendableProjectChanges(read()).map { op ->
             op.get("operation_id").asString to ((op.get("size_bytes")?.asLong ?: 0) + op.toString().toByteArray().size)
         }
     }
 
-    fun pendingCount(): Int = synchronized(lock) { read().getAsJsonArray("pending").size() }
+    /** The queued changes the server refused, kept until the user retries or discards them. */
+    fun refusedChanges(): List<RefusedProjectChange> = synchronized(lock) { refusedProjectChanges(read()) }
+
+    /** Queues the refused change [operationId] for the next Sync again ([retryRefusedProjectChange]). */
+    fun retryRefused(operationId: String): Boolean = synchronized(lock) {
+        val state = read()
+        retryRefusedProjectChange(state, operationId).also { changed -> if (changed) write(state) }
+    }
+
+    /** Drops the refused change [operationId]; the Project shows as the server has it again. */
+    fun discardRefused(operationId: String): Boolean = synchronized(lock) {
+        val state = read()
+        val dropped = discardRefusedProjectChange(state, operationId) ?: return@synchronized false
+        write(state)
+        // The page staged for an HTML import is of no further use; an imported PDF stays readable.
+        if (dropped.get("action")?.asString == "import_html") {
+            dropped.get("local_path")?.takeIf { it.isJsonPrimitive }?.asString?.let { File(it).delete() }
+        }
+        true
+    }
+
+    /** Changes waiting for the next Sync; one the server refused waits for the user instead ([refusedChanges]). */
+    fun pendingCount(): Int = synchronized(lock) { sendableProjectChanges(read()).size }
 
     /**
      * Fedora's connected-folder renames (M, `source_folder_renames`) as last received with the
@@ -69,7 +92,22 @@ class LibraryProjectStore(private val context: Context, stateDirectory: File? = 
     /** The Project catalogue as Fedora last sent it, without queued changes. */
     internal fun storedCatalogue(): JsonArray = synchronized(lock) { read().getAsJsonArray("projects") ?: JsonArray() }
 
+    /**
+     * The Project catalogue with the queued changes applied. Reading and parsing the state file
+     * (about 100 KB) for every call ran on the main thread whenever the Library drew its Projects;
+     * the result is kept while the file is unchanged ([ParsedFileCache]), and [warm] fills it from
+     * a background thread before the Library first draws.
+     */
     fun projects(): JsonArray = synchronized(lock) {
+        PROJECTS.get(state.baseFile, SourceFolderNames.generation) { computeProjects() }
+    }
+
+    /** Reads the catalogue now, on the caller's (background) thread, so that the next [projects] need not. */
+    fun warm() {
+        runCatching { projects() }
+    }
+
+    private fun computeProjects(): JsonArray {
         val state = read()
         val localCreates = state.getAsJsonArray("pending").map { it.asJsonObject }
             .filter { it.get("action")?.asString == "create" }.map { it.get("project_id").asString }.toSet()
@@ -87,7 +125,7 @@ class LibraryProjectStore(private val context: Context, stateDirectory: File? = 
             }
         }
         projects.forEach { it.asJsonObject.apply { add("sources", librarySourceFolders(this)) } }
-        projects
+        return projects
     }
 
     fun enqueue(action: String, project: JsonObject, values: JsonObject = JsonObject()) = synchronized(lock) {
@@ -198,58 +236,69 @@ class LibraryProjectStore(private val context: Context, stateDirectory: File? = 
         } catch (error: Exception) { temporary.delete(); throw error }
     }
 
-    /** Called only by explicit global Sync, under its existing transfer policy. */
-    fun synchronize(client: SyncClient) {
-        val failures = linkedMapOf<String, Exception>()
-        while (true) {
-            val operation = synchronized(lock) { read().getAsJsonArray("pending").firstOrNull {
-                it.asJsonObject.get("project_id").asString !in failures
-            }?.asJsonObject?.deepCopy() } ?: break
-            val projectId = operation.get("project_id").asString
-            try {
-            // A change queued before this phone moved its folders names them as they are called now.
-            val payload = SourceFolderNames.followLocal(operation.deepCopy(), SourceFolderNamesMigration.SKIP_KEYS)
-            val localPath = payload.remove("local_path")?.asString
-            payload.remove("size_bytes")
-            if (localPath != null) {
-                val file = File(localPath)
-                val digest = payload.get("sha256").asString
-                val html = payload.get("action").asString == "import_html"
-                if (!client.hasObject(digest)) file.inputStream().use {
-                    client.uploadObject(it, file.length(), digest, if (html) "text/html" else "application/pdf")
-                }
-                if (!html) {
-                    val documentId = payload.get("document_id").asString
-                    check(client.importLibraryPdf(payload.get("filename").asString, digest, documentId).documentId == documentId) { "The server returned a different document identifier" }
-                }
+    /** Sends one queued change and, once the server took it, removes it from the queue. */
+    private fun send(client: SyncClient, operation: JsonObject) {
+        // A change queued before this phone moved its folders names them as they are called now.
+        val payload = SourceFolderNames.followLocal(operation.deepCopy(), SourceFolderNamesMigration.SKIP_KEYS)
+        val localPath = payload.remove("local_path")?.asString
+        payload.remove("size_bytes")
+        if (localPath != null) {
+            val file = File(localPath)
+            val digest = payload.get("sha256").asString
+            val html = payload.get("action").asString == "import_html"
+            if (!client.hasObject(digest)) file.inputStream().use {
+                client.uploadObject(it, file.length(), digest, if (html) "text/html" else "application/pdf")
             }
-            val snapshot = try { client.editLibraryProject(payload) }
-            catch (error: org.tbend.thoughts.sdk.ServerException) {
-                if (error.statusCode == 404) throw IllegalStateException("Project changes are saved on this device. Install the project update on the Thoughts server, then tap Sync.", error)
-                throw error
+            if (!html) {
+                val documentId = payload.get("document_id").asString
+                check(client.importLibraryPdf(payload.get("filename").asString, digest, documentId).documentId == documentId) { "The server returned a different document identifier" }
             }
-            synchronized(lock) {
-                val state = read()
-                val retained = JsonArray()
-                state.getAsJsonArray("pending").filter { it.asJsonObject.get("operation_id") != operation.get("operation_id") }.forEach(retained::add)
-                state.add("pending", retained); state.add("projects", snapshot.getAsJsonArray("projects")); state.addProperty("downloaded", true)
-                snapshot.get(SourceFolderNamesMigration.RENAMES_KEY)?.let { state.add(SourceFolderNamesMigration.RENAMES_KEY, it) }
-                // This copy came from an edit response, not from the catalogue the ETag names.
-                state.remove("projects_etag")
-                write(state)
-            }
-            // Keep registered import bytes available to readers until publication is activated.
-            if (operation.get("action").asString != "import") localPath?.let { File(it).delete() }
-            } catch (error: kotlinx.coroutines.CancellationException) { throw error }
-            catch (error: Exception) { failures[projectId] = error }
         }
+        val snapshot = try { client.editLibraryProject(payload) }
+        catch (error: org.tbend.thoughts.sdk.ServerException) {
+            if (error.statusCode == 404) throw IllegalStateException("Project changes are saved on this device. Install the project update on the Thoughts server, then tap Sync.", error)
+            throw error
+        }
+        synchronized(lock) {
+            val state = read()
+            val retained = JsonArray()
+            state.getAsJsonArray("pending").filter { it.asJsonObject.get("operation_id") != operation.get("operation_id") }.forEach(retained::add)
+            state.add("pending", retained); state.add("projects", snapshot.getAsJsonArray("projects")); state.addProperty("downloaded", true)
+            snapshot.get(SourceFolderNamesMigration.RENAMES_KEY)?.let { state.add(SourceFolderNamesMigration.RENAMES_KEY, it) }
+            // This copy came from an edit response, not from the catalogue the ETag names.
+            state.remove("projects_etag")
+            write(state)
+        }
+        // Keep registered import bytes available to readers until publication is activated.
+        if (operation.get("action").asString != "import") localPath?.let { File(it).delete() }
+    }
+
+    /**
+     * Called only by explicit global Sync, under its existing transfer policy. A change the
+     * server refuses ([isRefusedByServer]) is set aside and returned; it does not fail the Sync,
+     * which goes on to pull and download. Any other failure fails the Sync as before.
+     */
+    fun synchronize(client: SyncClient): List<RefusedProjectChange> {
+        val outcome = drainQueuedProjectChanges(
+            next = { failedProjects -> synchronized(lock) { nextProjectChangeToSend(read(), failedProjects)?.deepCopy() } },
+            send = { operation -> send(client, operation) },
+            setAside = { operation, error ->
+                synchronized(lock) {
+                    val state = read()
+                    val operationId = operation.get("operation_id").asString
+                    if (setProjectChangeAside(state, operationId, refusalDetail(error), System.currentTimeMillis())) write(state)
+                }
+            },
+        )
+        val failures = outcome.failures
+        val refusedNow = outcome.refused
         // Revalidate the stored catalogue: an unchanged one answers 304 instead of about 100 KB.
         val cachedEtag = synchronized(lock) {
             read().takeIf { it.get("downloaded")?.asBoolean == true }?.get("projects_etag")?.asString
         }
         val call = try { client.libraryProjects(cachedEtag) }
         catch (error: org.tbend.thoughts.sdk.ServerException) {
-            if (error.statusCode == 404 && failures.isEmpty()) return
+            if (error.statusCode == 404 && failures.isEmpty()) return refusedChanges().filter { it.operationId in refusedNow }
             throw error
         }
         val snapshot = call.snapshot
@@ -263,6 +312,14 @@ class LibraryProjectStore(private val context: Context, stateDirectory: File? = 
             "Some project changes remain pending; other projects were synchronized: " +
                 failures.entries.joinToString("; ") { "${it.key}: ${it.value.message}" }
         }
+        return refusedChanges().filter { it.operationId in refusedNow }
+    }
+
+    /** The server's own words for a refusal (the `detail` of its JSON error), else the message. */
+    private fun refusalDetail(error: Exception): String {
+        val raw = error.message.orEmpty()
+        return runCatching { JsonParser.parseString(raw).asJsonObject.get("detail").asString }.getOrNull()
+            ?.takeIf(String::isNotBlank) ?: raw.ifBlank { error.javaClass.simpleName }
     }
 
     /**
@@ -387,6 +444,7 @@ class LibraryProjectStore(private val context: Context, stateDirectory: File? = 
     companion object {
         private const val MAX_HTML_BYTES = 100_000_000L
         private val lock = Any()
+        private val PROJECTS = com.gitlab.mudlej.MjPdfReader.data.ParsedFileCache<JsonArray> { it.deepCopy() }
     }
 }
 

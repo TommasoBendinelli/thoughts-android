@@ -75,8 +75,13 @@ class ToolbarActionController(
         menuItem.isEnabled = enabled
         menuItem.setTitle(actionId.titleRes)
         menuItem.setIcon(actionId.iconRes)
+        // A tinted icon looks the same when disabled: dim an arrow that leads nowhere.
+        menuItem.icon?.mutate()?.alpha = navigationIconAlpha(enabled)
     }
 }
+
+/** Back and Forward are drawn dimmed while they lead nowhere, as the agent note's arrows are. */
+internal fun navigationIconAlpha(enabled: Boolean): Int = if (enabled) 255 else 97
 
 internal data class ToolbarNavigationPresentation(
     val visible: Boolean,

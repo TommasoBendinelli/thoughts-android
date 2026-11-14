@@ -250,6 +250,21 @@ class PreferencesTest {
     }
 
     @Test
+    fun theGradingStudyModeDefaultCountsAsTheDefaultAndEditedCopiesStay() {
+        val study = AgentPromptTemplates.Kind.STUDY_MODE
+        val previous = AgentPromptTemplates.PREVIOUS_DEFAULT_STUDY_MODE_TEMPLATE
+        assertTrue(previous.contains("green = right"))
+        val shared = InMemorySharedPreferences(mapOf(Preferences.studyModePromptTemplateKey to previous))
+        val preferences = Preferences(shared)
+        assertEquals(AgentPromptTemplates.DEFAULT_STUDY_MODE_TEMPLATE, preferences.getAgentPromptTemplate(study))
+        // A template the user edited is theirs and stays.
+        preferences.setAgentPromptTemplate(study, previous + "Also speak French.\n")
+        assertEquals(previous + "Also speak French.\n", Preferences(shared).getAgentPromptTemplate(study))
+        preferences.setAgentPromptTemplate(study, previous)
+        assertFalse(shared.contains(Preferences.studyModePromptTemplateKey))
+    }
+
+    @Test
     fun agentNoteMessageStartsCollapsedAndKeepsTheLastChoice() {
         val shared = InMemorySharedPreferences(emptyMap())
         assertTrue(Preferences(shared).getAgentNoteMessageCollapsed())

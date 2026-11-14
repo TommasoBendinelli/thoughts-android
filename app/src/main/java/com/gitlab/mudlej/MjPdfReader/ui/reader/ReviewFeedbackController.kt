@@ -198,7 +198,7 @@ internal class ReviewFeedbackController(
             }
         binding.pdfView.setReviewFeedback(highlights)
         // The HTML view places the same records by their quotes inside the card's answer.
-        card?.let { shown -> activity.htmlReaderOrNull?.setFeedback(shown.id, placements.map { it.feedback }) }
+        card?.let { shown -> activity.htmlReaderOrNull?.setFeedback(shown.id, placements.filterNot { it.earlierVersion }.map { it.feedback }) }
         val summary = feedbackSummary(activity, placements)
         binding.reviewFeedbackSummary.text = summary
         binding.reviewFeedbackSummary.visibility = if (summary.isEmpty()) View.GONE else View.VISIBLE
@@ -516,12 +516,20 @@ internal class ReviewFeedbackController(
             setPadding(padding, (8 * density).toInt(), padding, 0)
         }
         var shownHeading = false
+        var shownEarlierHeading = false
         val selectable = TypedValue().also {
             context.theme.resolveAttribute(android.R.attr.selectableItemBackground, it, true)
         }.resourceId
         lateinit var listDialog: Dialog
         feedbackListOrder(placements).forEach { placement ->
-            if (placement.state == ReviewFeedbackAnchoring.State.ORPHANED && !shownHeading) {
+            if (placement.earlierVersion && !shownEarlierHeading) {
+                shownEarlierHeading = true
+                list.addView(TextView(context).apply {
+                    setText(R.string.review_feedback_earlier_versions)
+                    setTextAppearance(com.google.android.material.R.style.TextAppearance_Material3_TitleSmall)
+                    setPadding(0, (16 * density).toInt(), 0, (4 * density).toInt())
+                })
+            } else if (!placement.earlierVersion && placement.state == ReviewFeedbackAnchoring.State.ORPHANED && !shownHeading) {
                 shownHeading = true
                 list.addView(TextView(context).apply {
                     setText(R.string.review_feedback_not_found)
@@ -606,14 +614,22 @@ internal class ReviewFeedbackController(
 /** "2 liked · 1 disliked (1 not found)"; empty when the card has no feedback. */
 internal fun feedbackSummary(context: android.content.Context, placements: List<FeedbackPlacement>): String {
     if (placements.isEmpty()) return ""
-    val liked = placements.count { it.feedback.polarity == Polarity.POSITIVE }
-    val disliked = placements.size - liked
-    val missing = placements.count { it.state == ReviewFeedbackAnchoring.State.ORPHANED }
-    val counts = listOfNotNull(
+    // Likes and dislikes of another PDF version are not counted with this one, only mentioned.
+    val current = placements.filterNot { it.earlierVersion }
+    val earlier = placements.size - current.size
+    val liked = current.count { it.feedback.polarity == Polarity.POSITIVE }
+    val disliked = current.size - liked
+    val missing = current.count { it.state == ReviewFeedbackAnchoring.State.ORPHANED }
+    var counts = listOfNotNull(
         context.getString(R.string.review_feedback_liked_count, liked).takeIf { liked > 0 },
         context.getString(R.string.review_feedback_disliked_count, disliked).takeIf { disliked > 0 },
     ).joinToString(" · ")
-    return if (missing > 0) "$counts ${context.getString(R.string.review_feedback_not_found_count, missing)}" else counts
+    if (missing > 0) counts = "$counts ${context.getString(R.string.review_feedback_not_found_count, missing)}"
+    if (earlier > 0) {
+        val note = context.resources.getQuantityString(R.plurals.review_feedback_earlier_count, earlier, earlier)
+        counts = if (counts.isEmpty()) note else "$counts · $note"
+    }
+    return counts
 }
 
 /** "From another card · “question”" (or just "From another card" when it has no question). */

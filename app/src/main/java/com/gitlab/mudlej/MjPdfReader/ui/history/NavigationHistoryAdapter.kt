@@ -32,9 +32,11 @@ class NavigationHistoryAdapter(
 
         fun bind(entry: NavigationHistoryRow) {
             val context = binding.root.context
-            binding.navigationHistoryTitle.text = context.getString(R.string.bookmark_page_label, entry.pageIndex + 1)
-            binding.navigationHistoryTocPath.text = entry.tableOfContentsPath.orEmpty()
-            binding.navigationHistoryTocPath.visibility = if (entry.tableOfContentsPath.isNullOrBlank()) View.GONE else View.VISIBLE
+            binding.navigationHistoryTitle.text = if (entry.isNote) entry.documentName.orEmpty()
+                else context.getString(R.string.bookmark_page_label, entry.pageIndex + 1)
+            val path = entry.tableOfContentsPath.takeUnless { entry.isNote }
+            binding.navigationHistoryTocPath.text = path.orEmpty()
+            binding.navigationHistoryTocPath.visibility = if (path.isNullOrBlank()) View.GONE else View.VISIBLE
 
             when (entry.kind) {
                 NavigationHistoryRow.Kind.CURRENT -> {

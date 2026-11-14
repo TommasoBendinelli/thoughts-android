@@ -219,15 +219,22 @@ internal object ProposalRestore {
             var from = text.indexOf(needle)
             while (from >= 0) {
                 val end = from + needle.length
-                val startsLine = from == 0 || text[from - 1] == '\n'
-                val endsLine = text[end - 1] == '\n' || end == text.length
+                // Whole lines; beside a card marker (section 8.1) a text may also start with the LF
+                // that ends the line before it, or end right before its last LF.
+                val startsLine = from == 0 || text[from - 1] == '\n' || needle.startsWith('\n')
+                val endsLine = end == text.length || text[end - 1] == '\n' || text[end] == '\n'
                 val free = blocked.none { from < it.last + 1 && it.first < end }
                 if (startsLine && endsLine && free) candidates.getOrPut(from to end) { Candidate(from, end, matched) }
                 from = text.indexOf(needle, from + 1)
             }
         }
         if (candidates.isEmpty() && (snapshot.before.isEmpty() || snapshot.after.isEmpty())) {
-            val offset = lineStart(text, line)
+            // The start of line L (the end of T when T has fewer lines); the end of line L, before its
+            // LF, when the other text starts with LF: that wrapper started there (section 8.1).
+            var offset = lineStart(text, line)
+            if (snapshot.after.ifEmpty { snapshot.before }.startsWith('\n') && line in 1..lineCount(text)) {
+                offset = text.indexOf('\n', offset).takeIf { it >= 0 } ?: text.length
+            }
             candidates[offset to offset] = Candidate(offset, offset, "empty")
         }
         if (candidates.isEmpty()) return Result.Refused("text_changed")
@@ -295,6 +302,10 @@ internal object ProposalRestore {
     }
 
     /** Offset of the start of 1-based [line], or the end of [text] when it has fewer lines. */
+    /** Lines of [text]; a final LF does not start another one. */
+    private fun lineCount(text: String): Int =
+        1 + text.indices.count { text[it] == '\n' && it + 1 < text.length }
+
     fun lineStart(text: String, line: Int): Int {
         var remaining = line.coerceAtLeast(1) - 1
         if (remaining == 0) return 0

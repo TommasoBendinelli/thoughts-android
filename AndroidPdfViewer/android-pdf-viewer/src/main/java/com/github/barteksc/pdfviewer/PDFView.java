@@ -947,6 +947,10 @@ public class PDFView extends RelativeLayout {
     private Paint agentProposalMarkerStrokePaint;
 
     private Paint agentProposalMarkerGlyphPaint;
+    /** Whether the press now ending may act on a marker (it neither stopped nor saw the page move). */
+    private final MarkerPressGuard markerPressGuard = new MarkerPressGuard();
+    /** The proposal markers as accessibility nodes, once the app says what they do. */
+    private AgentProposalMarkerAccessibility markerAccessibility;
 
     private final Path agentProposalMarkerPath = new Path();
 
@@ -3440,7 +3444,63 @@ public class PDFView extends RelativeLayout {
                 ? Collections.emptyList()
                 : Collections.unmodifiableList(new ArrayList<>(overlays));
         invalidateAgentProposalMarkerLayout();
+        if (markerAccessibility != null) markerAccessibility.invalidateRoot();
         invalidate();
+    }
+
+    /** What a tap and a long press on a proposal's marker do, for accessibility services. */
+    public interface AgentProposalMarkerActions {
+        boolean onAgentProposalMarkerTap(String proposalId);
+
+        boolean onAgentProposalMarkerLongPress(String proposalId);
+    }
+
+    /** Makes each proposal marker on screen an accessibility node saying [description]. */
+    public void setAgentProposalMarkerAccessibility(String description, AgentProposalMarkerActions actions) {
+        if (markerAccessibility == null) {
+            markerAccessibility = new AgentProposalMarkerAccessibility(this);
+            androidx.core.view.ViewCompat.setAccessibilityDelegate(this, markerAccessibility);
+        }
+        markerAccessibility.configure(description, actions);
+    }
+
+    @Override
+    protected boolean dispatchHoverEvent(MotionEvent event) {
+        if (markerAccessibility != null && markerAccessibility.dispatchHoverEvent(event)) return true;
+        return super.dispatchHoverEvent(event);
+    }
+
+    /** The proposal markers on screen, in view coordinates. */
+    List<AgentProposalMarkerAccessibility.VisibleMarker> visibleAgentProposalMarkers() {
+        if (!highlightAgentEdits) return Collections.emptyList();
+        List<AgentProposalMarkerGeometry.Marker> markers = agentProposalMarkers();
+        if (markers.isEmpty()) return Collections.emptyList();
+        float dx = getCurrentXOffset();
+        float dy = getCurrentYOffset();
+        RectF view = new RectF(0, 0, getWidth(), getHeight());
+        List<AgentProposalMarkerAccessibility.VisibleMarker> visible = new ArrayList<>();
+        for (AgentProposalMarkerGeometry.Marker marker : markers) {
+            RectF bounds = new RectF(marker.bounds.left + dx, marker.bounds.top + dy,
+                    marker.bounds.right + dx, marker.bounds.bottom + dy);
+            if (RectF.intersects(bounds, view)) {
+                visible.add(new AgentProposalMarkerAccessibility.VisibleMarker(marker.proposalId, bounds));
+            }
+        }
+        return visible;
+    }
+
+    /** A finger went down on the page; [pageMoving]: the page was still moving by itself. */
+    void onPressStarted(boolean pageMoving) {
+        markerPressGuard.onDown(pageMoving, getCurrentXOffset(), getCurrentYOffset());
+    }
+
+    /**
+     * True when the tap now confirmed may act on a marker: its press did not stop a moving page
+     * (a fling coasting, a page snap) and the page did not move under it. A scroll is never a tap.
+     */
+    public boolean isStillMarkerTap() {
+        return markerPressGuard.isStillTap(getCurrentXOffset(), getCurrentYOffset(),
+                ViewConfiguration.get(getContext()).getScaledTouchSlop());
     }
 
     private void invalidateAgentProposalMarkerLayout() {
@@ -3493,7 +3553,7 @@ public class PDFView extends RelativeLayout {
     }
 
     /**
-     * Draw one pencil marker per proposal at its document-wide first fragment,
+     * Draw one marker (a check mark) per proposal at its document-wide first fragment,
      * skipping LaTeX-made duplicates such as contents entries when it can.
      *
      * <p>The anchor is chosen before layout visibility is considered, so a page
@@ -3509,8 +3569,7 @@ public class PDFView extends RelativeLayout {
         agentProposalMarkerStrokePaint.setColor(commentMarkerOutlineColor());
         agentProposalMarkerStrokePaint.setStrokeWidth(Math.max(1f, density));
         agentProposalMarkerFillPaint.setColor(commentMarkerSurfaceColor());
-        agentProposalMarkerGlyphPaint.setColor(commentMarkerGlyphColor());
-        agentProposalMarkerGlyphPaint.setStrokeWidth(1.4f * density);
+        agentProposalMarkerGlyphPaint.setColor(agentProposalCheckColor());
         for (AgentProposalMarkerGeometry.Marker marker : markers) {
             if (!pages.contains(marker.pageIndex)) continue;
             RectF bounds = new RectF(
@@ -3525,28 +3584,27 @@ public class PDFView extends RelativeLayout {
                     COMMENT_MARKER_CORNER_RADIUS_DP * density,
                     COMMENT_MARKER_CORNER_RADIUS_DP * density,
                     agentProposalMarkerStrokePaint);
-            drawPencilGlyph(canvas, bounds);
+            drawCheckGlyph(canvas, bounds);
         }
     }
 
-    /** The desktop pencil outline, scaled from its 20-point marker box. */
-    private void drawPencilGlyph(Canvas canvas, RectF bounds) {
+    /**
+     * The desktop's check mark, scaled from its 20-point marker box, in the green of Accept: a tap
+     * on it accepts the proposal, a long press shows its options.
+     */
+    private void drawCheckGlyph(Canvas canvas, RectF bounds) {
         float scale = bounds.width() / COMMENT_MARKER_SIZE_DP;
+        agentProposalMarkerGlyphPaint.setStrokeWidth(2.4f * scale);
         Path path = agentProposalMarkerPath;
         path.rewind();
-        path.moveTo(bounds.left + 5f * scale, bounds.top + 15f * scale);
-        path.lineTo(bounds.left + 6f * scale, bounds.top + 11f * scale);
-        path.lineTo(bounds.left + 12f * scale, bounds.top + 5f * scale);
-        path.lineTo(bounds.left + 15f * scale, bounds.top + 8f * scale);
-        path.lineTo(bounds.left + 9f * scale, bounds.top + 14f * scale);
-        path.close();
+        path.moveTo(bounds.left + 5f * scale, bounds.top + 10.5f * scale);
+        path.lineTo(bounds.left + 8.5f * scale, bounds.top + 14f * scale);
+        path.lineTo(bounds.left + 15f * scale, bounds.top + 6.5f * scale);
         canvas.drawPath(path, agentProposalMarkerGlyphPaint);
-        canvas.drawLine(
-                bounds.left + 10.5f * scale,
-                bounds.top + 6.5f * scale,
-                bounds.left + 13.5f * scale,
-                bounds.top + 9.5f * scale,
-                agentProposalMarkerGlyphPaint);
+    }
+
+    private int agentProposalCheckColor() {
+        return nightMode ? 0xFF66BB6A : 0xFF239B4B;
     }
 
     private int commentMarkerOutlineColor() {
@@ -3555,10 +3613,6 @@ public class PDFView extends RelativeLayout {
 
     private int commentMarkerSurfaceColor() {
         return nightMode ? 0xFF424242 : 0xFFFFFFFF;
-    }
-
-    private int commentMarkerGlyphColor() {
-        return nightMode ? 0xFFECEFF1 : 0xFF212121;
     }
 
     /**
@@ -3613,7 +3667,7 @@ public class PDFView extends RelativeLayout {
         return agentProposalMarkerLayout;
     }
 
-    /** Return the proposal whose pencil marker is under a view-coordinate tap, if any. */
+    /** Return the proposal whose marker (a check mark) is under a view-coordinate tap, if any. */
     public String agentProposalMarkerAt(float viewX, float viewY) {
         if (!highlightAgentEdits) return null;
         List<AgentProposalMarkerGeometry.Marker> markers = agentProposalMarkers();
@@ -3639,7 +3693,7 @@ public class PDFView extends RelativeLayout {
         public final boolean selected;
         /**
          * A LaTeX-made copy (contents entry, running head) of the edited text.
-         * It is highlighted like any fragment but does not anchor the pencil marker.
+         * It is highlighted like any fragment but does not anchor the proposal's marker.
          */
         public final boolean duplicate;
 
@@ -4044,6 +4098,8 @@ public class PDFView extends RelativeLayout {
         if (pdfFile == null || renderScheduler == null) {
             return;
         }
+        // The page moved: the markers on screen are others, or elsewhere.
+        if (markerAccessibility != null) markerAccessibility.invalidateRoot();
 
         synchronized (previewPending) {
             previewPending.clear();
@@ -7493,6 +7549,8 @@ public class PDFView extends RelativeLayout {
 
         private OnLongPressListener onLongPressListener;
 
+        private OnTapListener onLongPressFirstListener;
+
         private OnTextSelectionChangeListener onTextSelectionChangeListener;
 
         private OnPageErrorListener onPageErrorListener;
@@ -7646,6 +7704,12 @@ public class PDFView extends RelativeLayout {
 
         public Configurator onLongPress(OnLongPressListener onLongPressListener) {
             this.onLongPressListener = onLongPressListener;
+            return this;
+        }
+
+        /** Asked first on a long press; true when it was a marker's own, so no text selection starts. */
+        public Configurator onLongPressFirst(OnTapListener onLongPressFirstListener) {
+            this.onLongPressFirstListener = onLongPressFirstListener;
             return this;
         }
 
@@ -7817,6 +7881,7 @@ public class PDFView extends RelativeLayout {
             PDFView.this.callbacks.setOnTap(onTapListener);
             PDFView.this.callbacks.setOnTapUp(onTapUpListener);
             PDFView.this.callbacks.setOnLongPress(onLongPressListener);
+            PDFView.this.callbacks.setOnLongPressFirst(onLongPressFirstListener);
             PDFView.this.callbacks.setOnPageError(onPageErrorListener);
             PDFView.this.callbacks.setOnTextSelectionChange(onTextSelectionChangeListener);
             PDFView.this.callbacks.setLinkHandler(linkHandler);

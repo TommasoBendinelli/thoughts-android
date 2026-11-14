@@ -72,6 +72,9 @@ public class Callbacks {
 
     private OnTapListener onTapUpListener;
 
+    /** Consulted first on a long press; true when it was a marker's own (no text selection starts). */
+    private OnTapListener onLongPressFirstListener;
+
     /**
      * Call back object to call when the user does a long tap gesture
      */
@@ -187,6 +190,14 @@ public class Callbacks {
 
     public boolean callOnTapUp(MotionEvent event) {
         return onTapUpListener != null && onTapUpListener.onTap(event);
+    }
+
+    public void setOnLongPressFirst(OnTapListener onLongPressFirstListener) {
+        this.onLongPressFirstListener = onLongPressFirstListener;
+    }
+
+    public boolean callOnLongPressFirst(MotionEvent event) {
+        return onLongPressFirstListener != null && onLongPressFirstListener.onTap(event);
     }
 
     public void setOnLongPress(OnLongPressListener onLongPressListener) {

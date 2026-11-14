@@ -136,7 +136,13 @@ class LibraryProjectPane(
         }
     }
 
+    /** PDFs Fedora is building after a Sync that did not wait for them: their rows say "Updating…". */
+    private var updatingPdfs: Set<String> = emptySet()
+
     private fun redraw() {
+        updatingPdfs = runCatching {
+            com.gitlab.mudlej.MjPdfReader.data.sync.PendingFedoraBuildStore(context).builds().flatMapTo(hashSetOf()) { it.documents }
+        }.getOrDefault(emptySet())
         catalogueError = null
         projects = try { store.projects() } catch (error: Exception) {
             catalogueError = error.message ?: "The Project catalogue could not be read."
@@ -260,7 +266,10 @@ class LibraryProjectPane(
                 row.setOnLongClickListener { documentsMenu(project!!); true }
             }
             "document" -> {
-                val doc = model.entry!!; label.withDetails(doc.text("name"), details(listOf(doc)))
+                val doc = model.entry!!
+                // Its new PDF is building on Fedora; the one shown until it arrives is the previous one.
+                val updating = context.getString(R.string.document_status_updating).takeIf { doc.text("filename") in updatingPdfs }
+                label.withDetails(doc.text("name"), listOfNotNull(details(listOf(doc)), updating).joinToString(" · ").ifEmpty { null })
                 val capability = libraryDocumentSourceCapability(doc, sourceIndex)
                 val missingSources = libraryDocumentMissingSources(doc, capability)
                 val missing = missingSources.isNotEmpty()

@@ -42,6 +42,14 @@ data class ReviewCardsSheetItem(
     val reviewable: Boolean,
     /** The answer's normalized top-left fragments by zero-based page; empty while the card has no PDF place. */
     val regions: Map<Int, List<RectF>> = emptyMap(),
+    /** Retired: it stays on the PDF version it was retired on, so a tap opens the card, not a place here. */
+    val retired: Boolean = false,
+)
+
+/** The sheet's two lists: the cards on the PDF shown, and the document's retired cards. */
+data class ReviewCardsSheetContent(
+    val cards: List<ReviewCardsSheetItem>,
+    val retired: List<ReviewCardsSheetItem> = emptyList(),
 )
 
 /**
@@ -129,12 +137,14 @@ class ReviewCardsSheetController(
     private val binding: ActivityMainBinding,
     private val scope: CoroutineScope,
     private val beforeShow: () -> Unit,
-    private val loadCards: suspend () -> List<ReviewCardsSheetItem>,
+    private val loadCards: suspend () -> ReviewCardsSheetContent,
     /** Highlights the card's answer in the space above the sheet; null clears the highlight. */
     private val highlightCard: (ReviewCardsSheetItem?) -> Unit,
     private val openCard: (ReviewCardsSheetItem) -> Unit,
     /** Told when the sheet opens or closes; the PDF highlights every card while it is open. */
     private val openChanged: (Boolean) -> Unit,
+    /** A retired card picked in the sheet: its details, since it has no place on the PDF shown. */
+    private val openRetiredCard: (ReviewCardsSheetItem) -> Unit = {},
 ) {
     private val adapter = ReviewCardsSheetAdapter(::onCardClicked, ::onReviewClicked)
     private var sheet: PdfReviewCardsSheetBinding? = null
@@ -146,6 +156,9 @@ class ReviewCardsSheetController(
     private var reopenAfterLoad = false
     private var syncPosted = false
     private val host get() = binding.commentSheetHost
+    private var loaded = ReviewCardsSheetContent(emptyList())
+    /** The retired cards are listed instead of the PDF's cards. */
+    private var showingRetired = false
 
     fun show() {
         if (sheet != null || activity.isFinishing || activity.isDestroyed) return
@@ -208,15 +221,18 @@ class ReviewCardsSheetController(
             scheduleVisibleAreaSync()
         }
         adapter.submitList(emptyList())
+        showingRetired = false
+        content.reviewCardsRetired.setOnClickListener {
+            showingRetired = !showingRetired
+            showLoaded(content)
+        }
         loadJob = scope.launch {
             try {
                 val cards = loadCards()
                 if (request != generation || sheet !== content) return@launch
                 content.reviewCardsProgress.visibility = View.GONE
-                content.reviewCardsTitle.text = activity.getString(R.string.review_cards_sheet_count, cards.size)
-                content.reviewCardsMessage.setText(R.string.review_cards_sheet_empty)
-                content.reviewCardsMessage.visibility = if (cards.isEmpty()) View.VISIBLE else View.GONE
-                adapter.submitList(cards)
+                loaded = cards
+                showLoaded(content)
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (error: Exception) {
@@ -230,7 +246,32 @@ class ReviewCardsSheetController(
         }
     }
 
+    /** The list chosen (the PDF's cards, or the retired ones), its title, and the button to the other. */
+    private fun showLoaded(content: PdfReviewCardsSheetBinding) {
+        if (loaded.retired.isEmpty()) showingRetired = false
+        val shown = if (showingRetired) loaded.retired else loaded.cards
+        content.reviewCardsTitle.text = activity.getString(
+            if (showingRetired) R.string.review_cards_sheet_retired_title else R.string.review_cards_sheet_count, shown.size)
+        content.reviewCardsMessage.setText(R.string.review_cards_sheet_empty)
+        content.reviewCardsMessage.visibility = if (shown.isEmpty()) View.VISIBLE else View.GONE
+        content.reviewCardsRetired.visibility = if (loaded.retired.isEmpty()) View.GONE else View.VISIBLE
+        content.reviewCardsRetired.text = if (showingRetired) {
+            activity.getString(R.string.review_cards_sheet_current_button, loaded.cards.size)
+        } else {
+            activity.getString(R.string.review_cards_sheet_retired_button, loaded.retired.size)
+        }
+        if (adapter.selectedId != null) {
+            adapter.selectedId = null
+            highlightCard(null)
+        }
+        adapter.submitList(shown)
+    }
+
     private fun onCardClicked(item: ReviewCardsSheetItem) {
+        if (item.retired) {
+            openRetiredCard(item)
+            return
+        }
         val content = sheet ?: return
         adapter.selectedId = item.cardId
         syncVisibleArea()
@@ -330,6 +371,7 @@ class ReviewCardsSheetController(
 
     fun reset() {
         dismiss()
+        loaded = ReviewCardsSheetContent(emptyList())
         adapter.submitList(emptyList())
         settledState = BottomSheetBehavior.STATE_HALF_EXPANDED
         reopenAfterLoad = false

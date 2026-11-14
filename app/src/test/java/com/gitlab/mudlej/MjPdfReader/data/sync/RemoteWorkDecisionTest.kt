@@ -47,4 +47,43 @@ class RemoteWorkDecisionTest {
         assertEquals(c, behind.baseline)
         assertFalse(remoteWorkDecision(RemoteWork(c, cursorBehind = true), syncJustFinished = true, baseline = c, triggered = c).sync)
     }
+
+    @Test
+    fun anAutomaticSyncThatDidNotSucceedGetsNoFollowUpButMovesTheBaseline() {
+        // The phone is still behind because that Sync could not pull, not because of new work.
+        val stalled = remoteWorkDecision(RemoteWork(c, cursorBehind = true), syncJustFinished = true, baseline = a,
+            triggered = b, automaticSyncStalled = true)
+        assertFalse(stalled.sync)
+        assertEquals(c, stalled.baseline)
+        assertEquals(b, stalled.triggered)
+        // The same state after a Sync that succeeded is pulled, as before.
+        assertTrue(remoteWorkDecision(RemoteWork(c, cursorBehind = true), syncJustFinished = true, baseline = a,
+            triggered = b).sync)
+    }
+
+    @Test
+    fun whileBuildsArePendingTheirOwnProgressStartsNoSyncButNewOperationsDo() {
+        // A pending build going from queued to running changes the Library revision, not the operations.
+        val progress = remoteWorkDecision(RemoteWork(b, cursorBehind = false), syncJustFinished = false, baseline = a,
+            triggered = null, buildsPending = true)
+        assertFalse(progress.sync)
+        assertEquals(b, progress.baseline)
+        // An agent's proposal or another device's change arrives meanwhile: Sync.
+        assertTrue(remoteWorkDecision(RemoteWork(c, cursorBehind = true), syncJustFinished = false, baseline = b,
+            triggered = null, buildsPending = true).sync)
+        // Without pending builds a new state is work, as before.
+        assertTrue(remoteWorkDecision(RemoteWork(b, cursorBehind = false), syncJustFinished = false, baseline = a,
+            triggered = null).sync)
+    }
+
+    @Test
+    fun aFinishedPendingBuildStartsTheSyncThatFetchesItsPdf() {
+        val pending = listOf(PendingFedoraBuild("b1", listOf("a.pdf")), PendingFedoraBuild("b2"))
+        assertEquals(setOf("b1"), pendingBuildsDecision(pending, setOf("b1")))
+        assertEquals(emptySet<String>(), pendingBuildsDecision(pending, emptySet()))
+        // Fedora could not be asked: wait for the next check.
+        assertEquals(emptySet<String>(), pendingBuildsDecision(pending, null))
+        // Only builds the phone waits for.
+        assertEquals(emptySet<String>(), pendingBuildsDecision(pending, setOf("other")))
+    }
 }

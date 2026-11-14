@@ -400,9 +400,17 @@ object ThoughtsSyncScheduler {
         )
     }
 
-    fun reconcileInterruptedOperations(
+    /**
+     * Settles the pending Syncs that cannot go on ([syncOperationReconciliation]): one without
+     * scheduled or running work is "interrupted", and one whose work runs without progress for
+     * [SYNC_STALL_DEADLINE_MILLIS] ([stallObserver]) is ended as failed and its work cancelled,
+     * so that either can be started again. [SyncStallWatchdog] looks often, without announcing.
+     */
+    internal fun reconcileInterruptedOperations(
         context: Context,
         nowEpochMillis: Long = System.currentTimeMillis(),
+        announceContinuation: Boolean = true,
+        stallObserver: SyncStallObserver? = null,
     ) {
         val appContext = context.applicationContext
         SyncTransferCoordinator.resume(appContext)
@@ -421,52 +429,71 @@ object ThoughtsSyncScheduler {
             mutableSetOf()
         }
         scheduledOperationIds += runningOperationIds
+        // The Syncs whose job or worker is executing in this process right now.
+        val executingOperationIds = runningOperationIds.toMutableSet()
         val workManager = WorkManager.getInstance(appContext)
         pending.forEach { record ->
-            val active = runCatching {
+            val states = runCatching {
                 workManager.getWorkInfosByTag(syncOperationTag(record.id))
                     .get(10, TimeUnit.SECONDS)
-                    .any { !it.state.isFinished }
+                    .map { it.state }
             }.getOrElse { error ->
                 Log.w(SYNC_LOG_TAG, error.syncFailureMessage("Could not inspect sync work"))
                 return
             }
-            if (active) scheduledOperationIds += record.id
+            if (states.any { !it.isFinished }) scheduledOperationIds += record.id
+            if (states.any { it == androidx.work.WorkInfo.State.RUNNING }) executingOperationIds += record.id
         }
+        val stalledOperationIds = stallObserver
+            ?.stalled(pending.filter { it.id in executingOperationIds }, SystemClock.uptimeMillis())
+            .orEmpty()
 
         pending.sortedBy(SyncOperationRecord::updatedAtEpochMillis).forEach { record ->
-            if (
-                record.id in scheduledOperationIds &&
-                "Continuing the sync you started" !in record.events
-            ) {
-                store.append(
-                    record.id,
-                    record.status,
-                    "Continuing the sync you started",
-                )
-                return@forEach
-            }
-            if (
-                shouldMarkSyncOperationInterrupted(
-                    record,
-                    nowEpochMillis,
-                    record.id in scheduledOperationIds,
+            when (
+                syncOperationReconciliation(
+                    record, nowEpochMillis, record.id in scheduledOperationIds, announceContinuation,
+                    stalled = record.id in stalledOperationIds,
                 )
             ) {
-                val serverMayContinue = !record.serverTerminal &&
-                    record.serverState in setOf("queued", "running", "building")
-                store.fail(
-                    record.id,
-                    if (serverMayContinue) {
-                        "Phone disconnected; the server status was last known as ${record.serverState}."
-                    } else {
-                        interruptedSyncFailureMessage(
-                            ThoughtsNetworkPolicy.requiredVpnActive(appContext),
-                        )
-                    },
-                    "Phone execution was interrupted because no scheduled or running sync work was found after app startup",
-                )
-                store.markStreamState(record.id, SyncOperationStore.STREAM_SAVED)
+                SyncOperationReconciliation.KEEP -> Unit
+                SyncOperationReconciliation.ANNOUNCE_CONTINUATION ->
+                    store.append(record.id, record.status, SYNC_CONTINUATION_EVENT)
+                SyncOperationReconciliation.INTERRUPTED -> {
+                    val serverMayContinue = !record.serverTerminal &&
+                        record.serverState in setOf("queued", "running", "building")
+                    store.fail(
+                        record.id,
+                        if (serverMayContinue) {
+                            "Phone disconnected; the server status was last known as ${record.serverState}."
+                        } else {
+                            interruptedSyncFailureMessage(
+                                ThoughtsNetworkPolicy.requiredVpnActive(appContext),
+                            )
+                        },
+                        "Phone execution was interrupted because no scheduled or running sync work was found after app startup",
+                    )
+                    store.markStreamState(record.id, SyncOperationStore.STREAM_SAVED)
+                    // Nothing runs for it any more: the running notification must not outlive it.
+                    broadcastFinished(appContext, record.id)
+                }
+                SyncOperationReconciliation.STALLED -> {
+                    val detail = "No progress was recorded for ${SYNC_STALL_DEADLINE_MILLIS / 60_000} minutes; " +
+                        "the Sync was ended and its work cancelled so that it can be started again"
+                    Log.w(SYNC_LOG_TAG, "Sync ${record.id} stalled in phase ${record.phase}; ending it")
+                    store.fail(record.id, stalledSyncFailureMessage(), detail)
+                    store.markStreamState(record.id, SyncOperationStore.STREAM_SAVED)
+                    // A download it left half done is offered again by Retry, like any failed one.
+                    runCatching {
+                        val artifacts = ArtifactSyncStateStore(appContext)
+                        artifacts.load()?.takeIf { it.operationId == record.id }?.let { plan ->
+                            artifacts.markFailed(plan.planId, detail)?.let {
+                                ArtifactSyncCoordinator.broadcast(appContext, it, showPrompt = false)
+                            }
+                        }
+                    }
+                    // Cancels the worker or job that hangs, and takes the running notification down.
+                    broadcastFinished(appContext, record.id)
+                }
             }
         }
     }
@@ -757,6 +784,8 @@ object ThoughtsSyncScheduler {
             ARTIFACT_NOTIFICATION_ID,
             artifactNotification(context),
         )
+        // Every Sync that starts or goes on is watched, and takes older leftovers with it.
+        SyncStallWatchdog.ensureRunning(context)
     }
 
     fun dismissRunningNotificationIfIdle(context: Context) {
@@ -812,41 +841,34 @@ internal fun artifactTransferNeedsUnmeteredApproval(
     unmetered: Boolean,
 ): Boolean = !unmetered && !plan.canRunOnMeteredWithoutApproval && !plan.meteredApproved
 
+/**
+ * Whether an explicit Sync goes on in the background: only while source edits it sent are still
+ * undelivered. A PDF that Fedora is still building no longer keeps it going (13 November 2026: a
+ * Sync waited 44 of its 63 s for one); the Sync ends, saying how many PDFs are still building, and
+ * [RemoteWorkWatch] fetches them once Fedora has finished.
+ */
 internal fun needsBackgroundSyncContinuation(
-    buildsActive: Boolean,
     sourceRequestsPending: Boolean,
     explicit: Boolean,
-): Boolean = buildsActive || (explicit && sourceRequestsPending)
-
-internal fun controlPhaseAfterSync(
-    buildsActive: Boolean,
-    artifactTransferPending: Boolean,
-): String? = if (buildsActive && !artifactTransferPending) {
-    SyncOperationStore.STATUS_BUILDING
-} else {
-    null
-}
-
-internal fun artifactCompletionStatus(buildsStillActive: Boolean): String =
-    if (buildsStillActive) SyncOperationStore.STATUS_BUILDING else SyncOperationStore.STATUS_SYNCED
+): Boolean = explicit && sourceRequestsPending
 
 internal enum class ArtifactCompletionOutcome {
     ATTENTION,
-    BUILDING,
     SYNCED,
 }
 
 internal fun artifactCompletionOutcome(
-    buildsStillActive: Boolean,
     sourceAttention: List<PendingSourceMutation>,
 ): ArtifactCompletionOutcome = when {
     sourceAttention.isNotEmpty() -> ArtifactCompletionOutcome.ATTENTION
-    buildsStillActive -> ArtifactCompletionOutcome.BUILDING
     else -> ArtifactCompletionOutcome.SYNCED
 }
 
-internal fun continuationStatus(buildsActive: Boolean): String =
-    if (buildsActive) SyncOperationStore.STATUS_BUILDING else SyncOperationStore.STATUS_WAITING
+/** Ends the Sync [operationId] as Completed, naming the PDFs Fedora is still building. */
+internal fun completeSyncOperation(context: Context, operationId: String?) {
+    val stillBuilding = runCatching { PendingFedoraBuildStore(context).pdfCount() }.getOrDefault(0)
+    SyncOperationStore(context).completeSync(operationId, stillBuilding)
+}
 
 internal const val SOURCE_ATTENTION_MESSAGE = SyncOperationStore.STATUS_ATTENTION
 
@@ -1093,17 +1115,18 @@ class ThoughtsSyncJobService : JobService() {
                     sourceRequestsPending = result.scopeTargetPdfFilename == null &&
                         SourceEditQueue(applicationContext).hasUndeliveredRequests()
                     if (buildsActive || result.buildProgress.isNotEmpty()) {
+                        // Kept with the operation; the phone does not wait for a running build.
                         operationStore.recordBuildProgress(
                             operationId,
                             result.buildProgress,
-                            buildsActive,
+                            buildsActive = false,
                         )
                     }
                     val terminalBuild = result.terminalBuildFailures
                         .takeIf(List<TerminalPdfBuildFailure>::isNotEmpty)
                         ?.let(::TerminalPdfBuildException)
                     if (terminalBuild != null) operationStore.deferBuildFailure(operationId, terminalBuild)
-                    needsBackgroundSyncContinuation(buildsActive, sourceRequestsPending, explicit)
+                    needsBackgroundSyncContinuation(sourceRequestsPending, explicit)
                 }
             } catch (error: CancellationException) {
                 Log.w(SYNC_LOG_TAG, error.syncFailureMessage("Fedora sync job cancelled"))
@@ -1127,23 +1150,17 @@ class ThoughtsSyncJobService : JobService() {
                 false
             }
             if (continueInBackground) {
-                if (!buildsActive) {
-                    operationStore.append(
-                        operationId,
-                        continuationStatus(buildsActive),
-                        "Waiting for pending source changes",
-                    )
-                }
+                operationStore.append(
+                    operationId,
+                    SyncOperationStore.STATUS_WAITING,
+                    "Waiting for pending source changes",
+                )
                 finishJob(params, true)
                 return@launch
             }
             if (!artifactTransferPending && !syncFailed) {
                 SyncTransferStateStore(applicationContext).clearForOperation(operationId)
-                operationStore.append(
-                    operationId,
-                    SyncOperationStore.STATUS_SYNCED,
-                    "Completed",
-                )
+                completeSyncOperation(applicationContext, operationId)
                 ThoughtsSyncScheduler.broadcastFinished(applicationContext, operationId)
             }
             finishJob(params, false)
@@ -1317,10 +1334,11 @@ class ThoughtsSyncWorker(appContext: Context, params: WorkerParameters) : Corout
             operationStore.recordTransfer(operationId, plan, completed = false)
         }
         if (result.buildsActive || result.buildProgress.isNotEmpty()) {
+            // Kept with the operation; the phone does not wait for a running build.
             operationStore.recordBuildProgress(
                 operationId,
                 result.buildProgress,
-                result.buildsActive,
+                buildsActive = false,
             )
         }
         result.terminalBuildFailures
@@ -1329,23 +1347,17 @@ class ThoughtsSyncWorker(appContext: Context, params: WorkerParameters) : Corout
             ?.let { terminalBuild ->
                 operationStore.deferBuildFailure(operationId, terminalBuild)
             }
-        return if (result.buildsActive || sourceRequestsPending) {
-            if (!result.buildsActive) {
-                operationStore.append(
-                    operationId,
-                    continuationStatus(result.buildsActive),
-                    "Waiting for pending source changes",
-                )
-            }
+        return if (sourceRequestsPending) {
+            operationStore.append(
+                operationId,
+                SyncOperationStore.STATUS_WAITING,
+                "Waiting for pending source changes",
+            )
             Result.retry()
         } else {
             if (result.artifactPlan == null) {
                 SyncTransferStateStore(applicationContext).clearForOperation(operationId)
-                operationStore.append(
-                    operationId,
-                    SyncOperationStore.STATUS_SYNCED,
-                    "Completed",
-                )
+                completeSyncOperation(applicationContext, operationId)
                 ThoughtsSyncScheduler.broadcastFinished(applicationContext, operationId)
             }
             Result.success()
@@ -1477,7 +1489,7 @@ class ThoughtsArtifactSyncWorker(
             val diagnostics = SyncDiagnostics(applicationContext, plan.operationId)
             diagnostics.count("artifact_attempt", "attempt" to runAttemptCount.toLong(),
                 "target_documents" to plan.targetPdfFilenames.size.toLong())
-            val buildsStillActive = diagnostics.measureSuspending("artifact_repository_sync") {
+            diagnostics.measureSuspending("artifact_repository_sync") {
                 withTransientSyncRetries(operationStore, plan.operationId) {
                     FedoraRepository(applicationContext).syncArtifacts(planId)
                 }
@@ -1493,7 +1505,7 @@ class ThoughtsArtifactSyncWorker(
             val installationProblems = diagnostics.measure("check_source_installation_receipts") {
                 OfflineSourceBundleStore(applicationContext).materializationProblems()
             }
-            val completion = if (installationProblems.isNotEmpty()) ArtifactCompletionOutcome.ATTENTION else artifactCompletionOutcome(buildsStillActive, completionSourceAttention)
+            val completion = if (installationProblems.isNotEmpty()) ArtifactCompletionOutcome.ATTENTION else artifactCompletionOutcome(completionSourceAttention)
             withContext(Dispatchers.IO) { SyncDiagnosticBatcher.flushAll() }
             when (completion) {
                 ArtifactCompletionOutcome.ATTENTION -> {
@@ -1502,35 +1514,10 @@ class ThoughtsArtifactSyncWorker(
                         sourceAttentionEvent(completionSourceAttention, installationProblems),
                     )
                 }
-                ArtifactCompletionOutcome.BUILDING -> {
-                    operationStore.recordBuildProgress(
-                        plan.operationId,
-                        emptyList(),
-                        buildsActive = true,
-                    )
-                    runCatching {
-                        ThoughtsSyncScheduler.enqueueExplicitContinuation(
-                            applicationContext,
-                            plan.targetPdfFilenames.singleOrNull(),
-                            plan.operationId,
-                            building = false,
-                        )
-                    }.onFailure { error ->
-                        operationStore.fail(
-                            plan.operationId,
-                            SyncOperationStore.USER_MESSAGE_INTERRUPTED,
-                            error.message.orEmpty().ifBlank { error.javaClass.simpleName },
-                        )
-                        ThoughtsSyncScheduler.broadcastFinished(applicationContext, plan.operationId)
-                        return Result.failure()
-                    }
-                }
-                ArtifactCompletionOutcome.SYNCED -> {
-                    operationStore.append(
-                        plan.operationId,
-                        artifactCompletionStatus(buildsStillActive),
-                        "Completed",
-                    )
+                // Builds still running on Fedora do not keep this Sync going: RemoteWorkWatch
+                // fetches their PDFs when they are done ([needsBackgroundSyncContinuation]).
+                ArtifactCompletionOutcome.SYNCED -> diagnostics.measure("complete_operation") {
+                    completeSyncOperation(applicationContext, plan.operationId)
                 }
             }
             ThoughtsSyncScheduler.broadcastFinished(applicationContext, plan.operationId)
@@ -1629,7 +1616,7 @@ class ThoughtsTerminalArtifactRefreshWorker(
             refreshed?.let {
                 operationStore.recordTransfer(it.operationId, it, completed = false)
             }
-            if (refreshed == null) operationStore.append(plan.operationId, SyncOperationStore.STATUS_SYNCED, "Completed")
+            if (refreshed == null) completeSyncOperation(applicationContext, plan.operationId)
             ThoughtsSyncScheduler.broadcastFinished(applicationContext, plan.operationId)
             Result.success()
         } catch (error: CancellationException) {

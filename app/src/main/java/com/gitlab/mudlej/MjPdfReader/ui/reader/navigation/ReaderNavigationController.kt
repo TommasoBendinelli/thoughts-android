@@ -56,10 +56,11 @@ class ReaderNavigationController(
     private val launchLinks: (Intent) -> Unit,
     private val launchSearch: (Intent) -> Unit,
     private val launchGoToPageGrid: (Intent) -> Unit,
-    loadReviewCards: suspend () -> List<ReviewCardsSheetItem>,
+    loadReviewCards: suspend () -> com.gitlab.mudlej.MjPdfReader.ui.reader.ReviewCardsSheetContent,
     highlightReviewCard: (ReviewCardsSheetItem?) -> Unit,
     openReviewCard: (ReviewCardsSheetItem) -> Unit,
     reviewCardsSheetOpenChanged: (Boolean) -> Unit,
+    openRetiredReviewCard: (ReviewCardsSheetItem) -> Unit = {},
 ) {
 
     private val renderUri get() = pdf.renderUri ?: pdf.uri
@@ -87,7 +88,7 @@ class ReaderNavigationController(
     private val reviewCardsSheet: ReviewCardsSheetController = ReviewCardsSheetController(
         activity, binding, scope,
         { contentsSheet.dismiss(); commentsSheet.dismiss(); beforeShowContents() },
-        loadReviewCards, highlightReviewCard, openReviewCard, reviewCardsSheetOpenChanged,
+        loadReviewCards, highlightReviewCard, openReviewCard, reviewCardsSheetOpenChanged, openRetiredReviewCard,
     )
 
     fun search(query: String, preferredPage: Int = 0) {

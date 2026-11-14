@@ -669,7 +669,8 @@ class Preferences(private val prefMan: SharedPreferences) {
 
     private fun isDefaultAgentPromptTemplate(kind: AgentPromptTemplates.Kind, value: String) =
         value.isBlank() || value == AgentPromptTemplates.defaultTemplate(kind) ||
-            (kind == AgentPromptTemplates.Kind.AGENT && value == previousDefaultAgentPromptTemplate)
+            (kind == AgentPromptTemplates.Kind.AGENT && value == previousDefaultAgentPromptTemplate) ||
+            (kind == AgentPromptTemplates.Kind.STUDY_MODE && value == AgentPromptTemplates.PREVIOUS_DEFAULT_STUDY_MODE_TEMPLATE)
 
     /**
      * The review card "Copy for agent" template or the study-mode prompt; blank, unset or a previous

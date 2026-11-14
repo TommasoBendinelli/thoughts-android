@@ -49,6 +49,36 @@ class AgentPromptTemplatesTest {
         assertFalse(prompt, prompt.contains("Copy for physical studying"))
     }
 
+    @Test fun theStudyModePromptExplainsAndNeverGrades() {
+        val prompt = AgentPromptTemplates.DEFAULT_STUDY_MODE_TEMPLATE
+        // Study mode explains and never grades: no ✓/✗ or colour marks.
+        for (grading in listOf("grade it", "grade against", "you grade", "green = right", "red = fix", "what is right and what is wrong")) {
+            assertFalse(grading, prompt.contains(grading))
+        }
+        assertTrue(prompt, prompt.contains("Explain, never grade"))
+        assertTrue(prompt, prompt.contains("name it in one plain line and show the right step"))
+        assertTrue(prompt, prompt.contains("[p. N](<Library filename>.pdf#page=N), my own notes first"))
+        assertTrue(prompt, prompt.contains("knowledge_profile"))
+        assertTrue(prompt, prompt.contains("\"Answering rules for agent notes\""))
+        // Capture watching and reply watching stay.
+        assertTrue(prompt, prompt.contains("Watch both folders for the rest of this conversation"))
+        assertTrue(prompt, prompt.contains("run `~/.local/bin/thoughts-watch-replies` as a background monitor"))
+        assertTrue(prompt, prompt.contains("answer each reply to your own notes"))
+        assertTrue(prompt, prompt.contains("the Thoughts reply agent answers the replies no running agent covers"))
+        assertTrue(prompt, prompt.contains("PAGE line"))
+        // The study session owns the glasses captures, so the Thoughts reply agent does not answer them too.
+        assertTrue(prompt, prompt.contains("call own_topic with captures set to true, a label for what we are studying, " +
+            "and the document (document_ids) and card (review_card_ids) we are studying, so the Thoughts reply agent " +
+            "leaves my captures to you."))
+        assertTrue(prompt, prompt.contains("Keep your reply watcher running (below), because the claim lasts only while you listen."))
+        assertTrue(prompt, prompt.contains("When we move to another card or document, call own_topic again for it."))
+        assertTrue(prompt, prompt.contains("Call release_topic when study mode ends."))
+        assertTrue(prompt, prompt.contains("add `--conversation <your conversation id>`, the id you pass to own_topic"))
+        // Ownership comes before the captures it covers.
+        assertTrue(prompt.indexOf("own_topic") < prompt.indexOf("Read every new photo"))
+        assertFalse(AgentPromptTemplates.PREVIOUS_DEFAULT_STUDY_MODE_TEMPLATE.contains("own_topic"))
+    }
+
     @Test fun defaultsUseTheirOwnPlaceholdersAndLeaveTheAnswerOut() {
         for (kind in AgentPromptTemplates.Kind.entries) {
             val known = AgentPromptTemplates.placeholders(kind).map { it.first }.toSet()
