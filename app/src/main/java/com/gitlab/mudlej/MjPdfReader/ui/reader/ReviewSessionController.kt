@@ -1093,7 +1093,8 @@ class ReviewSessionController(
      * and its document. The answer text is read only for a template that shows it.
      */
     private fun copyForAgent(card: ReviewCard) {
-        // The agent may answer with a note to draw on: listen for it while the user is in the agent app.
+        // The agent may answer with a note to draw on: listen for it while the user is in the agent app
+        // (not while push delivers notes; AgentStudyListenerService.start says no then).
         com.gitlab.mudlej.MjPdfReader.data.agentnotes.AgentStudyListenerService.start(activity)
         val pages = card.regions.map { it.page }.filter { it > 0 }
         val documentFields = activity.agentDocumentFields()

@@ -116,6 +116,9 @@ class App : Application() {
                     java.io.File(filesDir, "backup-safety").deleteRecursively()
                     runCatching { com.gitlab.mudlej.MjPdfReader.data.agentnotes.AgentNotesWorker.schedule(this@App) }
                         .onFailure { Log.w("ThoughtsAgentNotes", "Unable to schedule the agent notes check", it) }
+                    // Push for agent notes: register this phone's token again (idempotent), or remove it.
+                    runCatching { com.gitlab.mudlej.MjPdfReader.data.agentnotes.AgentNotesPush.onAppStart(this@App) }
+                        .onFailure { Log.w("ThoughtsAgentNotes", "Unable to start push registration", it) }
                     runCatching { ThoughtsSyncScheduler.resume(this@App) }
                         .onFailure { error ->
                             Log.e(

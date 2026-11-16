@@ -11,8 +11,16 @@ import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.widget.FrameLayout
+import android.text.InputType
+import android.widget.LinearLayout
+import android.widget.RadioButton
+import android.widget.RadioGroup
+import android.widget.TextView
 import androidx.coordinatorlayout.widget.CoordinatorLayout
+import androidx.core.view.ViewCompat
+import androidx.core.view.accessibility.AccessibilityNodeInfoCompat
 import androidx.core.view.doOnLayout
+import androidx.core.widget.doAfterTextChanged
 import androidx.recyclerview.widget.DiffUtil
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.ListAdapter
@@ -21,8 +29,15 @@ import com.gitlab.mudlej.MjPdfReader.R
 import com.gitlab.mudlej.MjPdfReader.databinding.ActivityMainBinding
 import com.gitlab.mudlej.MjPdfReader.databinding.PdfReviewCardsSheetBinding
 import com.gitlab.mudlej.MjPdfReader.databinding.RowReviewCardSheetBinding
+import com.gitlab.mudlej.MjPdfReader.core.ui.AppSnackbar
+import com.gitlab.mudlej.MjPdfReader.data.review.ReviewCardMerge
+import com.gitlab.mudlej.MjPdfReader.ui.usernotes.AgentEditSelection
 import com.google.android.material.bottomsheet.BottomSheetBehavior
 import com.google.android.material.color.MaterialColors
+import com.google.android.material.dialog.MaterialAlertDialogBuilder
+import com.google.android.material.snackbar.Snackbar
+import com.google.android.material.textfield.TextInputEditText
+import com.google.android.material.textfield.TextInputLayout
 import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
@@ -44,7 +59,17 @@ data class ReviewCardsSheetItem(
     val regions: Map<Int, List<RectF>> = emptyMap(),
     /** Retired: it stays on the PDF version it was retired on, so a tap opens the card, not a place here. */
     val retired: Boolean = false,
+    /** How often it was answered: Merge cards keeps the most reviewed card unless told otherwise. */
+    val reviewCount: Int = 0,
 )
+
+/** What Merge cards in the sheet came to. */
+sealed class ReviewCardsSheetMergeOutcome {
+    /** The server merged them; [message] is shown, and the list follows at the next Sync. */
+    data class Merged(val message: String) : ReviewCardsSheetMergeOutcome()
+    /** Nothing changed; [message] says why. */
+    data class Refused(val message: String) : ReviewCardsSheetMergeOutcome()
+}
 
 /** The sheet's two lists: the cards on the PDF shown, and the document's retired cards. */
 data class ReviewCardsSheetContent(
@@ -95,6 +120,8 @@ internal fun reviewCardsSheetMetadata(
 private class ReviewCardsSheetAdapter(
     private val onClick: (ReviewCardsSheetItem) -> Unit,
     private val onReview: (ReviewCardsSheetItem) -> Unit,
+    /** A long press; true when it was handled (a card on this PDF starts selection mode). */
+    private val onLongClick: (ReviewCardsSheetItem) -> Boolean = { false },
 ) : ListAdapter<ReviewCardsSheetItem, ReviewCardsSheetAdapter.Holder>(object : DiffUtil.ItemCallback<ReviewCardsSheetItem>() {
     override fun areItemsTheSame(old: ReviewCardsSheetItem, new: ReviewCardsSheetItem) = old.cardId == new.cardId
     override fun areContentsTheSame(old: ReviewCardsSheetItem, new: ReviewCardsSheetItem) = old == new
@@ -111,20 +138,49 @@ private class ReviewCardsSheetAdapter(
             if (next >= 0) notifyItemChanged(next)
         }
 
+    /** Selection mode: the selected card IDs; null while it is off. */
+    var selection: Set<String>? = null
+        set(value) {
+            if (field == value) return
+            field = value
+            notifyItemRangeChanged(0, itemCount)
+        }
+
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int) =
         Holder(RowReviewCardSheetBinding.inflate(LayoutInflater.from(parent.context), parent, false))
 
     override fun onBindViewHolder(holder: Holder, position: Int) {
         val item = getItem(position)
-        val selected = item.cardId == selectedId
+        val selecting = selection != null && !item.retired
+        val checked = selecting && item.cardId in selection.orEmpty()
+        val selected = checked || (selection == null && item.cardId == selectedId)
+        val context = holder.row.root.context
         holder.row.reviewCardQuestion.text = item.question
         holder.row.reviewCardMetadata.text = item.metadata
+        // A card that is not checkable ignores setChecked: clear the check first, then the mode.
+        holder.row.root.isCheckable = true
+        holder.row.root.isChecked = checked
+        holder.row.root.isCheckable = selecting
         holder.row.root.setCardBackgroundColor(MaterialColors.getColor(holder.row.root,
             if (selected) com.google.android.material.R.attr.colorSecondaryContainer
             else com.google.android.material.R.attr.colorSurface))
-        holder.row.reviewCardReview.visibility = if (selected && item.reviewable) View.VISIBLE else View.GONE
+        holder.row.reviewCardReview.visibility =
+            if (selection == null && selected && item.reviewable) View.VISIBLE else View.GONE
         holder.row.reviewCardReview.setOnClickListener { onReview(item) }
         holder.row.root.setOnClickListener { onClick(item) }
+        if (item.retired) {
+            holder.row.root.setOnLongClickListener(null)
+            holder.row.root.isLongClickable = false
+        } else {
+            holder.row.root.setOnLongClickListener { onLongClick(item) }
+        }
+        // TalkBack: "Selected" or "Not selected", and what a tap or a long press does now.
+        ViewCompat.setStateDescription(holder.row.root, if (!selecting) null
+            else context.getString(if (checked) R.string.review_cards_sheet_row_selected else R.string.review_cards_sheet_row_not_selected))
+        ViewCompat.replaceAccessibilityAction(holder.row.root, AccessibilityNodeInfoCompat.AccessibilityActionCompat.ACTION_CLICK,
+            if (!selecting) null else context.getString(if (checked) R.string.review_cards_sheet_row_deselect else R.string.review_cards_sheet_row_select), null)
+        ViewCompat.replaceAccessibilityAction(holder.row.root, AccessibilityNodeInfoCompat.AccessibilityActionCompat.ACTION_LONG_CLICK,
+            if (!item.retired && selection == null) context.getString(R.string.review_cards_sheet_row_select) else null, null)
     }
 }
 
@@ -145,8 +201,16 @@ class ReviewCardsSheetController(
     private val openChanged: (Boolean) -> Unit,
     /** A retired card picked in the sheet: its details, since it has no place on the PDF shown. */
     private val openRetiredCard: (ReviewCardsSheetItem) -> Unit = {},
+    /**
+     * Merges the cards (in list order) into the kept one with the question given; null when this
+     * reader cannot merge. Called off the main thread's work by the caller (it suspends).
+     */
+    private val mergeCards: (suspend (List<ReviewCardsSheetItem>, String, String) -> ReviewCardsSheetMergeOutcome)? = null,
 ) {
-    private val adapter = ReviewCardsSheetAdapter(::onCardClicked, ::onReviewClicked)
+    private val adapter = ReviewCardsSheetAdapter(::onCardClicked, ::onReviewClicked, ::onCardLongClicked)
+    /** Cards held for Merge cards: a long press starts it, a tap adds or removes one. */
+    private val selection = AgentEditSelection()
+    private var merging = false
     private var sheet: PdfReviewCardsSheetBinding? = null
     private var container: FrameLayout? = null
     private var behavior: BottomSheetBehavior<FrameLayout>? = null
@@ -222,10 +286,19 @@ class ReviewCardsSheetController(
         }
         adapter.submitList(emptyList())
         showingRetired = false
+        selection.clear()
+        adapter.selection = null
         content.reviewCardsRetired.setOnClickListener {
             showingRetired = !showingRetired
             showLoaded(content)
         }
+        content.reviewCardsCancelSelection.setOnClickListener { endSelection() }
+        content.reviewCardsMerge.setOnClickListener { showMergeDialog() }
+        load(content, request)
+    }
+
+    private fun load(content: PdfReviewCardsSheetBinding, request: Int) {
+        loadJob?.cancel()
         loadJob = scope.launch {
             try {
                 val cards = loadCards()
@@ -246,6 +319,13 @@ class ReviewCardsSheetController(
         }
     }
 
+    /** Reads the cards again while the sheet is open (after a Sync): the list follows merges made anywhere. */
+    fun refresh() {
+        val content = sheet ?: return
+        if (merging) return
+        load(content, generation)
+    }
+
     /** The list chosen (the PDF's cards, or the retired ones), its title, and the button to the other. */
     private fun showLoaded(content: PdfReviewCardsSheetBinding) {
         if (loaded.retired.isEmpty()) showingRetired = false
@@ -264,10 +344,176 @@ class ReviewCardsSheetController(
             adapter.selectedId = null
             highlightCard(null)
         }
+        if (selection.active && !selection.retainExisting(loaded.cards.mapTo(mutableSetOf()) { it.cardId })) adapter.selection = null
         adapter.submitList(shown)
+        updateSelectionUi(content)
+    }
+
+    /** The header says "N selected" with Cancel, and Merge N cards replaces Retired, while cards are held. */
+    private fun updateSelectionUi(content: PdfReviewCardsSheetBinding) {
+        val selecting = selection.active && !showingRetired
+        adapter.selection = if (selecting) selection.ids else null
+        if (selecting) {
+            content.reviewCardsTitle.text = activity.getString(R.string.review_cards_sheet_selected, selection.count)
+        } else {
+            val shown = if (showingRetired) loaded.retired else loaded.cards
+            content.reviewCardsTitle.text = activity.getString(
+                if (showingRetired) R.string.review_cards_sheet_retired_title else R.string.review_cards_sheet_count, shown.size)
+        }
+        ViewCompat.setAccessibilityLiveRegion(content.reviewCardsTitle,
+            if (selecting) ViewCompat.ACCESSIBILITY_LIVE_REGION_POLITE else ViewCompat.ACCESSIBILITY_LIVE_REGION_NONE)
+        content.reviewCardsCancelSelection.visibility = if (selecting) View.VISIBLE else View.GONE
+        content.reviewCardsResize.visibility = if (selecting) View.GONE else View.VISIBLE
+        content.reviewCardsClose.visibility = if (selecting) View.GONE else View.VISIBLE
+        content.reviewCardsRetired.visibility = if (selecting || loaded.retired.isEmpty()) View.GONE else View.VISIBLE
+        content.reviewCardsMerge.visibility = if (selecting && mergeCards != null) View.VISIBLE else View.GONE
+        content.reviewCardsMerge.isEnabled = selection.count >= ReviewCardMerge.MIN_CARDS && !merging
+        content.reviewCardsMerge.text = if (selection.count >= ReviewCardMerge.MIN_CARDS) {
+            activity.getString(R.string.review_cards_sheet_merge_button, selection.count)
+        } else {
+            activity.getString(R.string.review_cards_sheet_merge_button_disabled)
+        }
+    }
+
+    private fun onCardLongClicked(item: ReviewCardsSheetItem): Boolean {
+        val content = sheet ?: return false
+        if (item.retired || showingRetired || mergeCards == null || merging) return false
+        if (adapter.selectedId != null) {
+            adapter.selectedId = null
+            highlightCard(null)
+        }
+        selection.longPress(item.cardId)
+        updateSelectionUi(content)
+        return true
+    }
+
+    private fun endSelection() {
+        val content = sheet ?: return
+        selection.clear()
+        updateSelectionUi(content)
+    }
+
+    /** Merge cards: which card to keep (the most reviewed by default) and its question, then the server merges. */
+    private fun showMergeDialog() {
+        val content = sheet ?: return
+        val chosen = loaded.cards.filter { it.cardId in selection }
+        if (chosen.size < ReviewCardMerge.MIN_CARDS) return
+        val density = activity.resources.displayMetrics.density
+        val padding = (20 * density).toInt()
+        val keepIds = chosen.map { it.cardId }
+        var kept = ReviewCardMerge.defaultKept(keepIds, chosen.associate { it.cardId to it.reviewCount }) ?: keepIds.first()
+        val questionLayout = TextInputLayout(activity).apply {
+            hint = activity.getString(R.string.review_cards_sheet_merge_question)
+        }
+        val question = TextInputEditText(questionLayout.context).apply {
+            inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_CAP_SENTENCES or InputType.TYPE_TEXT_FLAG_MULTI_LINE
+            maxLines = 4
+            setText(chosen.first { it.cardId == kept }.question)
+        }
+        questionLayout.addView(question)
+        var questionEdited = false
+        var settingQuestion = false
+        question.doAfterTextChanged {
+            if (!settingQuestion) questionEdited = true
+            questionLayout.error = null
+        }
+        val group = RadioGroup(activity).apply { orientation = RadioGroup.VERTICAL }
+        chosen.forEachIndexed { index, item ->
+            group.addView(RadioButton(activity).apply {
+                id = View.generateViewId()
+                tag = item.cardId
+                text = item.question
+                maxLines = 2
+                ellipsize = android.text.TextUtils.TruncateAt.END
+                isChecked = item.cardId == kept
+            })
+        }
+        group.setOnCheckedChangeListener { radios, checkedId ->
+            val id = radios.findViewById<RadioButton>(checkedId)?.tag as? String ?: return@setOnCheckedChangeListener
+            kept = id
+            // The kept card's question, until the user writes their own.
+            if (!questionEdited) {
+                settingQuestion = true
+                question.setText(chosen.first { it.cardId == id }.question)
+                settingQuestion = false
+            }
+        }
+        val body = LinearLayout(activity).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(padding, padding / 2, padding, 0)
+            addView(TextView(activity).apply {
+                setText(R.string.review_cards_sheet_merge_explanation)
+                setTextAppearance(com.google.android.material.R.style.TextAppearance_Material3_BodyMedium)
+            })
+            addView(TextView(activity).apply {
+                setText(R.string.review_cards_sheet_merge_keep)
+                setTextAppearance(com.google.android.material.R.style.TextAppearance_Material3_TitleSmall)
+                setPadding(0, padding / 2, 0, 0)
+            })
+            addView(group)
+            addView(questionLayout)
+        }
+        val dialog = MaterialAlertDialogBuilder(activity)
+            .setTitle(R.string.review_cards_sheet_merge_title)
+            .setView(android.widget.ScrollView(activity).apply { addView(body) })
+            .setNegativeButton(R.string.cancel, null)
+            .setPositiveButton(R.string.review_cards_sheet_merge_action, null)
+            .create()
+        dialog.setOnShowListener {
+            dialog.getButton(android.content.DialogInterface.BUTTON_POSITIVE).setOnClickListener {
+                val text = question.text?.toString()?.trim().orEmpty()
+                if (text.isEmpty()) {
+                    questionLayout.error = activity.getString(R.string.review_cards_sheet_merge_question_empty)
+                    return@setOnClickListener
+                }
+                dialog.dismiss()
+                merge(content, chosen, kept, text.take(ReviewCardMerge.MAX_QUESTION_LENGTH))
+            }
+        }
+        dialog.show()
+    }
+
+    private fun merge(content: PdfReviewCardsSheetBinding, cards: List<ReviewCardsSheetItem>, keptId: String, question: String) {
+        val mergeAction = mergeCards ?: return
+        merging = true
+        updateSelectionUi(content)
+        content.reviewCardsTitle.setText(R.string.review_cards_sheet_merging)
+        scope.launch {
+            val outcome = try {
+                mergeAction(cards, keptId, question)
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (error: Exception) {
+                Log.w("ReviewCardsSheet", "Could not merge review cards", error)
+                ReviewCardsSheetMergeOutcome.Refused(activity.getString(R.string.review_cards_sheet_merge_offline))
+            }
+            merging = false
+            if (activity.isFinishing || activity.isDestroyed) return@launch
+            when (outcome) {
+                is ReviewCardsSheetMergeOutcome.Merged -> {
+                    selection.clear()
+                    if (sheet === content) updateSelectionUi(content)
+                    AppSnackbar.make(binding.root, outcome.message, Snackbar.LENGTH_LONG).show()
+                }
+                is ReviewCardsSheetMergeOutcome.Refused -> {
+                    if (sheet === content) updateSelectionUi(content)
+                    MaterialAlertDialogBuilder(activity)
+                        .setTitle(R.string.review_cards_sheet_merge_failed_title)
+                        .setMessage(activity.getString(R.string.review_cards_sheet_merge_failed, outcome.message))
+                        .setPositiveButton(android.R.string.ok, null)
+                        .show()
+                }
+            }
+        }
     }
 
     private fun onCardClicked(item: ReviewCardsSheetItem) {
+        if (selection.active && !showingRetired) {
+            if (item.retired || merging) return
+            selection.toggle(item.cardId)
+            sheet?.let(::updateSelectionUi)
+            return
+        }
         if (item.retired) {
             openRetiredCard(item)
             return
@@ -345,7 +591,13 @@ class ReviewCardsSheetController(
         }
     }
 
-    fun handleBack(): Boolean = dismiss()
+    fun handleBack(): Boolean {
+        if (selection.active && sheet != null && !merging) {
+            endSelection()
+            return true
+        }
+        return dismiss()
+    }
 
     fun dismiss(): Boolean {
         val frame = container ?: return false
@@ -356,6 +608,8 @@ class ReviewCardsSheetController(
         generation++
         loadJob?.cancel()
         loadJob = null
+        selection.clear()
+        adapter.selection = null
         sheet?.reviewCardsList?.adapter = null
         sheet = null
         container = null

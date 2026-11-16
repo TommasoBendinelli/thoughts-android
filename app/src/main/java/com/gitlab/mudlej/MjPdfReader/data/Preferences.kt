@@ -3,6 +3,7 @@
 package com.gitlab.mudlej.MjPdfReader.data
 
 import android.content.SharedPreferences
+import com.gitlab.mudlej.MjPdfReader.data.agentnotes.AgentNoteReplySources
 import com.gitlab.mudlej.MjPdfReader.ui.reader.AgentPromptTemplates
 import com.gitlab.mudlej.MjPdfReader.ui.reader.annotation.HighlightPalette
 import com.gitlab.mudlej.MjPdfReader.ui.reader.actions.ConfigurableAction
@@ -236,6 +237,8 @@ class Preferences(private val prefMan: SharedPreferences) {
         /** Whether an agent note's message shows one line (true) or all of it; the last choice holds for every note. */
         const val agentNoteMessageCollapsedKey = "agentNoteMessageCollapsed"
         const val agentNoteMessageCollapsedDefault = true
+        /** What the agent that answers a reply may use (an AgentNoteReplySources API value); the last choice holds for every reply. */
+        const val agentNoteReplySourcesKey = "agentNoteReplySources"
         const val dictionaryDefineWordsKey = "dictionaryDefineWords"
 
         // Default values
@@ -708,5 +711,12 @@ class Preferences(private val prefMan: SharedPreferences) {
 
     fun setAgentNoteMessageCollapsed(collapsed: Boolean) =
         prefMan.edit().putBoolean(agentNoteMessageCollapsedKey, collapsed).apply()
+
+    /** The user's last choice of what an answering agent may use; the default until they choose (or for a value no longer known). */
+    fun getAgentNoteReplySources(): AgentNoteReplySources =
+        AgentNoteReplySources.fromApi(safeGetString(agentNoteReplySourcesKey, null)) ?: AgentNoteReplySources.DEFAULT
+
+    fun setAgentNoteReplySources(sources: AgentNoteReplySources) =
+        prefMan.edit().putString(agentNoteReplySourcesKey, sources.apiValue).apply()
 
 }

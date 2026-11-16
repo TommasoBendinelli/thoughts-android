@@ -103,6 +103,49 @@ object AgentNoteNotifier {
         NotificationManagerCompat.from(context).cancel(NOTIFICATION_TAG, noteId.hashCode())
     }
 
+    private const val PUSH_TEST_TAG = "agent-notes-push-test"
+    private const val FETCHING_CHANNEL = "agent_notes_fetching"
+    const val FETCHING_NOTIFICATION_ID = 7152
+
+    /** The server's test ping ("Send a test push" in Settings) arrived. Whether it could be shown. */
+    fun notifyPushTest(context: Context): Boolean {
+        val manager = NotificationManagerCompat.from(context)
+        if (!manager.areNotificationsEnabled() || (Build.VERSION.SDK_INT >= 33 &&
+                ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) !=
+                PackageManager.PERMISSION_GRANTED)
+        ) {
+            Log.i(AgentNotes.TAG, "push test notification skipped: notifications are off")
+            return false
+        }
+        ensureChannel(context)
+        val notification = NotificationCompat.Builder(context, CHANNEL)
+            .setSmallIcon(R.drawable.ic_agent_note)
+            .setContentTitle(context.getString(R.string.agent_notes_push_test_notification))
+            .setAutoCancel(true)
+            .setTimeoutAfter(60_000L)
+            .setPriority(NotificationCompat.PRIORITY_HIGH)
+            .setCategory(NotificationCompat.CATEGORY_STATUS)
+            .build()
+        return runCatching { manager.notify(PUSH_TEST_TAG, 1, notification) }.isSuccess
+    }
+
+    /** Shown only before Android 12, while a push's inbox request runs as a foreground job. */
+    fun fetchingNotification(context: Context): android.app.Notification {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            context.getSystemService(NotificationManager::class.java)?.createNotificationChannel(
+                NotificationChannel(FETCHING_CHANNEL, context.getString(R.string.agent_notes_fetching), NotificationManager.IMPORTANCE_MIN),
+            )
+        }
+        return NotificationCompat.Builder(context, FETCHING_CHANNEL)
+            .setSmallIcon(R.drawable.ic_agent_note)
+            .setContentTitle(context.getString(R.string.agent_notes_fetching))
+            .setSilent(true)
+            .setOngoing(true)
+            .setPriority(NotificationCompat.PRIORITY_MIN)
+            .setCategory(NotificationCompat.CATEGORY_SERVICE)
+            .build()
+    }
+
     private fun ensureChannel(context: Context) {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return
         context.getSystemService(NotificationManager::class.java)?.createNotificationChannel(

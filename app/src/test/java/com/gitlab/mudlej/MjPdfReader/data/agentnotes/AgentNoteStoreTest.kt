@@ -164,6 +164,26 @@ class AgentNoteStoreTest {
         assertTrue(store.hasNote("b"))
     }
 
+    @Test fun aQueuedReplyKeepsItsSourcesAndAnOlderOneHasNone() {
+        val store = store()
+        store.queueReply(reply("r1", "a").copy(sources = AgentNoteReplySources.NONE.apiValue), byteArrayOf(1), null)
+        store.queueReply(reply("r2", "a"), byteArrayOf(1), null)
+        val reopened = AgentNoteStore.under(folder.root)
+        assertEquals("none", reopened.reply("r1")?.sources)
+        assertEquals(AgentNoteReplySources.NONE, reopened.pendingReplies().first { it.replyId == "r1" }.sourcesChoice)
+        // A reply written before the choice: its record has no field, and it stays without.
+        assertNull(reopened.reply("r2")?.sources)
+        assertFalse(File(folder.root, "thoughts/agent-notes/replies/r2.json").readText().contains("sources"))
+        // Marked sent with the server's record, the reply still says what it was written with.
+        reopened.markReplySent("r1", AgentNoteReply("r1", "a", sequence = 5, sources = "none"))
+        assertEquals("none", reopened.reply("r1")?.sources)
+        assertEquals("none", reopened.reply("r1")?.server?.sources)
+
+        // A reply only the server has (written on another device) keeps the server's value.
+        reopened.saveDownloadedReply(AgentNoteReply("r3", "a", sources = "library"), byteArrayOf(1))
+        assertEquals(AgentNoteReplySources.LIBRARY, reopened.reply("r3")?.sourcesChoice)
+    }
+
     @Test fun atomicWritesReplaceWholeFiles() {
         val target = File(folder.root, "x/file.json")
         AgentNoteStore.writeAtomically(target, "first".toByteArray())

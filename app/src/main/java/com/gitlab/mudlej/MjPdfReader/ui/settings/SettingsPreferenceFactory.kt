@@ -16,13 +16,19 @@ import android.widget.Toast
 import androidx.annotation.StringRes
 import androidx.appcompat.app.AppCompatDelegate.setDefaultNightMode
 import androidx.lifecycle.lifecycleScope
+import androidx.lifecycle.repeatOnLifecycle
 import androidx.preference.Preference
 import androidx.preference.PreferenceFragmentCompat
 import androidx.preference.PreferenceViewHolder
 import androidx.preference.SwitchPreferenceCompat
 import com.gitlab.mudlej.MjPdfReader.R
 import com.gitlab.mudlej.MjPdfReader.data.Preferences
+import com.gitlab.mudlej.MjPdfReader.data.agentnotes.AgentNotes
+import com.gitlab.mudlej.MjPdfReader.data.agentnotes.AgentNotesHttpException
+import com.gitlab.mudlej.MjPdfReader.data.agentnotes.AgentNotesPush
 import com.gitlab.mudlej.MjPdfReader.data.agentnotes.AgentNotesReceiving
+import com.gitlab.mudlej.MjPdfReader.data.agentnotes.PushStatus
+import com.gitlab.mudlej.MjPdfReader.data.agentnotes.PushTestResult
 import com.gitlab.mudlej.MjPdfReader.data.glasses.GlassesCamera
 import com.gitlab.mudlej.MjPdfReader.data.speech.OpenRouterKeyStore
 import com.gitlab.mudlej.MjPdfReader.data.speech.ReadAloudMessages
@@ -276,6 +282,62 @@ internal class SettingsPreferenceFactory(
             val checked = newValue == true
             AgentNotesReceiving.set(context, checked)
             preference.summary = summaryFor(checked)
+            true
+        }
+    }
+
+    /** Runs [show] with push's status now and each time it changes, while Settings is on screen. */
+    private fun followPush(show: (PushStatus) -> Unit) {
+        val push = AgentNotesPush.status(context)
+        show(push.value)
+        fragment.lifecycleScope.launch {
+            fragment.repeatOnLifecycle(androidx.lifecycle.Lifecycle.State.STARTED) { push.collect { show(it) } }
+        }
+    }
+
+    /** "Push": Active, or Off and why. A tap checks again with the server (when this build can push). */
+    fun pushStatusPreference(breadcrumb: String?): Preference = Preference(context).apply {
+        key = "agent_notes_push"
+        title = getString(R.string.agent_notes_push_title)
+        isIconSpaceReserved = false
+        val settings = this@SettingsPreferenceFactory.fragment
+        followPush { status ->
+            if (settings.isAdded) {
+                summary = formatSummary(breadcrumb, com.gitlab.mudlej.MjPdfReader.ui.agentnotes.pushStatusText(
+                    status, settings::getString) { id, argument -> settings.getString(id, argument) })
+            }
+        }
+        setOnPreferenceClickListener {
+            if (AgentNotesPush.buildHasConfig) {
+                AgentNotesPush.requestRegistration(context)
+                Toast.makeText(context, R.string.agent_notes_push_checking, Toast.LENGTH_SHORT).show()
+            }
+            true
+        }
+    }
+
+    /** "Send a test push", while the server can send pushes: it pings this phone only. */
+    fun pushTestPreference(breadcrumb: String?): Preference = Preference(context).apply {
+        key = "agent_notes_push_test"
+        title = getString(R.string.agent_notes_push_test)
+        summary = formatSummary(breadcrumb, getString(R.string.agent_notes_push_test_summary))
+        isIconSpaceReserved = false
+        followPush { isVisible = it.serverSupportsPush }
+        setOnPreferenceClickListener {
+            val app = context.applicationContext
+            this@SettingsPreferenceFactory.fragment.lifecycleScope.launch {
+                val message = withContext(Dispatchers.IO) {
+                    try {
+                        val result: PushTestResult = AgentNotes.client(app).sendTestPush()
+                        if (result.sent > 0) R.string.agent_notes_push_test_sent else R.string.agent_notes_push_test_none
+                    } catch (error: AgentNotesHttpException) {
+                        if (error.statusCode == 409) R.string.agent_notes_push_test_off else R.string.agent_notes_push_test_failed
+                    } catch (error: java.io.IOException) {
+                        R.string.agent_notes_push_test_failed
+                    }
+                }
+                Toast.makeText(app, message, Toast.LENGTH_LONG).show()
+            }
             true
         }
     }
@@ -633,6 +695,7 @@ internal class SettingsPreferenceFactory(
                 if (configured != null) {
                     setNeutralButton(R.string.thoughts_server_clear) { _, _ ->
                         secretStore.clear()
+                        AgentNotesPush.serverChanged(context)
                         (fragment as? SettingsFragment)?.refreshPreferences()
                     }
                 }
@@ -654,6 +717,7 @@ internal class SettingsPreferenceFactory(
                         Toast.LENGTH_LONG,
                     ).show()
                     if (moved.isSuccess) {
+                        AgentNotesPush.serverChanged(context)
                         (fragment as? SettingsFragment)?.refreshPreferences()
                         showThoughtsServerDialog(secretStore)
                     }
@@ -668,6 +732,7 @@ internal class SettingsPreferenceFactory(
                     ).show()
                     return@setPositiveButton
                 }
+                AgentNotesPush.serverChanged(context)
                 fragment.lifecycleScope.launch {
                     val connected = withContext(Dispatchers.IO) {
                         runCatching {

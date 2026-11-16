@@ -20,6 +20,7 @@ import com.gitlab.mudlej.MjPdfReader.data.Preferences
 import com.gitlab.mudlej.MjPdfReader.ui.reader.DocumentState
 import com.gitlab.mudlej.MjPdfReader.ui.reader.ReviewCardsSheetController
 import com.gitlab.mudlej.MjPdfReader.ui.reader.ReviewCardsSheetItem
+import com.gitlab.mudlej.MjPdfReader.ui.reader.ReviewCardsSheetMergeOutcome
 import com.gitlab.mudlej.MjPdfReader.pdf.PDF
 import com.gitlab.mudlej.MjPdfReader.pdf.SearchResult
 import com.gitlab.mudlej.MjPdfReader.pdf.grantPdfReadAccess
@@ -61,6 +62,7 @@ class ReaderNavigationController(
     openReviewCard: (ReviewCardsSheetItem) -> Unit,
     reviewCardsSheetOpenChanged: (Boolean) -> Unit,
     openRetiredReviewCard: (ReviewCardsSheetItem) -> Unit = {},
+    mergeReviewCards: (suspend (List<ReviewCardsSheetItem>, String, String) -> ReviewCardsSheetMergeOutcome)? = null,
 ) {
 
     private val renderUri get() = pdf.renderUri ?: pdf.uri
@@ -89,6 +91,7 @@ class ReaderNavigationController(
         activity, binding, scope,
         { contentsSheet.dismiss(); commentsSheet.dismiss(); beforeShowContents() },
         loadReviewCards, highlightReviewCard, openReviewCard, reviewCardsSheetOpenChanged, openRetiredReviewCard,
+        mergeReviewCards,
     )
 
     fun search(query: String, preferredPage: Int = 0) {
@@ -109,6 +112,9 @@ class ReaderNavigationController(
     fun showTableOfContents() { commentsSheet.dismiss(); reviewCardsSheet.dismiss(); contentsSheet.show() }
 
     fun showReviewCards() = reviewCardsSheet.show()
+
+    /** After a Sync: the open Review Cards sheet reads its cards again (a merge shows as one card). */
+    fun refreshReviewCards() = reviewCardsSheet.refresh()
 
     fun dismissTableOfContents(): Boolean {
         val commentsClosed = commentsSheet.dismiss()

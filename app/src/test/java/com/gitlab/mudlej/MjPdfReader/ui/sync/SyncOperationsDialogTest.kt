@@ -276,7 +276,7 @@ class SyncOperationsDialogTest {
                     serverSequence = 1,
                     occurredAtEpochMillis = 3_000,
                     receivedAtEpochMillis = 3_000,
-                    component = "fedora_worker",
+                    component = "build_worker",
                     phase = "building",
                     state = "running",
                     buildId = "build",
@@ -294,7 +294,7 @@ class SyncOperationsDialogTest {
         val details = syncOperationLogDetails(record, "Time not recorded") { "DATE-$it" }
 
         assertTrue(details.startsWith("Started: DATE-1000\nElapsed: 3 sec"))
-        assertTrue(details.contains("+2 sec · Fedora worker · Compiling paper.tex (1 of 2)"))
+        assertTrue(details.contains("+2 sec · Build worker · Compiling paper.tex (1 of 2)"))
         assertEquals(1, "DATE-".toRegex().findAll(details).count())
     }
 
@@ -494,12 +494,12 @@ class SyncOperationsDialogTest {
         )
 
         assertEquals(
-            "Build completed on the server; local download is pending.",
+            "Server build completed; local download is pending.",
             syncOperationDisplayMessage(record),
         )
         assertTrue(
             syncOperationLogDetails(record, "Time not recorded") { "T$it" }
-                .contains("Build completed on the server; local download is pending."),
+                .contains("Server build completed; local download is pending."),
         )
     }
 

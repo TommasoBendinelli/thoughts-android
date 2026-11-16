@@ -22,7 +22,7 @@ import kotlin.coroutines.coroutineContext
 class GlobalSearchIndexer private constructor(context: Context) {
 
     /** One PDF to index: [ref] is its URI string, [identity] changes whenever its content does. */
-    data class Pdf(val ref: String, val identity: String, val uri: Uri)
+    data class Pdf(val ref: String, val identity: String)
 
     data class Progress(val done: Int, val total: Int)
 
@@ -66,7 +66,7 @@ class GlobalSearchIndexer private constructor(context: Context) {
                     progress = Progress(done, plan.changed.size).also(onProgress)
                     val pdf = byKey.getValue(item.key)
                     val texts = try {
-                        pdfText.pages(pdf.uri) { Thread.yield() }
+                        pdfText.pages(Uri.parse(pdf.ref)) { Thread.yield() }
                     } catch (error: Throwable) {
                         Log.w(TAG, "could not read ${pdf.ref}: ${error.javaClass.simpleName}")
                         failed++

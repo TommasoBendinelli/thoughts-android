@@ -1,6 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- Written for Thoughts. License is GPLv3. -->
-<!-- The reader menu's Study mode panel: the same controls as the Home menu, plus the prompt. -->
+<!-- The reader menu's Study session panel: as in the Home menu "Instant notes" (or "Notes arrive
+     instantly" while push delivers them) and "Start a new study session", plus the agent tools
+     under the page and the agent notes list. -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
@@ -8,6 +10,19 @@
     android:orientation="vertical"
     android:paddingTop="8dp"
     android:paddingBottom="8dp">
+
+    <TextView
+        android:id="@+id/pushActiveLine"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:gravity="center_vertical"
+        android:minHeight="52dp"
+        android:paddingStart="68dp"
+        android:paddingEnd="24dp"
+        android:text="@string/agent_notes_push_arrives"
+        android:textAppearance="?attr/textAppearanceBodyLarge"
+        android:textColor="?attr/colorOnSurface"
+        android:visibility="gone" />
 
     <com.google.android.material.materialswitch.MaterialSwitch
         android:id="@+id/studyModeSwitch"
@@ -20,6 +35,7 @@
         android:textAppearance="?attr/textAppearanceBodyLarge" />
 
     <TextView
+        android:id="@+id/studyModeDetail"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:paddingStart="68dp"
@@ -52,10 +68,30 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginStart="20dp"
-            android:text="@string/agent_notes_study_mode_copy_prompt"
+            android:text="@string/agent_notes_start_study_session"
             android:textAppearance="?attr/textAppearanceBodyLarge"
             android:textColor="?attr/colorOnSurface" />
     </LinearLayout>
+
+    <com.google.android.material.materialswitch.MaterialSwitch
+        android:id="@+id/pageToolsSwitch"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:minHeight="52dp"
+        android:paddingStart="68dp"
+        android:paddingEnd="24dp"
+        android:text="@string/agent_notes_page_tools"
+        android:textAppearance="?attr/textAppearanceBodyLarge" />
+
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:paddingStart="68dp"
+        android:paddingEnd="24dp"
+        android:paddingBottom="8dp"
+        android:text="@string/agent_notes_page_tools_detail"
+        android:textAppearance="?attr/textAppearanceBodyMedium"
+        android:textColor="?attr/colorOnSurfaceVariant" />
 
     <LinearLayout
         android:id="@+id/agentNotesRow"

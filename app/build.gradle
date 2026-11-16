@@ -141,6 +141,30 @@ def legacyMjPdfAuthor = thoughtsBuildInput('thoughtsLegacyMjPdfAuthor', '')
 // default of the {mentra_folder} setting.
 def studyCaptureFolder = thoughtsBuildInput('thoughtsStudyCaptureFolder', '~/glasses')
 
+// Push for agent notes (Firebase Cloud Messaging) reads a google-services.json that is never in the
+// repository: -PthoughtsFirebaseConfig=<path>, by default ~/.config/thoughts/firebase/google-services.json.
+// Each variant takes the client of its own application ID (firebase-config.groovy); without the file
+// or that client its FIREBASE_* fields are empty and push is off. Only "on"/"off" is ever printed.
+def thoughtsFirebaseConfigFile = {
+    def home = System.getProperty('user.home')
+    def configured = project.findProperty('thoughtsFirebaseConfig')?.toString()?.trim()
+    def path = configured ?: "${home}/.config/thoughts/firebase/google-services.json"
+    if (path == '~' || path.startsWith('~/')) path = home + path.substring(1)
+    file(path)
+}()
+def selectFirebaseClient = new GroovyShell(getClass().classLoader).evaluate(file('firebase-config.groovy'))
+def thoughtsPushStates = new TreeMap<String, String>()
+// Push is a build option: -PthoughtsPush=on|off, by default on when that google-services.json exists.
+// Only a build with push compiles in Firebase Cloud Messaging and Google Play services (dependencies
+// below, src/push and its manifest); a build without push has src/nopush, contains no Google library,
+// and agent notes reach the phone as before push (inbox checks and Study mode's listener).
+def thoughtsPushBuild = {
+    def value = project.findProperty('thoughtsPush')?.toString()?.trim()?.toLowerCase(Locale.ROOT)
+    if (!value) return thoughtsFirebaseConfigFile.isFile()
+    if (value in ['on', 'off']) return value == 'on'
+    throw new GradleException("thoughtsPush must be on or off, got ${value}")
+}()
+
 android {
     defaultConfig {
         applicationId "org.tbend.thoughts"
@@ -282,7 +306,21 @@ androidComponents {
                 output.versionCode.set(offset * 1000 + android.defaultConfig.versionCode)
             }
         }
+        // The push option (thoughtsPush above): one of the two PushProvider versions, and the push manifest.
+        variant.sources.kotlin.addStaticSourceDirectory(thoughtsPushBuild ? 'src/push/java' : 'src/nopush/java')
+        if (thoughtsPushBuild) variant.sources.manifests.addStaticManifestFile('src/push/AndroidManifest.xml')
+        def firebase = thoughtsPushBuild
+            ? selectFirebaseClient(thoughtsFirebaseConfigFile, variant.applicationId.get())
+            : [on: false, reason: project.hasProperty('thoughtsPush') ? 'not in this build, thoughtsPush=off' : 'not in this build, no google-services.json']
+        [FIREBASE_APP_ID: 'appId', FIREBASE_API_KEY: 'apiKey', FIREBASE_PROJECT_ID: 'projectId', FIREBASE_SENDER_ID: 'senderId'].each { field, key ->
+            variant.buildConfigFields.put(field, new com.android.build.api.variant.BuildConfigField(
+                'String', '"' + (firebase.on ? firebase[key] : '') + '"', 'Push (firebase-config.groovy); empty: push is off'))
+        }
+        thoughtsPushStates[variant.name] = firebase.on ? 'on' : "off (${firebase.reason})"
     }
+}
+gradle.projectsEvaluated {
+    logger.lifecycle('[thoughts-push] ' + thoughtsPushStates.collect { name, state -> "${name}: push ${state}" }.join(', '))
 }
 
 ksp {
@@ -336,7 +374,19 @@ dependencies {
     // kotlin coroutines
     implementation 'org.jetbrains.kotlinx:kotlinx-coroutines-android:1.11.0'
 
+    // Push for agent notes, only in a build with push (thoughtsPush above): Firebase Cloud Messaging
+    // only (no analytics), initialized by the app itself and only when the build has a Firebase config.
+    // BoM 34.19.0 is the last one whose libraries still run on minSdk 23 (35.x needs 24).
+    if (thoughtsPushBuild) {
+        implementation platform('com.google.firebase:firebase-bom:34.19.0')
+        implementation 'com.google.firebase:firebase-messaging'
+        // GoogleApiAvailability: no Google Play services, no push (the version firebase-messaging brings).
+        implementation 'com.google.android.gms:play-services-base:18.9.0'
+    }
+
     testImplementation 'junit:junit:4.13.2'
+    // firebase-config.groovy is evaluated by FirebaseConfigSelectionTest with Gradle's own Groovy.
+    testImplementation localGroovy()
     // Real SQLite for host JVM tests of raw SQL (default-folder migration).
     testImplementation 'org.xerial:sqlite-jdbc:3.53.4.0'
     androidTestImplementation 'androidx.test:core-ktx:1.7.0'

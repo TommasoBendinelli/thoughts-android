@@ -6,6 +6,8 @@ import com.gitlab.mudlej.MjPdfReader.R
 import com.gitlab.mudlej.MjPdfReader.data.agentnotes.AgentNoteCoverer
 import com.gitlab.mudlej.MjPdfReader.data.agentnotes.AgentNoteListening
 import com.gitlab.mudlej.MjPdfReader.data.agentnotes.AgentNoteListeningAnswer
+import com.gitlab.mudlej.MjPdfReader.data.agentnotes.AgentNoteReply
+import com.gitlab.mudlej.MjPdfReader.data.agentnotes.AgentNoteWake
 import com.google.gson.JsonParser
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
@@ -42,6 +44,8 @@ class AgentNoteSentStatusTest {
         R.string.agent_note_sent_not_listening to "Sent ✓ · no agent is listening",
         R.string.agent_note_sent_plain to "Sent ✓",
         R.string.agent_note_queued to "Queued",
+        R.string.agent_note_sent_will_be_woken to "Sent ✓ · %1\$s will be woken",
+        R.string.agent_note_wake_fallback to "The study session",
     )
     private val string: (Int, Array<out Any>) -> String = { id, args -> String.format(strings.getValue(id), *args) }
 
@@ -84,5 +88,32 @@ class AgentNoteSentStatusTest {
         assertEquals("Sent ✓ · waiting for the agent", agentNoteSentText(true, AgentNoteListening.LISTENING, null, string))
         assertEquals("Sent ✓ · no agent is listening", agentNoteSentText(true, AgentNoteListening.NOT_LISTENING, null, string))
         assertEquals("Queued", agentNoteSentText(false, AgentNoteListening.LISTENING, replyAgent, string))
+    }
+
+    @Test fun aReplyForASessionAWakerWakesSaysSo() {
+        val replyAgent = AgentNoteCoverer(AgentNoteCoverer.RESPONDER)
+        val woken = AgentNoteWake(AgentNoteWake.WILL_BE_WOKEN, AgentNoteCoverer.SENDER, "mac", "Chapter draft", "closed")
+        // The server's waker listens as the reply agent; the session it wakes answers.
+        assertEquals("Sent ✓ · Chapter draft will be woken",
+            agentNoteSentText(true, AgentNoteListening.LISTENING, replyAgent, string, woken))
+        assertEquals("Sent ✓ · Chapter draft will be woken", agentNoteSentText(true, AgentNoteListening.NOT_LISTENING, null, string, woken))
+        assertEquals("Sent ✓ · Chapter draft will be woken", agentNoteSentText(true, AgentNoteListening.NOT_LISTENING, null, string,
+            woken.copy(state = AgentNoteWake.WAKER_OFFLINE, fallbackAt = "2026-11-15T02:14:00Z")))
+        assertEquals("Sent ✓ · The study session will be woken", agentNoteSentText(true, AgentNoteListening.LISTENING, replyAgent, string,
+            AgentNoteWake(AgentNoteWake.WILL_BE_WOKEN, AgentNoteCoverer.RESPONDER, "example-server", "The study session")))
+        // The note's own agent listens: it is named as before.
+        assertEquals("Sent ✓ · answered by the agent that sent it",
+            agentNoteSentText(true, AgentNoteListening.LISTENING, AgentNoteCoverer(AgentNoteCoverer.SENDER), string, woken))
+        assertEquals("Queued", agentNoteSentText(false, AgentNoteListening.UNKNOWN, null, string, woken))
+        // A reply's answer carries it as the listening answer does; an older server's does not.
+        val reply = AgentNoteReply.fromJson(JsonParser.parseString("""{"reply_id":"r-1","note_id":"n-1","listening":{"state":"listening",
+            "listeners":[{"device_id":"example-server","responder":true,"role":"responder"}],
+            "wake":{"state":"will_be_woken","role":"sender","device_id":"example-mac","machine":"mac",
+            "conversation_id":"0190a000-0000-7000-8000-00000000000a","title":"Chapter draft","session_state":"closed",
+            "owner_id":null,"label":null,"waker_live":true,"fallback_at":null}}}""").asJsonObject)
+        assertEquals(woken, reply.wake)
+        assertEquals("Sent ✓ · Chapter draft will be woken", agentNoteSentText(true, reply.listening, reply.coverer, string, reply.wake))
+        assertNull(AgentNoteReply.fromJson(JsonParser.parseString(
+            """{"reply_id":"r-2","note_id":"n-2","listening":{"state":"not_listening","listeners":[]}}""").asJsonObject).wake)
     }
 }

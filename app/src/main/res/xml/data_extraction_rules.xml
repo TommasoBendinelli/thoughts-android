@@ -5,10 +5,12 @@
         <exclude domain="file" path="verified-source-pdfs/" />
         <exclude domain="sharedpref" path="read_aloud_voice.xml" />
         <exclude domain="sharedpref" path="agent_notes_device.xml" />
+        <exclude domain="sharedpref" path="agent_notes_push.xml" />
     </cloud-backup>
     <device-transfer>
         <exclude domain="file" path="verified-source-pdfs/" />
         <exclude domain="sharedpref" path="read_aloud_voice.xml" />
         <exclude domain="sharedpref" path="agent_notes_device.xml" />
+        <exclude domain="sharedpref" path="agent_notes_push.xml" />
     </device-transfer>
 </data-extraction-rules>

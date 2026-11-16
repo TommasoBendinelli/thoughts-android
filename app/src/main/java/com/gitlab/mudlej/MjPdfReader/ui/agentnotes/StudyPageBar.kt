@@ -20,7 +20,7 @@ import com.gitlab.mudlej.MjPdfReader.R
 import com.gitlab.mudlej.MjPdfReader.data.agentnotes.AgentNote
 import com.gitlab.mudlej.MjPdfReader.data.agentnotes.AgentNotes
 import com.gitlab.mudlej.MjPdfReader.data.agentnotes.AgentStudyListenerService
-import com.gitlab.mudlej.MjPdfReader.data.agentnotes.AgentStudyMode
+import com.gitlab.mudlej.MjPdfReader.data.agentnotes.AgentPageTools
 import com.gitlab.mudlej.MjPdfReader.databinding.ViewStudyPageBarBinding
 import com.gitlab.mudlej.MjPdfReader.pdf.createPdfExtractor
 import com.google.gson.JsonObject
@@ -87,7 +87,7 @@ internal object StudyPages {
 }
 
 /**
- * Study mode in the reader: the agent-note tools under the page on screen. A drawing tool renders
+ * The agent tools under the page on screen ([AgentPageTools]; Study mode showed them until push). A drawing tool renders
  * the page and opens it in the note screen with that tool (the comment goes along); Send sends the
  * page as it is, with the comment, to the agent as a note from this phone.
  *
@@ -159,9 +159,9 @@ internal class StudyPageBar(
         }
 
 
-    /** Shown while study mode is on and a PDF is open, unless [steppedAside]; folded during a review. */
+    /** Shown while the agent tools under the page are on and a PDF is open, unless [steppedAside]; folded during a review. */
     fun refresh() {
-        bar.root.visibility = if (AgentStudyMode.isOn(activity) && documentOpen() && !steppedAside) View.VISIBLE else View.GONE
+        bar.root.visibility = if (AgentPageTools.isOn(activity) && documentOpen() && !steppedAside) View.VISIBLE else View.GONE
         val folded = inReview && !opened
         bar.studyPageFull.visibility = if (folded) View.GONE else View.VISIBLE
         bar.studyPageCollapsedRow.visibility = if (folded) View.VISIBLE else View.GONE
@@ -233,6 +233,7 @@ internal class StudyPageBar(
                 hideKeyboard()
                 bar.studyPageCommentField.text = null
                 fold()
+                // Listens for the answer for 30 minutes, unless push delivers it anyway.
                 AgentStudyListenerService.start(activity)
             }
             Toast.makeText(activity, if (sent) R.string.agent_note_sent else R.string.agent_note_page_send_failed, Toast.LENGTH_SHORT).show()

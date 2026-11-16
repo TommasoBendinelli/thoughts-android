@@ -7,6 +7,7 @@ import com.gitlab.mudlej.MjPdfReader.data.agentnotes.AgentNoteAgent
 import com.gitlab.mudlej.MjPdfReader.data.agentnotes.AgentNoteCoverer
 import com.gitlab.mudlej.MjPdfReader.data.agentnotes.AgentNoteListening
 import com.gitlab.mudlej.MjPdfReader.data.agentnotes.AgentNoteListeningAnswer
+import com.gitlab.mudlej.MjPdfReader.data.agentnotes.AgentNoteWake
 
 /**
  * Who answers the reply, as the note screen names it: "Thoughts reply agent", a topic owner's
@@ -37,11 +38,58 @@ fun agentNoteAgentName(coverer: AgentNoteCoverer, string: (Int, Array<out Any>) 
 enum class AgentNoteAnswerMark {
     /** An agent is listening and answers a reply. */
     LISTENING,
+    /** A reply waker wakes the session that answers a reply (or messages it while it runs). */
+    WOKEN,
+    /** The machine of the session that answers is offline; the study session answers later instead. */
+    OFFLINE,
     /** The chosen agent is not listening; the Thoughts reply agent answers after a while. */
     WAITING,
     /** Nobody listens: a reply is kept, but no agent acts on it. */
     NOBODY,
 }
+
+/**
+ * The machine a reply waker runs on, as the screen names it: "the Mac", else "the server" (there
+ * are two wakers, and a text never names a host).
+ */
+fun agentNoteMachineName(machine: String, string: (Int, Array<out Any>) -> String): String =
+    string(if (machine.equals(AgentNoteWake.MAC, ignoreCase = true)) R.string.agent_note_machine_mac else R.string.agent_note_machine_server, emptyArray())
+
+/**
+ * The session a reply waker wakes, as the screen names it: the study session for the fallback session
+ * (role responder), else the session's title, or the agent's name when it has none.
+ */
+fun agentNoteWokenName(wake: AgentNoteWake, string: (Int, Array<out Any>) -> String): String = when {
+    wake.role == AgentNoteCoverer.RESPONDER -> string(R.string.agent_note_wake_fallback, emptyArray())
+    else -> wake.title ?: agentNoteAgentName(AgentNoteCoverer(wake.role, wake.label), string)
+}
+
+/**
+ * What the line says about [wake]: "<title> will be woken on the Mac", "The study session will be woken",
+ * "<title> answers when it finishes its current task" while it runs a task, or for an offline
+ * machine "The Mac is offline; the study session answers at <[time] of fallback_at> if it is still offline".
+ */
+fun agentNoteWakeText(wake: AgentNoteWake, time: (Long) -> String, string: (Int, Array<out Any>) -> String): String {
+    val name = agentNoteWokenName(wake, string)
+    return when {
+        !wake.willBeWoken -> {
+            val machine = agentNoteMachineName(wake.machine, string).replaceFirstChar { it.titlecase(java.util.Locale.ROOT) }
+            wake.fallbackAtMillis?.let { string(R.string.agent_note_wake_offline, arrayOf(machine, time(it))) }
+                ?: string(R.string.agent_note_wake_offline_later, arrayOf(machine))
+        }
+        wake.busy -> string(R.string.agent_note_wake_busy, arrayOf(name))
+        wake.role == AgentNoteCoverer.RESPONDER -> string(R.string.agent_note_wake_fallback_woken, arrayOf(name))
+        else -> string(R.string.agent_note_wake_woken, arrayOf(name, agentNoteMachineName(wake.machine, string)))
+    }
+}
+
+/**
+ * Whether the screen names the listener rather than [wake]: an agent listens ([listening]) and it
+ * is not only the responder. The server's own waker listens as the responder so that older apps
+ * still see an agent listening; while it does, the session the waker wakes is who answers.
+ */
+private fun namesTheListener(listening: AgentNoteListening, named: AgentNoteCoverer?, wake: AgentNoteWake?): Boolean =
+    listening == AgentNoteListening.LISTENING && (wake == null || named?.role != AgentNoteCoverer.RESPONDER)
 
 /**
  * The line under a note's title that says plainly whether an agent listens for a reply and which
@@ -53,6 +101,8 @@ data class AgentNoteAnswerLine(
     val text: String,
     /** The warning look the bar had: nobody will act on a reply. */
     val warning: Boolean,
+    /** The muted look: the machine that answers is offline, so the answer comes later. */
+    val muted: Boolean = false,
     /** "Change" is offered: the server lets the user choose who answers. */
     val changeOffered: Boolean,
     /** "Change" can be used now: the server answered the last check. */
@@ -62,45 +112,43 @@ data class AgentNoteAnswerLine(
 /**
  * What the line says for [answer], or null for no line (no answer yet, or a server that cannot
  * tell). [canChange]: the server has `agent_note_answer_by_v1`; an older one gets the line without
- * "Change", from the fields it sends. [reachable]: the last check reached the server.
+ * "Change", from the fields it sends. [reachable]: the last check reached the server. [time]
+ * writes a moment (milliseconds since the epoch) as a local time of day.
+ *
+ * An agent that listens is named as before. Otherwise, when a reply waker would wake the session
+ * that answers (`wake`), the line names it ("… will be woken on the Mac"), or says that its machine
+ * is offline and when the study session answers instead. Without `wake` (an older server, or no waker
+ * would wake anyone) the line is as before.
  */
 fun agentNoteAnswerLine(
     answer: AgentNoteListeningAnswer?,
     canChange: Boolean,
     reachable: Boolean,
     string: (Int, Array<out Any>) -> String,
+    time: (Long) -> String = { java.text.DateFormat.getTimeInstance(java.text.DateFormat.SHORT).format(java.util.Date(it)) },
 ): AgentNoteAnswerLine? {
     answer ?: return null
     val chosen = answer.answerBy
-    return when (answer.state) {
-        AgentNoteListening.UNKNOWN -> null
-        AgentNoteListening.LISTENING -> AgentNoteAnswerLine(
-            mark = AgentNoteAnswerMark.LISTENING,
-            // With a choice the server says "listening" exactly while the chosen agent is live.
-            text = (chosen?.coverer ?: answer.coverer)
-                ?.let { string(R.string.agent_note_answer_listening, arrayOf(agentNoteAgentName(it, string))) }
+    val wake = answer.wake
+    // With a choice the server says "listening" exactly while the chosen agent is live.
+    val named = chosen?.coverer ?: answer.coverer
+    fun line(mark: AgentNoteAnswerMark, text: String, warning: Boolean = false, muted: Boolean = false) =
+        AgentNoteAnswerLine(mark, text, warning, muted, changeOffered = canChange, changeEnabled = canChange && reachable)
+    return when {
+        namesTheListener(answer.state, named, wake) -> line(
+            AgentNoteAnswerMark.LISTENING,
+            named?.let { string(R.string.agent_note_answer_listening, arrayOf(agentNoteAgentName(it, string))) }
                 ?: string(R.string.agent_note_answer_listening_unnamed, emptyArray()),
-            warning = false,
-            changeOffered = canChange,
-            changeEnabled = canChange && reachable,
         )
-        AgentNoteListening.NOT_LISTENING -> if (chosen != null) {
-            AgentNoteAnswerLine(
-                mark = AgentNoteAnswerMark.WAITING,
-                text = string(R.string.agent_note_answer_chosen_not_listening, arrayOf(agentNoteAgentName(chosen.coverer, string))),
-                warning = false,
-                changeOffered = canChange,
-                changeEnabled = canChange && reachable,
-            )
-        } else {
-            AgentNoteAnswerLine(
-                mark = AgentNoteAnswerMark.NOBODY,
-                text = string(R.string.agent_note_answer_nobody, emptyArray()),
-                warning = true,
-                changeOffered = canChange,
-                changeEnabled = canChange && reachable,
-            )
-        }
+        wake != null && wake.willBeWoken -> line(AgentNoteAnswerMark.WOKEN, agentNoteWakeText(wake, time, string))
+        wake != null -> line(AgentNoteAnswerMark.OFFLINE, agentNoteWakeText(wake, time, string), muted = true)
+        answer.state == AgentNoteListening.NOT_LISTENING && chosen != null -> line(
+            AgentNoteAnswerMark.WAITING,
+            string(R.string.agent_note_answer_chosen_not_listening, arrayOf(agentNoteAgentName(chosen.coverer, string))),
+        )
+        answer.state == AgentNoteListening.NOT_LISTENING ->
+            line(AgentNoteAnswerMark.NOBODY, string(R.string.agent_note_answer_nobody, emptyArray()), warning = true)
+        else -> null
     }
 }
 
@@ -161,13 +209,20 @@ fun agentNoteAnswerChangeFailure(error: Throwable): Int =
         com.gitlab.mudlej.MjPdfReader.data.agentnotes.AGENT_NOTE_ANSWERER_UNKNOWN
     ) R.string.agent_note_answer_agent_unknown else R.string.agent_note_answer_change_failed
 
-/** The subtitle after Send: [agentNoteSentStatus], naming who answers when the server said. */
+/**
+ * The subtitle after Send: [agentNoteSentStatus], naming who answers when the server said: the
+ * agent that listens, or the session a reply waker wakes ([wake]: "Sent ✓ · <title> will be woken").
+ */
 fun agentNoteSentText(
     delivered: Boolean,
     listening: AgentNoteListening,
     coverer: AgentNoteCoverer?,
     string: (Int, Array<out Any>) -> String,
+    wake: AgentNoteWake? = null,
 ): String {
+    if (delivered && wake != null && !namesTheListener(listening, coverer, wake)) {
+        return string(R.string.agent_note_sent_will_be_woken, arrayOf(agentNoteWokenName(wake, string)))
+    }
     val status = agentNoteSentStatus(delivered, listening)
     return if (status == R.string.agent_note_sent_waiting && coverer != null) {
         string(R.string.agent_note_sent_answered_by, arrayOf(agentNoteCovererName(coverer, string)))

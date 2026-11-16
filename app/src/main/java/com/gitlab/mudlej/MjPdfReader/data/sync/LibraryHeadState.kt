@@ -190,7 +190,7 @@ class LibraryHeadStateStore internal constructor(
                 output.write((value.toString() + "\n").toByteArray(StandardCharsets.UTF_8))
                 output.fd.sync()
             }
-            check(temporary.renameTo(stateFile)) { "Could not publish the server's Library head" }
+            check(temporary.renameTo(stateFile)) { "Could not publish the server Library head" }
         } finally {
             temporary.delete()
         }

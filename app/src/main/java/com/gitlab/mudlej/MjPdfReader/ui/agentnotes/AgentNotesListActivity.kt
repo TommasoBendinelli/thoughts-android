@@ -284,7 +284,9 @@ class AgentNotesListActivity : AppCompatActivity() {
                     holder.binding.agentNoteTitle.text = context.getString(
                         if (reply.pending) R.string.agent_note_reply_not_sent else R.string.agent_note_your_reply,
                     )
+                    // "Linked PDF only" only when the reply did not leave the agent everything it uses by default.
                     holder.binding.agentNoteSubtitle.text = listOf(relativeTime(reply.createdAt, reply.createdAtMillis),
+                        agentNoteReplySourcesNote(reply.sources)?.let(context::getString).orEmpty(),
                         reply.message.orEmpty()).filter(String::isNotBlank).joinToString(" · ")
                     holder.itemView.setOnClickListener {
                         startActivity(AgentNoteActivity.replyIntent(this@AgentNotesListActivity, row.noteId, reply.replyId))

@@ -39,7 +39,8 @@ internal class GlobalSearchPdfText(context: Context) {
     }
 
     private fun open(uri: Uri): ParcelFileDescriptor? = when (uri.scheme) {
-        null, "file" -> uri.path?.let(::File)?.takeIf(File::isFile)
+        // A file that is no PDF (a Project's reading, say) has no pages to read.
+        null, "file" -> uri.path?.let(::File)?.takeIf { it.isFile && startsLikePdf(it) }
             ?.let { ParcelFileDescriptor.open(it, ParcelFileDescriptor.MODE_READ_ONLY) }
         else -> app.contentResolver.openFileDescriptor(uri, "r")
     }
@@ -48,3 +49,19 @@ internal class GlobalSearchPdfText(context: Context) {
         private const val MAX_PAGE_CHARS = 40_000
     }
 }
+
+/** Whether [file] has a PDF header ("%PDF-" within its first 1024 bytes, as readers accept it). */
+internal fun startsLikePdf(file: File): Boolean = runCatching {
+    file.inputStream().use { input ->
+        val head = ByteArray(PDF_HEADER_WINDOW)
+        var read = 0
+        while (read < head.size) {
+            val count = input.read(head, read, head.size - read)
+            if (count < 0) break
+            read += count
+        }
+        String(head, 0, read, Charsets.ISO_8859_1).contains("%PDF-")
+    }
+}.getOrDefault(false)
+
+private const val PDF_HEADER_WINDOW = 1024

@@ -442,7 +442,8 @@ internal class OpenDocumentTabsController(
             PhoneRenderQueue.defaultCanonicalPdfDirectory(), documentTab.title)["document_id"]?.takeIf(String::isNotBlank)
 
     private fun copyForAgent(documentTab: OpenDocumentTab) {
-        // The agent may answer with a note to draw on: listen for it while the user is in the agent app.
+        // The agent may answer with a note to draw on: listen for it while the user is in the agent app
+        // (not while push delivers notes; AgentStudyListenerService.start says no then).
         com.gitlab.mudlej.MjPdfReader.data.agentnotes.AgentStudyListenerService.start(activity)
         val place = agentReaderPlaceForTab(documentTab.isCurrent, readerPlace, liveDocuments[documentTab.taskId])
         val description = describeForAgent(documentTab, place)

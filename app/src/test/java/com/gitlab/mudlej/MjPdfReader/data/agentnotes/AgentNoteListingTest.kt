@@ -74,6 +74,16 @@ class AgentNoteListingTest {
         assertEquals(listOf("r2", "r3"), withServer.single().replies.map { it.replyId })
     }
 
+    @Test fun theListSaysWhatEachReplyLetTheAgentUse() {
+        val replies = mapOf("a" to listOf(local("r1", "a", sent = false).copy(sources = "linked_pdf"), local("r2", "a", sent = true)))
+        val fromServer = listOf(AgentNoteReply("r3", "a", sources = "none"), AgentNoteReply("r4", "a"))
+        val entry = mergeAgentNotes(listOf(note("a", 1, replies = fromServer)), null, replies, AgentNoteFilter()).single()
+        assertEquals(
+            listOf("r1" to AgentNoteReplySources.LINKED_PDF, "r2" to null, "r3" to AgentNoteReplySources.NONE, "r4" to null),
+            entry.replies.map { it.replyId to it.sources },
+        )
+    }
+
     @Test fun filtersByCardOrDocument() {
         val notes = listOf(note("a", 1, card = "card-1"), note("b", 2, card = "card-2"), note("c", 3, card = null, document = "doc-2"))
         assertEquals(listOf("a"), mergeAgentNotes(notes, null, emptyMap(), AgentNoteFilter(reviewCardId = "card-1")).map { it.note.noteId })

@@ -12,7 +12,7 @@ import java.sql.Connection
 import java.sql.DriverManager
 
 /** The index's SQL on a real SQLite over JDBC. */
-private class JdbcGlobalSearchSql(val connection: Connection) : GlobalSearchSql {
+internal class JdbcGlobalSearchSql(val connection: Connection) : GlobalSearchSql {
     override fun execute(sql: String, args: List<Any?>) {
         connection.prepareStatement(sql).use { statement ->
             args.forEachIndexed { index, value -> statement.setObject(index + 1, value) }

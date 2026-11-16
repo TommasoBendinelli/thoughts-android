@@ -36,6 +36,8 @@ class LibraryTabController(
 
     fun importPdfs(uris: List<android.net.Uri>) = projectPane.importPdfs(uris)
     fun importHtml(uri: android.net.Uri?) = projectPane.importHtml(uri)
+    /** The item a Project document row opens for [file] (the Home search opens the same). */
+    fun projectDocumentItem(file: File): HomeItem? = projectPane.itemForFile(file)
 
     private var expansionState = LibrarySectionExpansionState()
     private var linkedItems: List<HomeItem> = emptyList()

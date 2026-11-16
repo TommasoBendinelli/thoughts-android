@@ -3,14 +3,18 @@
 package com.gitlab.mudlej.MjPdfReader.ui.home
 
 import android.content.Context
+import android.net.Uri
 import android.os.SystemClock
 import android.util.Log
 import com.gitlab.mudlej.MjPdfReader.R
 import com.gitlab.mudlej.MjPdfReader.data.annotation.OverviewComment
+import com.gitlab.mudlej.MjPdfReader.data.render.PhoneRenderQueue
 import com.gitlab.mudlej.MjPdfReader.data.review.ReviewBrowserCard
 import com.gitlab.mudlej.MjPdfReader.data.review.ReviewStore
 import com.gitlab.mudlej.MjPdfReader.data.search.GlobalSearchIndexer
 import com.gitlab.mudlej.MjPdfReader.data.search.GlobalSearchQuery
+import com.google.gson.JsonArray
+import com.google.gson.JsonObject
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -29,22 +33,33 @@ internal interface GlobalSearchCommentSource {
 
 /**
  * The one Home search: every word of the query against document names, the text of every PDF
- * page, review cards, comments, To-dos and the diary, whichever tab is showing.
+ * page, review cards, comments, To-dos and the diary, whichever tab is showing. Documents are
+ * those of every Project (as the Library lists them) and every other PDF opened in the reader.
  */
 internal class HomeGlobalSearch(
     private val context: Context,
     private val scope: CoroutineScope,
     private val adapter: GlobalSearchAdapter,
+    /** PDFs opened in the reader (its records); read on the main thread. */
     private val documents: () -> List<HomeItem>,
+    /** The Project catalogue as the Library shows it; read on [Dispatchers.IO]. */
+    private val projects: () -> JsonArray,
     private val comments: GlobalSearchCommentSource,
     private val todos: GlobalSearchCommentSource,
     private val diary: DiaryTabController,
     private val openDocument: (HomeItem) -> Unit,
     private val openPage: (item: HomeItem, pageIndex: Int, highlight: String?) -> Unit,
+    /** Opens a Project's document as the Library does, at [pageIndex] when given. */
+    private val openProjectDocument: (entry: JsonObject, pageIndex: Int?, highlight: String?) -> Unit,
     private val openCard: (cardId: String) -> Unit,
     private val onOpen: () -> Unit,
 ) {
+    /** The searchable documents of one generation of Home data, with the records they open. */
+    private class Library(val generation: Int, val search: GlobalSearchLibrary, val records: Map<String, HomeItem>)
+
     private val indexer = GlobalSearchIndexer.get(context)
+    private var generation = 0
+    private var library: Library? = null
     private var query = GlobalSearchQuery.parse("")
     private var searchJob: Job? = null
     private var indexJob: Job? = null
@@ -69,15 +84,18 @@ internal class HomeGlobalSearch(
         }
     }
 
+    /** Home has new data (records, Projects, downloaded PDFs): the next search lists documents again. */
+    fun documentsChanged() {
+        generation++
+    }
+
     /** Indexes new or changed PDFs in the background; cheap when nothing changed. */
     fun refreshIndex() {
         if (indexJob?.isActive == true) return
-        val pdfs = documents().filter { it.available && it.uri.toString().isNotBlank() }.map {
-            GlobalSearchIndexer.Pdf(it.uri.toString(), "${it.hash}:${it.sizeBytes}:${it.fileModifiedMillis}", it.uri)
-        }
         indexJob = scope.launch {
             var lastShown = 0L
             runCatching {
+                val pdfs = library().search.pdfs
                 indexer.update(pdfs) { progress ->
                     scope.launch {
                         indexProgress = progress
@@ -110,42 +128,79 @@ internal class HomeGlobalSearch(
         }
     }
 
-    private suspend fun buildRows(q: GlobalSearchQuery): List<GlobalSearchRow> {
+    /** The documents of the current Home data, listed again (off the main thread) after [documentsChanged]. */
+    private suspend fun library(): Library {
+        val wanted = generation
+        library?.takeIf { it.generation == wanted }?.let { return it }
         val items = documents()
-        val itemsByUri = items.associateBy { it.uri.toString() }
-        val itemsByStem = items.filter { it.pdfStem.isNotBlank() }.associateBy { it.pdfStem.lowercase() }
+        val built = withContext(Dispatchers.IO) {
+            val startedAt = SystemClock.elapsedRealtime()
+            val catalogue = runCatching(projects)
+                .onFailure { Log.w(GlobalSearchIndexer.TAG, "Projects unavailable: ${it.javaClass.simpleName}") }
+                .getOrDefault(JsonArray())
+            val search = globalSearchLibrary(
+                catalogue,
+                items.map(::searchRecord),
+                PhoneRenderQueue.defaultCanonicalPdfDirectory(),
+            ) { Uri.fromFile(it).toString() }
+            Log.d(GlobalSearchIndexer.TAG, "${search.documents.size} documents (${catalogue.size()} Projects), " +
+                "${search.pdfs.size} PDFs on the phone, ${SystemClock.elapsedRealtime() - startedAt} ms")
+            Library(wanted, search, items.associateBy { it.uri.toString() })
+        }
+        if (generation == wanted) library = built
+        return built
+    }
+
+    private fun searchRecord(item: HomeItem) = GlobalSearchRecord(
+        ref = item.uri.toString(),
+        path = item.uri.takeIf { it.scheme == "file" }?.path,
+        title = item.title,
+        fileName = item.fileName,
+        libraryDisplayName = item.libraryDisplayName,
+        identity = "${item.hash}:${item.sizeBytes}:${item.fileModifiedMillis}",
+        available = item.available,
+    )
+
+    /** Opens [document] as its Library row (or its reader record) does, at [pageIndex] when given. */
+    private fun open(library: Library, document: GlobalSearchDocument, pageIndex: Int?, highlight: String?) {
+        onOpen()
+        document.projectEntry?.let { return openProjectDocument(it, pageIndex, highlight) }
+        val item = document.record?.let { library.records[it.ref] } ?: return
+        if (pageIndex == null) openDocument(item) else openPage(item, pageIndex, highlight)
+    }
+
+    private suspend fun buildRows(q: GlobalSearchQuery): List<GlobalSearchRow> {
+        val library = library()
+        val itemsByStem = library.records.values.filter { it.pdfStem.isNotBlank() }.associateBy { it.pdfStem.lowercase() }
         val rows = mutableListOf<GlobalSearchRow>()
         progressRow()?.let(rows::add)
 
-        val namedDocuments = items.filter { q.matches(documentSearchName(it)) }
-            .sortedByDescending { q.matchedStemCount(displayName(it)) }
-        section(rows, R.string.global_search_documents, namedDocuments) { item ->
+        val namedDocuments = library.search.named(q)
+        section(rows, R.string.global_search_documents, namedDocuments) { document ->
             GlobalSearchRow.Result(
-                key = "document:${item.uri}",
-                title = displayName(item),
-                subtitle = item.fileName.takeIf { it != displayName(item) }.orEmpty(),
+                key = document.key,
+                title = document.title,
+                subtitle = document.subtitle,
                 snippet = null,
-                titleMatches = q.matchRanges(displayName(item)),
-                open = { onOpen(); openDocument(item) },
+                titleMatches = q.matchRanges(document.title),
+                open = { open(library, document, null, null) },
             )
         }
 
-        val pageRows = runCatching { indexer.searchPages(q) }.getOrDefault(emptyList())
-            .filter { itemsByUri.containsKey(it.ref) }
-            .groupBy { it.ref }
-            .entries.sortedByDescending { it.value.size }
-        val pageResults = pageRows.flatMap { (ref, hits) ->
-            val item = itemsByUri.getValue(ref)
-            hits.sortedBy { it.position }.take(PAGES_PER_DOCUMENT).map { hit ->
+        val pageRows = library.search.pagesByDocument(q, runCatching { indexer.searchPages(q) }.getOrDefault(emptyList()))
+        val pageResults = pageRows.flatMap { (document, hits) ->
+            val first = hits.first()
+            hits.take(PAGES_PER_DOCUMENT).map { hit ->
+                val page = context.getString(R.string.global_search_page, hit.position) +
+                    if (hits.size > PAGES_PER_DOCUMENT && hit === first) {
+                        " · " + context.getString(R.string.global_search_more_pages, hits.size)
+                    } else ""
                 GlobalSearchRow.Result(
-                    key = "page:$ref#${hit.position}",
-                    title = displayName(item),
-                    subtitle = context.getString(R.string.global_search_page, hit.position) +
-                        if (hits.size > PAGES_PER_DOCUMENT && hit === hits.minBy { it.position }) {
-                            " · " + context.getString(R.string.global_search_more_pages, hits.size)
-                        } else "",
+                    key = "page:${hit.ref}#${hit.position}",
+                    title = document.title,
+                    subtitle = if (document.projectEntry != null) "${document.subtitle} · $page" else page,
                     snippet = q.snippet(hit.body),
-                    open = { onOpen(); openPage(item, hit.position - 1, q.highlightWord(hit.body)) },
+                    open = { open(library, document, hit.position - 1, q.highlightWord(hit.body)) },
                 )
             }
         }
@@ -219,8 +274,6 @@ internal class HomeGlobalSearch(
         listOf(item.card.question, item.answerText, item.card.note, item.documentDisplayName).joinToString("\n")
 
     private fun displayName(item: HomeItem) = item.libraryDisplayName.ifBlank { item.title }.ifBlank { item.fileName }
-
-    private fun documentSearchName(item: HomeItem) = listOf(item.title, item.fileName, item.libraryDisplayName).joinToString(" ")
 
     companion object {
         private const val DEBOUNCE_MS = 120L

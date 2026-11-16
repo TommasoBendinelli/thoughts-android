@@ -5,10 +5,7 @@ package com.gitlab.mudlej.MjPdfReader.ui.home
 import android.content.Intent
 import android.view.View
 import androidx.appcompat.app.AppCompatActivity
-import com.gitlab.mudlej.MjPdfReader.R
 import com.gitlab.mudlej.MjPdfReader.data.Preferences
-import com.gitlab.mudlej.MjPdfReader.data.agentnotes.AgentNotesReceiving
-import com.gitlab.mudlej.MjPdfReader.data.agentnotes.AgentStudyMode
 import com.gitlab.mudlej.MjPdfReader.databinding.DialogHomeMenuBinding
 import com.gitlab.mudlej.MjPdfReader.ui.about.AboutActivity
 import com.gitlab.mudlej.MjPdfReader.ui.agentnotes.StudyModeControls
@@ -43,18 +40,11 @@ class HomeMenuDialog(
             dialog.dismiss()
             activity.startActivity(com.gitlab.mudlej.MjPdfReader.ui.agentnotes.AgentNotesListActivity.intent(activity))
         }
-        binding.studyModeSwitch.isChecked = AgentStudyMode.isOn(activity)
-        // A phone that does not receive agent notes cannot listen for them (it can still turn study mode off).
-        binding.studyModeSwitch.isEnabled = AgentNotesReceiving.isOn(activity) || binding.studyModeSwitch.isChecked
-        binding.studyModeSwitch.contentDescription =
-            activity.getString(R.string.agent_notes_study_mode) + ". " + activity.getString(R.string.agent_notes_study_mode_detail)
-        binding.studyModeSwitch.setOnCheckedChangeListener { _, checked ->
-            AgentStudyMode.set(activity, checked)
-            if (checked) {
-                dialog.dismiss()
-                StudyModeControls.showStudyModeOn(activity, pref)
-            }
-        }
+        // "Instant notes", or "Notes arrive instantly" while push delivers them; "Start a new study session".
+        StudyModeControls.bind(
+            activity, pref, binding.studyModeSwitch, detail = null, pushLine = binding.pushActiveLine,
+            startSession = binding.startStudySessionRow, dismiss = dialog::dismiss,
+        )
         binding.settingsRow.setOnClickListener {
             dialog.dismiss()
             activity.startActivity(Intent(activity, SettingsActivity::class.java))

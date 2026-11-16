@@ -12,6 +12,10 @@
     app:cardBackgroundColor="?attr/colorSurface"
     app:cardCornerRadius="10dp"
     app:cardElevation="0dp"
+    app:checkedIconGravity="BOTTOM_END"
+    app:checkedIconMargin="10dp"
+    app:checkedIconSize="20dp"
+    app:checkedIconTint="?attr/colorPrimary"
     app:strokeColor="?attr/colorOutlineVariant"
     app:strokeWidth="1dp">
     <LinearLayout

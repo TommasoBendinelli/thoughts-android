@@ -36,7 +36,7 @@ class SyncSavedDiagnosticsTest {
     }
     @Test fun retriesFindTheirOriginalBuildReceiptWithoutIncludingOtherProjects() {
         val r = SyncOperationRecord("retry", null, SyncOperationKind.SYNC, "Error", 1, 2,
-            listOf("Fedora PDF build old-build failed"))
+            listOf("Server PDF build old-build failed"))
         val same = JsonParser.parseString("""{"build_id":"old-build","terminal_operation_id":"original"}""").asJsonObject
         val other = JsonParser.parseString("""{"build_id":"unrelated","terminal_operation_id":"other"}""").asJsonObject
         assertEquals(listOf(same), relevantSyncReceipts(r, listOf(same, other)))

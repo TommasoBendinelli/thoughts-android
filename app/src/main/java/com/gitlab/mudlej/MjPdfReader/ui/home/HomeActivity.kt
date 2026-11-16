@@ -948,11 +948,13 @@ class HomeActivity : AppCompatActivity(), HomeItemFunctions {
             lifecycleScope,
             globalSearchAdapter,
             documents = { allItems },
+            projects = { LibraryProjectStore(applicationContext).projects() },
             comments = overviewTab,
             todos = notesTab,
             diary = diaryTab,
             openDocument = ::openGlobalSearchDocument,
             openPage = ::openGlobalSearchPage,
+            openProjectDocument = ::openGlobalSearchProjectDocument,
             openCard = { id ->
                 startActivity(com.gitlab.mudlej.MjPdfReader.ui.review.ReviewCardDetailsActivity.intent(this, id))
             },
@@ -1057,6 +1059,14 @@ class HomeActivity : AppCompatActivity(), HomeItemFunctions {
         if (item.available) openInReader(item.uri, item.hash.takeUnless { item.isScanOnly }) else onItemClicked(item)
     }
 
+    /** A Project's document opens as its Library row opens it; a page hit opens at that page. */
+    private fun openGlobalSearchProjectDocument(entry: com.google.gson.JsonObject, pageIndex: Int?, highlight: String?) {
+        fun text(key: String) = entry.get(key)?.takeIf { it.isJsonPrimitive }?.asString.orEmpty()
+        openLibraryProjectDocument(this, entry, libraryTab::projectDocumentItem, pageIndex) { item, page ->
+            openProjectDocumentInReader(item, page, text("document_id"), text("name"), projectId = null, highlight = highlight)
+        }
+    }
+
     private fun openGlobalSearchPage(item: HomeItem, pageIndex: Int, highlight: String?) {
         startActivity(Intent(this, MainActivity::class.java).apply {
             data = item.uri
@@ -1139,6 +1149,8 @@ class HomeActivity : AppCompatActivity(), HomeItemFunctions {
         }
         allRecordItems = libraryData.items.filterNot(::isPendingLibraryRemoval)
         allItems = allRecordItems.filter { it.availability != Availability.MISSING }
+        // Its documents (records, Projects, downloaded PDFs) may have changed with this data.
+        if (::globalSearch.isInitialized) globalSearch.documentsChanged()
         overviewDocuments = libraryData.comments.overviewDocuments.filterNot { document ->
             "${document.stem}.pdf" in pendingLibraryRemovalFilenames
         }
@@ -1598,7 +1610,12 @@ class HomeActivity : AppCompatActivity(), HomeItemFunctions {
         }
     }
 
-    override fun onProjectDocumentClicked(item: HomeItem, pageIndex: Int, documentId: String?, displayTitle: String?, projectId: String?) {
+    override fun onProjectDocumentClicked(item: HomeItem, pageIndex: Int, documentId: String?, displayTitle: String?, projectId: String?) =
+        openProjectDocumentInReader(item, pageIndex, documentId, displayTitle, projectId, highlight = null)
+
+    private fun openProjectDocumentInReader(
+        item: HomeItem, pageIndex: Int, documentId: String?, displayTitle: String?, projectId: String?, highlight: String?,
+    ) {
         startActivity(Intent(this, MainActivity::class.java).apply {
             data = item.uri
             putExtra(EXTRA_FROM_HOME, true)
@@ -1606,6 +1623,7 @@ class HomeActivity : AppCompatActivity(), HomeItemFunctions {
             putExtra(com.gitlab.mudlej.MjPdfReader.ui.reader.EXTRA_DISPLAY_DOCUMENT_ID, documentId)
             putExtra(com.gitlab.mudlej.MjPdfReader.ui.reader.EXTRA_DISPLAY_PROJECT_ID, projectId)
             putExtra(com.gitlab.mudlej.MjPdfReader.ui.reader.EXTRA_DISPLAY_TITLE, displayTitle)
+            highlight?.let { putExtra(com.gitlab.mudlej.MjPdfReader.ui.reader.EXTRA_SEARCH_HIGHLIGHT, it) }
         })
     }
 

@@ -257,7 +257,7 @@ internal fun terminalPdfBuildFailure(build: BuildRecord): TerminalPdfBuildFailur
         report.failedDocuments.joinToString("; ") { failure ->
             "${failure.pdfFilename}: ${failure.message}"
         }
-    }.ifBlank { "The PDF update on the server ended with ${build.status}." }
+    }.ifBlank { "Server PDF update ended with ${build.status}." }
     return TerminalPdfBuildFailure(
         buildId = build.id,
         status = status,
@@ -1295,7 +1295,8 @@ class FedoraRepository(
      */
     internal suspend fun remoteWork(): RemoteWork? = withContext(Dispatchers.IO) {
         val config = secretStore.config() ?: return@withContext null
-        val state = runCatching {
+        // Right after a held request ([awaitRemoteChange]) the server has just said what its state is.
+        val state = SYNC_STATE_ANSWER.takeConfirmed(config.baseUrl, monotonicMillis(), CONFIRMED_STATE_MILLIS) ?: runCatching {
             val connection = connectionFactory(java.net.URI.create(config.baseUrl.trimEnd('/') + "/v2/sync/state").toURL())
                 as java.net.HttpURLConnection
             try {
@@ -1312,6 +1313,47 @@ class FedoraRepository(
             return@withContext null
         }
         RemoteWork(key = "$latest/$revision/$frontier", cursorBehind = (dao.state()?.serverCursor ?: 0L) < latest)
+    }
+
+    /**
+     * Waits up to [waitMillis] on the server for its Sync state to differ from the one [remoteWork]
+     * last read (`GET /v2/sync/state?wait_ms=`, [waitForSyncState]), for [RemoteWorkWatch]: the
+     * server answers as soon as it changes, holding no thread meanwhile, and the check that follows
+     * takes the answer without asking again. Nothing local changes. Cancelling the caller ends the
+     * request.
+     */
+    internal suspend fun awaitRemoteChange(waitMillis: Long): SyncStateWait {
+        val config = withContext(Dispatchers.IO) { secretStore.config() } ?: return SyncStateWait.FAILED
+        val wait = waitMillis.coerceIn(1L, SYNC_STATE_LONGEST_WAIT_MILLIS)
+        val url = runCatching {
+            java.net.URI.create(config.baseUrl.trimEnd('/') + "/v2/sync/state?wait_ms=$wait").toURL()
+        }.getOrNull() ?: return SyncStateWait.FAILED
+        return waitForSyncState(
+            url,
+            open = { connectionFactory(it) as java.net.HttpURLConnection },
+            token = config.token,
+            key = config.baseUrl,
+            kept = SYNC_STATE_ANSWER,
+            waitMillis = wait,
+        )
+    }
+
+    /**
+     * Whether the server holds Sync state requests until they change ([SYNC_STATE_WAIT_CAPABILITY]),
+     * for [RemoteWorkWatch]. Capabilities change only with a server update: asked at most every 15
+     * minutes (a minute after a failure), or taken from a Sync that asked within the last minute.
+     */
+    internal suspend fun holdsStateWaits(): Boolean = withContext(Dispatchers.IO) {
+        val config = secretStore.config() ?: return@withContext false
+        val now = android.os.SystemClock.elapsedRealtime()
+        stateWaitSupport?.takeIf { it.first == config.baseUrl && now < it.second }?.let { return@withContext it.third }
+        val supported = runCatching { SYNC_STATE_WAIT_CAPABILITY in serverCapabilities(syncClient(config)) }
+        stateWaitSupport = Triple(
+            config.baseUrl,
+            now + if (supported.isSuccess) STATE_WAIT_SUPPORT_CACHE_MS else CAPABILITY_CACHE_MS,
+            supported.getOrDefault(false),
+        )
+        supported.getOrDefault(false)
     }
 
     /**
@@ -1335,16 +1377,30 @@ class FedoraRepository(
      * fetches a PDF the moment it is built instead of up to 20 s later. True when it has ended,
      * false when it still runs, null when Fedora cannot be asked.
      */
-    internal suspend fun awaitBuildEnd(buildId: String, waitMillis: Int): Boolean? = withContext(Dispatchers.IO) {
-        val config = secretStore.config() ?: return@withContext null
-        buildStatus(config, buildId, waitMillis.coerceIn(0, 30_000))?.let { it !in setOf("queued", "running") }
+    internal suspend fun awaitBuildEnd(buildId: String, waitMillis: Int): Boolean? {
+        val config = withContext(Dispatchers.IO) { secretStore.config() } ?: return null
+        val wait = waitMillis.coerceIn(0, 30_000)
+        val connection = runCatching {
+            connectionFactory(java.net.URI.create(buildStatusUrl(config, buildId, wait)).toURL()) as java.net.HttpURLConnection
+        }.getOrNull() ?: return null
+        // Leaving the screen cancels the watch: that ends the held request too, not only its answer.
+        return cancellableRequest(connection) { buildStatus(config, buildId, wait, connection) }
+            .getOrNull()?.let { it !in setOf("queued", "running") }
     }
 
-    /** A build's status ("gone" when Fedora no longer knows it), or null when it cannot be read. */
-    private fun buildStatus(config: ThoughtsServerConfig, buildId: String, waitMillis: Int): String? = runCatching {
-        val url = config.baseUrl.trimEnd('/') + "/v2/builds/" + java.net.URLEncoder.encode(buildId, StandardCharsets.UTF_8) +
+    private fun buildStatusUrl(config: ThoughtsServerConfig, buildId: String, waitMillis: Int): String =
+        config.baseUrl.trimEnd('/') + "/v2/builds/" + java.net.URLEncoder.encode(buildId, StandardCharsets.UTF_8) +
             if (waitMillis > 0) "?wait_ms=$waitMillis" else ""
-        val connection = connectionFactory(java.net.URI.create(url).toURL()) as java.net.HttpURLConnection
+
+    /** A build's status ("gone" when Fedora no longer knows it), or null when it cannot be read. */
+    private fun buildStatus(
+        config: ThoughtsServerConfig,
+        buildId: String,
+        waitMillis: Int,
+        opened: java.net.HttpURLConnection? = null,
+    ): String? = runCatching {
+        val connection = opened
+            ?: connectionFactory(java.net.URI.create(buildStatusUrl(config, buildId, waitMillis)).toURL()) as java.net.HttpURLConnection
         try {
             connection.connectTimeout = 10_000
             connection.readTimeout = 15_000 + waitMillis
@@ -2373,7 +2429,7 @@ class FedoraRepository(
         }
         val state = dao.state() ?: ThoughtsSyncStateEntity()
         check(SYNC_PLAN_CAPABILITY in diagnostics.measure("preflight_server_ready") { serverCapabilities(client) }) {
-            "The Thoughts server does not support the required sync transfer plan v2 contract"
+            "The server does not support the required sync transfer plan v2 contract"
         }
         val advertisedPdfDeltaBases = if (allowPdfDelta) {
             pdfDeltaBases.sorted().take(20_000)
@@ -2624,7 +2680,7 @@ class FedoraRepository(
     /** Discards only the exact unresolved Fedora conflict and then removes its local draft. */
     suspend fun discardSourceConflict(conflictId: String, expectedSha256: String): Boolean {
         require(conflictId.isNotBlank()) { "The TeX conflict identity is invalid." }
-        require(expectedSha256.matches(SHA256)) { "The server's source identity is invalid." }
+        require(expectedSha256.matches(SHA256)) { "The server source identity is invalid." }
         val queue = SourceEditQueue(appContext, scheduleRequests = false)
         val pending = queue.pendingSourceMutations().singleOrNull {
             it.conflictId == conflictId &&
@@ -4961,7 +5017,7 @@ class FedoraRepository(
                 sourceSha256 = contentSha256,
                 contents = requireNotNull(contents),
                 resolutionId = resolutionId,
-                message = "The server advanced again and preserved a successor TeX conflict for review.",
+                message = "The server's source advanced again; the server preserved a successor TeX conflict for review.",
                 conflictPath = result.conflictId,
                 draftRevision = request.safeInt("draft_revision"),
                 conflictCount = result.conflictCount,
@@ -5298,7 +5354,7 @@ class FedoraRepository(
                     )
                 }.getOrDefault(false)
             ) {
-                throw IOException("Build ${observedBuild.id} on the server sent no heartbeat for 90 seconds")
+                throw IOException("Server build ${observedBuild.id} sent no heartbeat for 90 seconds")
             }
             when (observedBuild.status) {
                 "queued" -> {
@@ -5388,7 +5444,7 @@ class FedoraRepository(
                         }
                     }
                 }
-                throw IOException("The server trace stream ended before a terminal event")
+                throw IOException("The server's trace stream ended before a terminal event")
             } catch (error: Exception) {
                 lastError = error
                 store.markStreamState(operationId, SyncOperationStore.STREAM_RECONNECTING)
@@ -5396,7 +5452,7 @@ class FedoraRepository(
             }
         }
         store.markStreamState(operationId, SyncOperationStore.STREAM_SAVED)
-        throw lastError ?: IOException("The server trace stream is unavailable")
+        throw lastError ?: IOException("The server's trace stream is unavailable")
     }
 
     private fun cachePreviouslyReceivedFailedBuildLogs(client: SyncClient, receiptRoot: File) {
@@ -6012,7 +6068,7 @@ class FedoraRepository(
                         "Staged PDF ${publication.filename} failed identity verification"
                     }
                     check(!stagedPdf.canWrite() || stagedPdf.setReadOnly()) {
-                        "The staged PDF from the server could not be marked read-only"
+                        "Staged server PDF could not be marked read-only"
                     }
                 }
 
@@ -7247,11 +7303,17 @@ class FedoraRepository(
         /** Set in the stored generation manifest whose publications carry the HTML edition fields. */
         const val GENERATION_HTML_FIELDS = "html_edition_fields"
         private const val CAPABILITY_CACHE_MS = 60_000L
+        /** How long [holdsStateWaits] trusts what the server said. */
+        private const val STATE_WAIT_SUPPORT_CACHE_MS = 15 * 60_000L
+        /** How long after a held request [remoteWork] takes its answer instead of asking ([ConditionalAnswer.takeConfirmed]). */
+        private const val CONFIRMED_STATE_MILLIS = 3_000L
         private const val PROPOSAL_ENTITY_TYPE = RemovedProposalDismissal.ENTITY_TYPE
         private const val PROPOSAL_COLLECTION = RemovedProposalDismissal.COLLECTION
         private const val PROJECTION_REVISION = RemovedProposalDismissal.PROJECTION_REVISION
         @Volatile private var pooledNetwork: android.net.Network? = null
         @Volatile private var cachedCapabilities: Triple<String, Long, Set<String>>? = null
+        /** Per server, until when (elapsed realtime) and whether it holds Sync state requests. */
+        @Volatile private var stateWaitSupport: Triple<String, Long, Boolean>? = null
         /** The PDF status fetched beside a Sync; it outlives the Sync that started it. */
         private val FEDORA_STATUS_REFRESH = DeferredRefresh(
             kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.SupervisorJob() + Dispatchers.IO),

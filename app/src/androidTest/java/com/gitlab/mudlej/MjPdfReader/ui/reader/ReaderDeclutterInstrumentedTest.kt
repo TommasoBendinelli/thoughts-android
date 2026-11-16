@@ -35,7 +35,7 @@ import org.junit.Test
 import org.junit.runner.RunWith
 
 /**
- * The reader during a review with study mode on keeps room for the page: the review card is compact
+ * The reader during a review with the agent tools under the page on keeps room for the page: the review card is compact
  * (the question in two lines, its details folded; the arrow or a tap on the question shows them, and
  * the choice is kept), the agent bar is folded into its Agent button until opened, and a selection
  * that takes feedback offers one row (the feedback, Copy and ⋯) until ⋯ shows the rest. Screens are
@@ -48,8 +48,8 @@ class ReaderDeclutterInstrumentedTest {
         val context = instrumentation.targetContext
         instrumentation.uiAutomation.setRotation(UiAutomation.ROTATION_FREEZE_0)
         val preferences = PreferenceManager.getDefaultSharedPreferences(context)
-        val previousStudyMode = preferences.getBoolean(STUDY_MODE_KEY, false)
-        preferences.edit().putBoolean(STUDY_MODE_KEY, true).remove(DETAILS_KEY).commit()
+        val previousPageTools = preferences.getBoolean(PAGE_TOOLS_KEY, false)
+        preferences.edit().putBoolean(PAGE_TOOLS_KEY, true).remove(DETAILS_KEY).commit()
         val stem = "reader-declutter-${UUID.randomUUID()}"
         val root = File(context.cacheDir, stem).apply { mkdirs() }
         val pdf = File(PhoneRenderQueue.defaultCanonicalPdfDirectory(), "$stem.pdf")
@@ -214,7 +214,7 @@ class ReaderDeclutterInstrumentedTest {
                 awaitUi("Full agent bar after the review") { bar.studyPageFull.isShown && !bar.studyPageCollapsedRow.isShown }
             }
         } finally {
-            preferences.edit().putBoolean(STUDY_MODE_KEY, previousStudyMode).remove(DETAILS_KEY).commit()
+            preferences.edit().putBoolean(PAGE_TOOLS_KEY, previousPageTools).remove(DETAILS_KEY).commit()
             DocumentFeedback.file = previousFeedbackFile
             ReviewCardFeedback.file = previousCardFeedbackFile
             pdf.delete()
@@ -223,7 +223,8 @@ class ReaderDeclutterInstrumentedTest {
     }
 
     private companion object {
-        const val STUDY_MODE_KEY = "agent_notes_study_mode"
+        /** [com.gitlab.mudlej.MjPdfReader.data.agentnotes.AgentPageTools.KEY]; Study mode showed the bar before push. */
+        const val PAGE_TOOLS_KEY = "agent_notes_page_tools"
         const val DETAILS_KEY = "review_card_details_shown"
     }
 }

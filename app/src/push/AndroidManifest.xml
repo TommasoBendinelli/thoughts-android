@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Written for Thoughts. License is GPLv3. -->
+<!-- Only in a build with push (app/build.gradle, thoughtsPush). -->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+
+    <application>
+        <!-- Push for agent notes (Firebase Cloud Messaging): the server's content-free pings and token
+             refreshes. Firebase is set up by the app itself and only when the build has a config, so
+             Firebase's start-up provider is removed and its automatic token is off. -->
+        <service
+            android:name=".data.agentnotes.ThoughtsPushService"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="com.google.firebase.MESSAGING_EVENT" />
+            </intent-filter>
+        </service>
+        <provider
+            android:name="com.google.firebase.provider.FirebaseInitProvider"
+            android:authorities="${applicationId}.firebaseinitprovider"
+            tools:node="remove" />
+        <meta-data
+            android:name="firebase_messaging_auto_init_enabled"
+            android:value="false" />
+        <meta-data
+            android:name="firebase_analytics_collection_enabled"
+            android:value="false" />
+    </application>
+</manifest>

@@ -15,6 +15,8 @@ data class AgentNoteReplyEntry(
     val pending: Boolean,
     /** The server has it. */
     val sent: Boolean,
+    /** What the answering agent was allowed to use; null when the reply does not say. */
+    val sources: AgentNoteReplySources? = null,
 )
 
 /** A note in the list with its replies (oldest first). */
@@ -62,9 +64,10 @@ fun mergeAgentNotes(
         val mine = localReplies[note.noteId].orEmpty()
         val mineIds = mine.map { it.replyId }.toSet()
         val replies = mine.map {
-            AgentNoteReplyEntry(it.replyId, it.createdAtMillis, it.server?.createdAt.orEmpty(), it.message, it.pending, it.sent)
+            AgentNoteReplyEntry(it.replyId, it.createdAtMillis, it.server?.createdAt.orEmpty(), it.message, it.pending, it.sent,
+                it.sourcesChoice)
         } + note.replies.filter { it.replyId !in mineIds }.map {
-            AgentNoteReplyEntry(it.replyId, null, it.createdAt, it.message, pending = false, sent = true)
+            AgentNoteReplyEntry(it.replyId, null, it.createdAt, it.message, pending = false, sent = true, sources = it.sourcesChoice)
         }
         val state = when {
             replies.any { it.sent } -> AgentNoteAnswerState.ANSWERED

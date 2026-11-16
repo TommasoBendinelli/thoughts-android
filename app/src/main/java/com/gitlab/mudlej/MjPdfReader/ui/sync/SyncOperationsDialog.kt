@@ -294,12 +294,12 @@ internal fun syncOperationDisplayMessage(record: SyncOperationRecord): String = 
         record.serverState == "succeeded" &&
         record.phase == SyncRunPhase.INTERRUPTED &&
         record.kind == SyncOperationKind.BUILD ->
-        "Build completed on the server; local download is pending."
+        "Server build completed; local download is pending."
 
     record.serverTerminal &&
         record.serverState == "succeeded" &&
         record.phase == SyncRunPhase.INTERRUPTED ->
-        "Synchronization with the server completed; local activation is pending."
+        "Sync with the server completed; local activation is pending."
 
     else -> record.displayMessage
 }

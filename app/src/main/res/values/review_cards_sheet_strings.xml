@@ -16,4 +16,32 @@
     <string name="review_cards_sheet_current_button">Cards on this PDF (%1$d)</string>
     <string name="review_cards_sheet_retired_title">Retired cards (%1$d)</string>
     <string name="review_cards_sheet_retired_place">On the PDF version it was retired on</string>
+    <!-- Merge cards: a long press on a card starts selecting; the selected cards become one. -->
+    <string name="review_cards_sheet_selected">%1$d selected</string>
+    <string name="review_cards_sheet_cancel_selection">Stop selecting cards</string>
+    <string name="review_cards_sheet_row_selected">Selected</string>
+    <string name="review_cards_sheet_row_not_selected">Not selected</string>
+    <string name="review_cards_sheet_row_select">Select</string>
+    <string name="review_cards_sheet_row_deselect">Deselect</string>
+    <string name="review_cards_sheet_merge_button">Merge %1$d cards</string>
+    <!-- Fewer than two cards held: the button stays, disabled. -->
+    <string name="review_cards_sheet_merge_button_disabled">Merge cards</string>
+    <string name="review_cards_sheet_merge_title">Merge cards</string>
+    <string name="review_cards_sheet_merge_explanation">The kept card keeps its schedule and history; the others are deleted and their answers join it.</string>
+    <string name="review_cards_sheet_merge_keep">Card to keep</string>
+    <string name="review_cards_sheet_merge_question">Question</string>
+    <string name="review_cards_sheet_merge_action">Merge</string>
+    <string name="review_cards_sheet_merging">Merging cards…</string>
+    <string name="review_cards_sheet_merged">Merged %1$d cards into one. Syncing…</string>
+    <string name="review_cards_sheet_merge_failed_title">Cards not merged</string>
+    <string name="review_cards_sheet_merge_failed">Nothing was changed. %1$s</string>
+    <string name="review_cards_sheet_merge_too_few">Select at least two cards.</string>
+    <string name="review_cards_sheet_merge_too_many">Select at most 20 cards.</string>
+    <string name="review_cards_sheet_merge_retired">Retired cards cannot be merged.</string>
+    <string name="review_cards_sheet_merge_not_in_source">Only cards whose answers are marked in the source can be merged.</string>
+    <string name="review_cards_sheet_merge_several_sources">Only cards whose answers are in the same source file can be merged.</string>
+    <string name="review_cards_sheet_merge_unsupported">The server cannot merge cards yet.</string>
+    <string name="review_cards_sheet_merge_not_configured">No Thoughts server is set up on this phone.</string>
+    <string name="review_cards_sheet_merge_offline">The server could not be reached. Try again when the phone is online.</string>
+    <string name="review_cards_sheet_merge_question_empty">Write the merged card\'s question.</string>
 </resources>

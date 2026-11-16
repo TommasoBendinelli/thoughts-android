@@ -256,7 +256,7 @@ class LibraryProjectStore(private val context: Context, stateDirectory: File? = 
         }
         val snapshot = try { client.editLibraryProject(payload) }
         catch (error: org.tbend.thoughts.sdk.ServerException) {
-            if (error.statusCode == 404) throw IllegalStateException("Project changes are saved on this device. Install the project update on the Thoughts server, then tap Sync.", error)
+            if (error.statusCode == 404) throw IllegalStateException("Project changes are saved on this device. Install the Project update on the server, then tap Sync.", error)
             throw error
         }
         synchronized(lock) {

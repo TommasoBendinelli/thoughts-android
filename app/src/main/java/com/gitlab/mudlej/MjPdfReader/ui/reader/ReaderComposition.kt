@@ -449,6 +449,7 @@ class ReaderComposition(
         activity::reviewCardFromSheet,
         activity::setReviewCardsSheetOpen,
         activity::openRetiredReviewCard,
+        activity::mergeReviewCardsFromSheet,
     )
     val pdfLinkOverrideController = com.gitlab.mudlej.MjPdfReader.ui.reader.links.PdfLinkOverrideController(
         activity,

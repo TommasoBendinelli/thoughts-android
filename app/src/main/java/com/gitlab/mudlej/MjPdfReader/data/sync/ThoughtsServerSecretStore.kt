@@ -62,6 +62,9 @@ class ThoughtsServerSecretStore(context: Context) {
     /** The saved server address without decrypting the token, or null when none is saved. */
     fun baseUrl(): String? = preferences.getString(KEY_BASE_URL, null)
 
+    /** [baseUrl] when a token is saved with it (still without decrypting it), else null. */
+    fun baseUrlWithToken(): String? = baseUrl()?.takeIf { preferences.getString(KEY_CIPHERTEXT, null) != null }
+
     fun set(baseUrl: String, token: String) {
         val normalizedUrl = baseUrl.trim().trimEnd('/')
         requireAllowedEnvironment(normalizedUrl)

@@ -3,9 +3,15 @@
 package com.gitlab.mudlej.MjPdfReader.data.agentnotes
 
 import android.content.Context
+import android.util.Log
 import androidx.preference.PreferenceManager
 
-/** Study mode: the user asked Thoughts to listen for agent notes until they turn it off. */
+/**
+ * Study mode, shown as "Instant notes": the user asked Thoughts to listen for agent notes until they
+ * turn it off (a foreground service with the notification Android requires). Needed only while push
+ * ([AgentNotesPush]) does not deliver notes: push that becomes active turns it off for good
+ * ([retireForPush]), and the switch is not shown then.
+ */
 object AgentStudyMode {
     private const val KEY = "agent_notes_study_mode"
 
@@ -14,6 +20,8 @@ object AgentStudyMode {
 
     /** Turns study mode on or off; call from a user action in the foreground. */
     fun set(context: Context, on: Boolean) {
+        // Study mode also showed the agent tools under the page: they keep the state they had.
+        AgentPageTools.isOn(context)
         PreferenceManager.getDefaultSharedPreferences(context).edit().putBoolean(KEY, on).apply()
         if (on) AgentStudyListenerService.start(context) else AgentStudyListenerService.stop(context)
     }
@@ -21,6 +29,40 @@ object AgentStudyMode {
     /** Clears the preference only; the service calls this when the user taps Stop. */
     internal fun clear(context: Context) {
         PreferenceManager.getDefaultSharedPreferences(context).edit().putBoolean(KEY, false).apply()
+    }
+
+    /**
+     * Push delivers notes now: Study mode was on, so it is turned off and its listener stopped. The
+     * agent tools under the page, which Study mode also showed, stay. Returns whether it was on.
+     */
+    fun retireForPush(context: Context): Boolean {
+        if (!isOn(context)) return false
+        AgentPageTools.isOn(context)
+        clear(context)
+        AgentStudyListenerService.stop(context)
+        Log.i(AgentNotes.TAG, "study mode off: push delivers agent notes")
+        return true
+    }
+}
+
+/**
+ * The agent tools under the page in the reader (send the page on screen to the agent, or draw on
+ * it first). Until push, Study mode showed them; the first read takes Study mode's state, after
+ * that they have their own switch in the reader's Study session panel.
+ */
+object AgentPageTools {
+    const val KEY = "agent_notes_page_tools"
+
+    fun isOn(context: Context): Boolean {
+        val preferences = PreferenceManager.getDefaultSharedPreferences(context)
+        if (preferences.contains(KEY)) return preferences.getBoolean(KEY, false)
+        val inherited = AgentStudyMode.isOn(context)
+        preferences.edit().putBoolean(KEY, inherited).apply()
+        return inherited
+    }
+
+    fun set(context: Context, on: Boolean) {
+        PreferenceManager.getDefaultSharedPreferences(context).edit().putBoolean(KEY, on).apply()
     }
 }
 

@@ -29,7 +29,17 @@ data class AgentNoteReply(
     val listening: AgentNoteListening = AgentNoteListening.UNKNOWN,
     /** Who answers it, from the same answer (null when nobody listens or the server does not say). */
     val coverer: AgentNoteCoverer? = null,
+    /** The session a reply waker wakes for it, from the same answer (null when none would, or an older server). */
+    val wake: AgentNoteWake? = null,
+    /**
+     * What the answering agent may use, as the server keeps it (an [AgentNoteReplySources] value,
+     * kept as sent so a value this phone does not know survives); null from an older server.
+     */
+    val sources: String? = null,
 ) {
+    /** [sources] as a choice this phone knows; null when absent or unknown. */
+    val sourcesChoice: AgentNoteReplySources? get() = AgentNoteReplySources.fromApi(sources)
+
     fun toJson(): JsonObject = JsonObject().apply {
         addProperty("reply_id", replyId)
         addProperty("sequence", sequence)
@@ -45,6 +55,8 @@ data class AgentNoteReply(
         addProperty("strokes_url", strokesUrl)
         addProperty("stroke_count", strokeCount)
         addProperty("message", message)
+        // Only when there is one, so the notes stored before the choice are not all rewritten.
+        sources?.let { addProperty("sources", it) }
     }
 
     companion object {
@@ -65,7 +77,30 @@ data class AgentNoteReply(
             message = json.string("message"),
             listening = AgentNoteListening.fromJson(json.getAsJsonObjectOrNull("listening")),
             coverer = AgentNoteCoverer.fromListening(json.getAsJsonObjectOrNull("listening")),
+            wake = AgentNoteWake.fromListening(json.getAsJsonObjectOrNull("listening")),
+            sources = json.string("sources")?.takeIf(String::isNotBlank),
         )
+    }
+}
+
+/**
+ * What the agent that answers a reply may use to ground its answer (the reply's `sources`, server
+ * `agent_note_reply_sources_v1`): nothing from Thoughts, only the PDF the note is linked to, every
+ * Library document, or every document and the Mental Model. Every reply carries it: a server
+ * without that capability reads only the reply fields it knows and ignores this one.
+ */
+enum class AgentNoteReplySources(val apiValue: String) {
+    NONE("none"),
+    LINKED_PDF("linked_pdf"),
+    LIBRARY("library"),
+    LIBRARY_AND_MENTAL_MODEL("library_and_mental_model");
+
+    companion object {
+        /** What agents use when the user has not chosen, as they did before the choice. */
+        val DEFAULT = LIBRARY_AND_MENTAL_MODEL
+
+        /** The choice with that API value; null for none or one this phone does not know. */
+        fun fromApi(value: String?): AgentNoteReplySources? = entries.firstOrNull { it.apiValue == value }
     }
 }
 
@@ -177,16 +212,75 @@ data class AgentNoteAgent(
 }
 
 /**
+ * The session a reply waker would wake for a reply arriving now (protocol/agent-notes.md "Wakers",
+ * `wake` in every listening answer, server `agent_note_wakers_v1`): the note's own session
+ * ([AgentNoteCoverer.SENDER]), a topic owner's ([AgentNoteCoverer.OWNER]) or the fallback session
+ * that answers what has no other home ([AgentNoteCoverer.RESPONDER], the study session). [machine] is the
+ * waker's machine; [sessionState] idle, busy or closed; while that machine is offline
+ * ([WAKER_OFFLINE]) the fallback answers at [fallbackAt] instead.
+ */
+data class AgentNoteWake(
+    val state: String,
+    val role: String,
+    val machine: String,
+    val title: String? = null,
+    val sessionState: String? = null,
+    val label: String? = null,
+    val fallbackAt: String? = null,
+) {
+    val willBeWoken: Boolean get() = state == WILL_BE_WOKEN
+
+    /** The session is running a task now: it answers when that is done. */
+    val busy: Boolean get() = sessionState == BUSY
+
+    /** [fallbackAt] in milliseconds since the epoch; null when the server gave none or it cannot be read. */
+    val fallbackAtMillis: Long?
+        get() = fallbackAt?.let { runCatching { java.time.Instant.parse(it).toEpochMilli() }.getOrNull() }
+
+    companion object {
+        const val WILL_BE_WOKEN = "will_be_woken"
+        const val WAKER_OFFLINE = "waker_offline"
+        const val BUSY = "busy"
+        /** The machine name of the Mac's waker. */
+        const val MAC = "mac"
+
+        /** `wake` of a listening answer; null when absent (nobody would be woken, or an older server). */
+        fun fromListening(json: JsonObject?): AgentNoteWake? = fromJson(json?.getAsJsonObjectOrNull("wake"))
+
+        /** Null for anything the screen cannot say (an unknown state or role, no machine). */
+        fun fromJson(json: JsonObject?): AgentNoteWake? {
+            val state = json?.string("state")?.takeIf { it == WILL_BE_WOKEN || it == WAKER_OFFLINE } ?: return null
+            val role = json.string("role")
+                ?.takeIf { it in setOf(AgentNoteCoverer.SENDER, AgentNoteCoverer.OWNER, AgentNoteCoverer.RESPONDER) }
+                ?: return null
+            val machine = json.string("machine")?.takeIf(String::isNotBlank) ?: return null
+            fun text(key: String) = json.string(key)?.trim()?.takeIf(String::isNotEmpty)?.take(120)
+            return AgentNoteWake(
+                state = state,
+                role = role,
+                machine = machine,
+                title = text("title"),
+                sessionState = json.string("session_state"),
+                label = text("label"),
+                fallbackAt = json.string("fallback_at"),
+            )
+        }
+    }
+}
+
+/**
  * A note's listening state with who answers it. With `agent_note_answer_by_v1` the server also
  * says which agent the user chose to answer ([answerBy]; null is automatic: the agent that sent
  * the note first, then the Thoughts reply agent) and which agents could answer now
  * ([candidates]); with a choice set, [state] is listening exactly while the chosen agent is live.
+ * With `agent_note_wakers_v1`, [wake] is the session a reply waker would wake for a reply now.
  */
 data class AgentNoteListeningAnswer(
     val state: AgentNoteListening,
     val coverer: AgentNoteCoverer? = null,
     val answerBy: AgentNoteAgent? = null,
     val candidates: List<AgentNoteAgent> = emptyList(),
+    val wake: AgentNoteWake? = null,
 ) {
     companion object {
         val UNKNOWN = AgentNoteListeningAnswer(AgentNoteListening.UNKNOWN)
@@ -198,6 +292,7 @@ data class AgentNoteListeningAnswer(
             candidates = json?.get("candidates")?.takeIf(JsonElement::isJsonArray)?.asJsonArray
                 ?.mapNotNull { AgentNoteAgent.fromJson(it.takeIf(JsonElement::isJsonObject)?.asJsonObject) }
                 .orEmpty(),
+            wake = AgentNoteWake.fromListening(json),
         )
     }
 }

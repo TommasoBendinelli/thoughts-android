@@ -10,6 +10,7 @@ import androidx.appcompat.content.res.AppCompatResources
 import androidx.core.view.doOnPreDraw
 import com.gitlab.mudlej.MjPdfReader.BuildConfig
 import com.gitlab.mudlej.MjPdfReader.R
+import com.gitlab.mudlej.MjPdfReader.data.agentnotes.AgentNotesPush
 import com.gitlab.mudlej.MjPdfReader.data.agentnotes.AgentStudyMode
 import com.gitlab.mudlej.MjPdfReader.ui.reader.MainActivity
 
@@ -206,9 +207,11 @@ class ReaderMenu(
     }
 
     private fun pagesSection(): List<ReaderAction> {
+        // Filled while notes reach the phone at once: by push, or by the Instant notes listener.
+        val instant = AgentNotesPush.isActive(activity) || AgentStudyMode.isOn(activity)
         return readerMenuActionLayout().pages.mapNotNull(::action) + ReaderAction(
-            R.string.agent_notes_study_mode,
-            if (AgentStudyMode.isOn(activity)) R.drawable.ic_agent_note else R.drawable.ic_agent_note_outline,
+            R.string.agent_notes_study_session,
+            if (instant) R.drawable.ic_agent_note else R.drawable.ic_agent_note_outline,
         ) {
             activity.showStudyMode()
         }

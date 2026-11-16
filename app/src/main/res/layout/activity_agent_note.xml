@@ -158,6 +158,44 @@
         android:paddingHorizontal="8dp"
         android:paddingVertical="4dp">
 
+        <!-- What the agent that answers the reply may use: one slim line over the comment. The whole
+             line is the touch target and opens the choice (the chip shows its pressed state), and the
+             last choice holds for every reply. Not for a page from the reader (a new note, not a reply). -->
+        <FrameLayout
+            android:id="@+id/agentNoteSourcesRow"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:clickable="true"
+            android:focusable="true"
+            android:minHeight="36dp"
+            android:paddingStart="4dp"
+            android:paddingEnd="4dp"
+            android:visibility="gone">
+
+            <com.google.android.material.chip.Chip
+                android:id="@+id/agentNoteSources"
+                style="@style/Widget.Material3.Chip.Assist"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_gravity="center_vertical|start"
+                android:clickable="false"
+                android:duplicateParentState="true"
+                android:ellipsize="end"
+                android:focusable="false"
+                android:importantForAccessibility="noHideDescendants"
+                android:maxLines="1"
+                android:textAppearance="?attr/textAppearanceLabelMedium"
+                app:chipIcon="@drawable/ic_library_documents"
+                app:chipIconSize="16dp"
+                app:chipIconTint="?attr/colorOnSurfaceVariant"
+                app:chipMinHeight="28dp"
+                app:closeIcon="@drawable/ic_small_arrow_down"
+                app:closeIconSize="18dp"
+                app:closeIconTint="?attr/colorOnSurfaceVariant"
+                app:closeIconVisible="true"
+                app:ensureMinTouchTargetSize="false" />
+        </FrameLayout>
+
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"

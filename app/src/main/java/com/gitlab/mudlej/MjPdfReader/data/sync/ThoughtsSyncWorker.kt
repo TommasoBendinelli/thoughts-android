@@ -739,7 +739,7 @@ object ThoughtsSyncScheduler {
         val manager = context.getSystemService(NotificationManager::class.java)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             manager.createNotificationChannel(
-                NotificationChannel(CHANNEL_ID, "Updates from the server", NotificationManager.IMPORTANCE_LOW),
+                NotificationChannel(CHANNEL_ID, "Server updates", NotificationManager.IMPORTANCE_LOW),
             )
         }
         val open = PendingIntent.getActivity(
@@ -760,7 +760,7 @@ object ThoughtsSyncScheduler {
         val manager = context.getSystemService(NotificationManager::class.java)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             manager.createNotificationChannel(
-                NotificationChannel(CHANNEL_ID, "Updates from the server", NotificationManager.IMPORTANCE_LOW),
+                NotificationChannel(CHANNEL_ID, "Server updates", NotificationManager.IMPORTANCE_LOW),
             )
         }
         val open = PendingIntent.getActivity(

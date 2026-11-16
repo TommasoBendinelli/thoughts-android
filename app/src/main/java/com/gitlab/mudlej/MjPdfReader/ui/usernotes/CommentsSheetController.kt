@@ -24,7 +24,10 @@ import com.gitlab.mudlej.MjPdfReader.core.io.computeSha256
 import com.gitlab.mudlej.MjPdfReader.data.annotation.CommentCatalogue
 import com.gitlab.mudlej.MjPdfReader.data.annotation.OverviewComment
 import com.gitlab.mudlej.MjPdfReader.data.AppDatabase
+import com.gitlab.mudlej.MjPdfReader.data.sync.AgentProposalDecision
 import com.gitlab.mudlej.MjPdfReader.data.sync.AgentProposalDecisionPhase
+import com.gitlab.mudlej.MjPdfReader.data.sync.ExplicitSyncOrigin
+import com.gitlab.mudlej.MjPdfReader.data.sync.SyncCommandCoordinator
 import com.gitlab.mudlej.MjPdfReader.data.sync.ThoughtsOutboxEntity
 import com.gitlab.mudlej.MjPdfReader.data.sync.activeAgentProposals
 import com.gitlab.mudlej.MjPdfReader.data.sync.agentProposalDecisionStates
@@ -35,7 +38,9 @@ import com.gitlab.mudlej.MjPdfReader.data.source.logicalReadScope
 import com.gitlab.mudlej.MjPdfReader.data.source.withLogicalPayloads
 import com.gitlab.mudlej.MjPdfReader.databinding.ActivityMainBinding
 import com.gitlab.mudlej.MjPdfReader.databinding.PdfCommentsSheetBinding
+import com.gitlab.mudlej.MjPdfReader.core.ui.AppSnackbar
 import com.google.android.material.bottomsheet.BottomSheetBehavior
+import com.google.android.material.snackbar.Snackbar
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -56,7 +61,13 @@ internal class CommentsSheetController(
     private val exportList: () -> Unit,
     private val projectReading: () -> com.gitlab.mudlej.MjPdfReader.data.sync.ProjectReadingContext? = { null },
 ) {
-    private val adapter = DocumentCommentsAdapter(::selectComment)
+    private val adapter = DocumentCommentsAdapter(::rowClicked, ::rowLongClicked)
+    /** Agent edits selected for a bulk Accept or Reject (selection mode while not empty). */
+    private val selection = AgentEditSelection()
+    /** A bulk decision is being checked and queued: the selection's actions wait for it. */
+    private var bulkRunning = false
+    /** The open sheet's comments and proposals are loaded (a restored selection is checked against them). */
+    private var listLoaded = false
     private var comments = emptyList<DocumentCommentItem>()
     private var sourceChecked = false
     private var texAvailable = false
@@ -170,6 +181,13 @@ internal class CommentsSheetController(
                 BottomSheetBehavior.STATE_HALF_EXPANDED else BottomSheetBehavior.STATE_EXPANDED
         }
         content.commentsBack.setOnClickListener { showList() }
+        content.commentsSelectAll.setOnClickListener { selectAllShown() }
+        content.commentsCancelSelection.setOnClickListener { endSelection() }
+        content.commentsAcceptSelected.setOnClickListener { decideSelected("accept") }
+        content.commentsRejectSelected.setOnClickListener { decideSelected("disregard") }
+        content.commentsSelectAll.contentDescription = activity.getString(R.string.agent_edits_select_all_description)
+        androidx.appcompat.widget.TooltipCompat.setTooltipText(content.commentsSelectAll, content.commentsSelectAll.contentDescription)
+        androidx.appcompat.widget.TooltipCompat.setTooltipText(content.commentsCancelSelection, content.commentsCancelSelection.contentDescription)
         content.commentsOptions.setOnClickListener { view ->
             PopupMenu(activity, view).apply {
                 menu.add(0, 1, 0, R.string.sort_by_creation_date).apply { isCheckable = true; isChecked = sortByDate }
@@ -235,6 +253,7 @@ internal class CommentsSheetController(
                 Log.d("CommentsSheet", "Loaded $filename: ${loaded.first.size} comments in ${android.os.SystemClock.elapsedRealtime() - startedAt} ms")
                 comments = loaded.first
                 proposals = loaded.second
+                listLoaded = true
                 content.commentsProgress.visibility = View.GONE
                 content.commentsOptions.isEnabled = true
                 val selected = filterDocumentComments(comments, filter, "").firstOrNull { it.comment.id.removePrefix("agent-remove-") == selectedId?.removePrefix("agent-remove-") }
@@ -307,6 +326,11 @@ internal class CommentsSheetController(
         val content = sheet ?: return
         val displayed = displayedComments()
         adapter.selectedId = selectedId
+        adapter.pendingActions = if (!agentEdits) emptyMap() else agentProposalDecisionStates(decisionRows, proposals.values)
+            .filterValues { it.phase == AgentProposalDecisionPhase.PENDING }
+            .mapValues { it.value.action }
+        // An edit decided elsewhere, or gone from this document, leaves the selection (once the list is loaded).
+        if (selection.active && !bulkRunning && listLoaded) selection.retainExisting(openProposalKeys())
         adapter.submitList(displayed) {
             if (sheet === content) (content.commentsList.layoutManager as LinearLayoutManager)
                 .scrollToPositionWithOffset(scrollPosition, scrollOffset)
@@ -317,6 +341,190 @@ internal class CommentsSheetController(
             else -> R.string.no_comments
         })
         content.commentsMessage.visibility = if (displayed.isEmpty()) View.VISIBLE else View.GONE
+        renderSelection()
+    }
+
+    /** The open agent edits of this document (whatever the search), by proposal ID. */
+    private fun openProposalKeys(): Set<String> {
+        val activeIds = activeAgentProposals(proposals.values, decisionRows).mapTo(hashSetOf()) { it.id }
+        return comments.asSequence().filter { it.isAgentProposal }.map(::proposalKey).filter { it in activeIds }.toSet()
+    }
+
+    /** The agent edits the list shows now (those matching the search), in list order. */
+    private fun shownProposalKeys(): List<String> =
+        displayedComments().filter { it.isAgentProposal }.map(::proposalKey).distinct()
+
+    private fun rowClicked(item: DocumentCommentItem) {
+        if (selection.active && agentEdits && item.isAgentProposal) {
+            if (!bulkRunning) {
+                selection.toggle(proposalKey(item))
+                renderSelection()
+            }
+            return
+        }
+        selectComment(item)
+    }
+
+    /** A long press on an agent edit starts selection mode with it (or adds or removes it). */
+    private fun rowLongClicked(item: DocumentCommentItem): Boolean {
+        if (!agentEdits || !item.isAgentProposal || showingDetail || bulkRunning || sheet == null) return false
+        hideKeyboard()
+        selection.longPress(proposalKey(item))
+        renderSelection()
+        return true
+    }
+
+    private fun selectAllShown() {
+        if (bulkRunning) return
+        selection.selectAll(shownProposalKeys())
+        renderSelection()
+    }
+
+    private fun endSelection() {
+        if (!selection.active) return
+        selection.clear()
+        renderSelection()
+    }
+
+    /** The header in selection mode: "N selected", Select all, Cancel, and Reject and Accept below it. */
+    private fun renderSelection() {
+        val content = sheet ?: return
+        val on = selection.active && agentEdits && !showingDetail
+        adapter.selection = if (on) selection.ids else null
+        val selectionViews = if (on) View.VISIBLE else View.GONE
+        val normalViews = if (on) View.GONE else View.VISIBLE
+        content.commentsSelectAll.visibility = selectionViews
+        content.commentsCancelSelection.visibility = selectionViews
+        content.commentsSelectionActions.visibility = selectionViews
+        content.commentsOptions.visibility = normalViews
+        content.commentsResize.visibility = normalViews
+        content.commentsClose.visibility = normalViews
+        // The count is announced as it changes.
+        content.commentsTitle.accessibilityLiveRegion =
+            if (on) View.ACCESSIBILITY_LIVE_REGION_POLITE else View.ACCESSIBILITY_LIVE_REGION_NONE
+        if (!on) {
+            if (!showingDetail) content.commentsTitle.setText(titleRes)
+            return
+        }
+        val count = selection.count
+        content.commentsTitle.text = activity.getString(R.string.overview_selected_count, count)
+        content.commentsSelectAll.isEnabled = !bulkRunning && !selection.coversAll(shownProposalKeys())
+        content.commentsAcceptSelected.isEnabled = !bulkRunning
+        content.commentsRejectSelected.isEnabled = !bulkRunning
+        content.commentsCancelSelection.isEnabled = !bulkRunning
+        content.commentsAcceptSelected.contentDescription =
+            activity.resources.getQuantityString(R.plurals.agent_edits_accept_selected_description, count, count)
+        content.commentsRejectSelected.contentDescription =
+            activity.resources.getQuantityString(R.plurals.agent_edits_reject_selected_description, count, count)
+    }
+
+    /**
+     * Accept or Reject of every selected edit, each through the single decision's path
+     * ([AgentProposalBulkDecider]), in page order. One Sync sends them all once Undo is over.
+     */
+    private fun decideSelected(action: String) {
+        if (!selection.active || bulkRunning) return
+        val content = sheet ?: return
+        val selected = selection.ids
+        val chosen = comments.asSequence().filter { it.isAgentProposal }.map(::proposalKey).distinct()
+            .filter { it in selected }.mapNotNull { proposals[it] }.toList()
+        if (chosen.isEmpty()) { endSelection(); return }
+        hideKeyboard()
+        bulkRunning = true
+        renderSelection()
+        scope.launch {
+            var failure = ""
+            val outcome = try {
+                withContext(Dispatchers.IO) {
+                    val rows = AppDatabase.getInstance(activity.applicationContext).thoughtsSyncDao().allOutbox()
+                    AgentProposalBulkDecider.decideAll(chosen, action, SheetBulkPorts(rows))
+                }
+            } catch (cancelled: CancellationException) {
+                bulkRunning = false
+                throw cancelled
+            } catch (error: Exception) {
+                Log.w("CommentsSheet", "Could not queue the bulk proposal decision", error)
+                failure = error.message.orEmpty().ifBlank { error.javaClass.simpleName }
+                null
+            }
+            decisionRows = runCatching {
+                withContext(Dispatchers.IO) { AppDatabase.getInstance(activity.applicationContext).thoughtsSyncDao().allOutbox() }
+            }.getOrDefault(decisionRows)
+            bulkRunning = false
+            selection.clear()
+            if (sheet === content) refreshList()
+            if (outcome == null) {
+                AppSnackbar.make(binding.root, activity.getString(R.string.agent_edits_bulk_failed, failure), Snackbar.LENGTH_LONG).show()
+            } else showBulkOutcome(outcome)
+        }
+    }
+
+    /** The summary, with Undo for [BULK_UNDO_MS] like the ✓ on the page; the Sync starts when Undo is over. */
+    private fun showBulkOutcome(outcome: AgentProposalBulkDecider.Outcome) {
+        Log.i("CommentsSheet", "Bulk ${outcome.action}: ${outcome.decidedCount} decided in ${outcome.decided.size} operation(s), " +
+            "${outcome.skipped.size} left undecided ${outcome.skippedByReason}")
+        val snackbar = AppSnackbar.make(binding.root, bulkDecisionSummary(outcome, AgentEditsBulkWords(activity)), Snackbar.LENGTH_LONG)
+        snackbar.view.findViewById<android.widget.TextView>(com.google.android.material.R.id.snackbar_text)?.maxLines = 4
+        if (outcome.decided.isEmpty()) {
+            snackbar.show()
+            return
+        }
+        snackbar.setDuration(BULK_UNDO_MS)
+            .setAction(R.string.overview_undo) { undoBulk(outcome) }
+            .addCallback(object : Snackbar.Callback() {
+                override fun onDismissed(transientBottomBar: Snackbar?, event: Int) {
+                    if (event != DISMISS_EVENT_ACTION) startSyncForDecisions()
+                }
+            })
+        snackbar.show()
+    }
+
+    /** Undo of a bulk decision: every one of its decisions, through the existing undo, newest first. */
+    private fun undoBulk(outcome: AgentProposalBulkDecider.Outcome) {
+        scope.launch {
+            val undone = try {
+                withContext(Dispatchers.IO) { AgentProposalBulkDecider.undoAll(outcome, SheetBulkPorts(emptyList())) }
+            } catch (cancelled: CancellationException) { throw cancelled }
+            catch (error: Exception) {
+                AgentProposalBulkDecider.UndoOutcome(outcome.action, 0, error.message.orEmpty())
+            }
+            if (undone.restoredCount > 0) startSyncForDecisions()
+            val message = when {
+                undone.failure != null -> activity.getString(R.string.agent_edits_bulk_undo_failed, undone.failure)
+                outcome.action == "accept" -> activity.resources.getQuantityString(
+                    R.plurals.agent_edits_bulk_accept_undone, undone.restoredCount, undone.restoredCount)
+                else -> activity.resources.getQuantityString(
+                    R.plurals.agent_edits_bulk_reject_undone, undone.restoredCount, undone.restoredCount)
+            }
+            AppSnackbar.make(binding.root, message, Snackbar.LENGTH_LONG).show()
+        }
+    }
+
+    /** One Sync for the whole bulk decision (or its undo); a Sync already running or queued carries it. */
+    private fun startSyncForDecisions() {
+        val context = activity.applicationContext
+        scope.launch(Dispatchers.IO) {
+            val result = runCatching {
+                SyncCommandCoordinator(context).start(target = null, origin = ExplicitSyncOrigin.BACKGROUND_COMMAND)
+            }
+            result.onSuccess { Log.i("CommentsSheet", "Sync after the bulk decision: accepted=${it.accepted} reused=${it.reused} ${it.errorCode.orEmpty()}") }
+                .onFailure { Log.w("CommentsSheet", "Sync after the bulk decision was not started; the next Sync sends it", it) }
+        }
+    }
+
+    private inner class SheetBulkPorts(private val rows: List<ThoughtsOutboxEntity>) : AgentProposalBulkDecider.Ports {
+        private val states = hashMapOf<String, Map<String, AgentProposalDecision>>()
+
+        override fun decision(proposal: OfflineAgentProposal): AgentProposalDecision? =
+            states.getOrPut(proposal.bundleId) { agentProposalDecisionStates(rows, proposal.bundleId) }[proposal.id]
+
+        override fun checkSource(proposal: OfflineAgentProposal): AgentProposalDecider.SourceCheck? =
+            AgentProposalDecider.checkSource(activity, proposal)
+
+        override suspend fun decide(proposal: OfflineAgentProposal, action: String): String =
+            AgentProposalDecider.decide(activity, proposal, action)
+
+        override suspend fun undo(operationId: String): String = AgentProposalDecider.undo(activity, operationId)
     }
 
     private fun snapshotScroll() {
@@ -331,6 +539,7 @@ internal class CommentsSheetController(
     }
 
     private fun selectComment(item: DocumentCommentItem) {
+        selection.clear()
         snapshotScroll()
         selectedId = item.comment.id
         reasonExpanded = false
@@ -588,6 +797,7 @@ internal class CommentsSheetController(
             hideKeyboard()
             return true
         }
+        if (selection.active && !showingDetail) { endSelection(); return true }
         if (showingDetail) { showList(); return true }
         return dismiss()
     }
@@ -600,6 +810,9 @@ internal class CommentsSheetController(
     fun dismiss(): Boolean {
         val frame = container ?: return false
         snapshotScroll()
+        selection.clear()
+        adapter.selection = null
+        listLoaded = false
         generation++
         loadJob?.cancel()
         loadJob = null
@@ -622,6 +835,7 @@ internal class CommentsSheetController(
 
     fun reset() {
         dismiss()
+        selection.clear()
         comments = emptyList()
         proposals = emptyMap()
         query = ""
@@ -647,6 +861,7 @@ internal class CommentsSheetController(
         bundle.putBoolean("comments_sheet_detail", showingDetail)
         bundle.putInt("comments_sheet_scroll", scrollPosition)
         bundle.putInt("comments_sheet_offset", scrollOffset)
+        bundle.putStringArrayList("comments_sheet_selection", ArrayList(selection.ids))
     }
 
     fun restoreState(bundle: Bundle) {
@@ -661,8 +876,50 @@ internal class CommentsSheetController(
         showingDetail = bundle.getBoolean("comments_sheet_detail")
         scrollPosition = bundle.getInt("comments_sheet_scroll").coerceAtLeast(0)
         scrollOffset = bundle.getInt("comments_sheet_offset")
+        selection.restore(bundle.getStringArrayList("comments_sheet_selection").orEmpty())
     }
 
     fun onDocumentLoaded() { if (reopenAfterLoad) show() }
     private fun dp(value: Int): Int = (value * activity.resources.displayMetrics.density).toInt()
+}
+
+/** Undo stays offered as long as after the ✓ on the page (MainActivity's MARKER_ACCEPT_UNDO_MS). */
+private const val BULK_UNDO_MS = 8_000
+
+/**
+ * The summary words of a bulk decision, from the app's resources ([string] and [plural] look an
+ * ID up as Context.getString and Resources.getQuantityString do).
+ */
+internal class AgentEditsBulkWords(
+    private val string: (id: Int, args: Array<out Any>) -> String,
+    private val plural: (id: Int, count: Int, args: Array<out Any>) -> String,
+) : BulkDecisionWords {
+    constructor(context: android.content.Context) : this(
+        { id, args -> context.getString(id, *args) },
+        { id, count, args -> context.resources.getQuantityString(id, count, *args) },
+    )
+
+    override fun decided(action: String, count: Int): String = when {
+        count == 0 -> string(if (action == "accept") R.string.agent_edits_bulk_none_accepted else R.string.agent_edits_bulk_none_rejected, emptyArray())
+        else -> plural(if (action == "accept") R.plurals.agent_edits_bulk_accepted else R.plurals.agent_edits_bulk_rejected, count, arrayOf<Any>(count))
+    }
+
+    override fun allDecided(action: String, count: Int): String = plural(
+        if (action == "accept") R.plurals.agent_edits_bulk_all_accepted else R.plurals.agent_edits_bulk_all_rejected, count, arrayOf<Any>(count))
+
+    override fun undecided(count: Int, reasons: String): String =
+        plural(R.plurals.agent_edits_bulk_undecided, count, arrayOf<Any>(count, reasons))
+
+    override fun reason(reason: AgentProposalBulkDecider.Skip, detail: String): String = when (reason) {
+        AgentProposalBulkDecider.Skip.ALREADY_DECIDED -> string(R.string.agent_edits_skip_already_decided, emptyArray())
+        AgentProposalBulkDecider.Skip.UNKNOWN_OBJECT -> string(R.string.agent_edits_skip_unknown_object, emptyArray())
+        AgentProposalBulkDecider.Skip.SOURCE_MISSING -> string(R.string.agent_edits_skip_source_missing, emptyArray())
+        AgentProposalBulkDecider.Skip.SOURCE_CHANGED -> string(R.string.agent_edits_skip_source_changed, emptyArray())
+        AgentProposalBulkDecider.Skip.NOT_SAVED -> string(R.string.agent_edits_skip_not_saved, arrayOf<Any>(detail))
+    }
+
+    override fun reasonWithCount(reason: String, count: Int): String =
+        string(R.string.agent_edits_bulk_reason_count, arrayOf<Any>(reason, count))
+
+    override val separator: String get() = string(R.string.agent_edits_bulk_separator, emptyArray())
 }

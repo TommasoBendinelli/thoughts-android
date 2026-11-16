@@ -28,8 +28,17 @@ data class LocalAgentNoteReply(
     /** "Send with picture": the glasses photo's media type and capture; the bytes are its photo file. */
     val photoMediaType: String? = null,
     val photoCapture: String? = null,
+    /**
+     * What the answering agent may use, as chosen when the reply was written (an
+     * [AgentNoteReplySources] API value), sent with it however late; null for replies queued
+     * before the choice, which go without it.
+     */
+    val sources: String? = null,
 ) {
     val pending: Boolean get() = !sent && !rejected
+
+    /** [sources] as a choice this phone knows, else the server's record of it; null when neither says. */
+    val sourcesChoice: AgentNoteReplySources? get() = AgentNoteReplySources.fromApi(sources) ?: server?.sourcesChoice
 
     fun toJson(): JsonObject = JsonObject().apply {
         addProperty("reply_id", replyId)
@@ -47,6 +56,7 @@ data class LocalAgentNoteReply(
         server?.let { add("server", it.toJson()) }
         photoMediaType?.let { addProperty("photo_media_type", it) }
         photoCapture?.let { addProperty("photo_capture", it) }
+        sources?.let { addProperty("sources", it) }
     }
 
     companion object {
@@ -66,6 +76,7 @@ data class LocalAgentNoteReply(
             server = json.getAsJsonObjectOrNull("server")?.let { runCatching { AgentNoteReply.fromJson(it) }.getOrNull() },
             photoMediaType = json.string("photo_media_type"),
             photoCapture = json.string("photo_capture"),
+            sources = json.string("sources"),
         )
     }
 }
@@ -223,6 +234,7 @@ class AgentNoteStore(val root: File) {
             val local = LocalAgentNoteReply(
                 reply.replyId, reply.noteId, System.currentTimeMillis(), reply.mediaType,
                 reply.imageWidth, reply.imageHeight, reply.strokeCount, reply.message, sent = true, server = reply,
+                sources = reply.sources,
             )
             writeAtomically(replyMetaFile(reply.replyId), local.toJson().toString().toByteArray())
         }

@@ -37,6 +37,21 @@ internal class SettingsEntryProvider(private val preferences: Preferences) {
             },
             SettingEntry(
                 page = SettingsPage.AGENT_PROMPTS,
+                titleRes = R.string.agent_notes_push_title,
+                keywords = listOf("push", "notification", "instant", "firebase", "fcm", "agent", "notes", "study"),
+            ) { breadcrumb ->
+                pushStatusPreference(breadcrumb)
+            },
+            SettingEntry(
+                page = SettingsPage.AGENT_PROMPTS,
+                titleRes = R.string.agent_notes_push_test,
+                summaryRes = R.string.agent_notes_push_test_summary,
+                keywords = listOf("push", "test", "notification", "firebase", "fcm"),
+            ) { breadcrumb ->
+                pushTestPreference(breadcrumb)
+            },
+            SettingEntry(
+                page = SettingsPage.AGENT_PROMPTS,
                 titleRes = R.string.copy_document_for_agent,
                 keywords = keywords,
             ) { breadcrumb ->
@@ -45,7 +60,7 @@ internal class SettingsEntryProvider(private val preferences: Preferences) {
             SettingEntry(
                 page = SettingsPage.AGENT_PROMPTS,
                 titleRes = R.string.agent_prompt_study_mode,
-                keywords = keywords + listOf("study", "mode", "physical", "paper", "mentra", "glasses", "photo"),
+                keywords = keywords + listOf("study", "session", "mode", "physical", "paper", "mentra", "glasses", "photo"),
             ) { breadcrumb ->
                 agentPromptTemplatePreference(AgentPromptTemplates.Kind.STUDY_MODE, breadcrumb)
             },

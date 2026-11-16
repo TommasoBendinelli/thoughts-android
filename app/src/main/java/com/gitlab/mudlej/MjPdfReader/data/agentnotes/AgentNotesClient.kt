@@ -49,6 +49,21 @@ interface AgentNotesApi {
     ): AgentNoteReply =
         if (photo == null) postReply(noteId, replyId, imageBytes, mediaType, strokesJson, message)
         else throw UnsupportedOperationException("photo")
+    /**
+     * A reply with what the answering agent may use ([sources], an [AgentNoteReplySources] API
+     * value; null leaves the field out, as replies queued before the choice). An API that does not
+     * send it posts the reply without.
+     */
+    fun postReply(
+        noteId: String,
+        replyId: String,
+        imageBytes: ByteArray,
+        mediaType: String,
+        strokesJson: String?,
+        message: String?,
+        photo: AgentNoteReplyPhotoUpload?,
+        sources: String?,
+    ): AgentNoteReply = postReply(noteId, replyId, imageBytes, mediaType, strokesJson, message, photo)
     fun delete(noteId: String)
     /** Whether an agent listens for replies to [noteId] right now; UNKNOWN on a server that cannot tell. */
     fun listening(noteId: String): AgentNoteListening = listeningAnswer(noteId).state
@@ -94,7 +109,7 @@ class AgentNotesClient(
     private val readTimeoutMillis: Int = 30_000,
     private val log: (String) -> Unit = {},
     private val maxImageBytes: Long = MAX_IMAGE_BYTES,
-) : AgentNotesApi {
+) : AgentNotesApi, ThoughtsPushApi {
     private val inFlight = Collections.synchronizedSet(mutableSetOf<HttpURLConnection>())
 
     override fun inbox(after: Long?, wait: Int, reviewCardId: String?, documentId: String?): AgentNoteInboxPage {
@@ -171,11 +186,24 @@ class AgentNotesClient(
         strokesJson: String?,
         message: String?,
         photo: AgentNoteReplyPhotoUpload?,
+    ): AgentNoteReply = postReply(noteId, replyId, imageBytes, mediaType, strokesJson, message, photo, null)
+
+    override fun postReply(
+        noteId: String,
+        replyId: String,
+        imageBytes: ByteArray,
+        mediaType: String,
+        strokesJson: String?,
+        message: String?,
+        photo: AgentNoteReplyPhotoUpload?,
+        sources: String?,
     ): AgentNoteReply {
         // Streamed: the base64 of a large PNG (and of the photo) is written straight into the request.
         val prefix = buildString {
             append("{\"reply_id\":").append(JsonPrimitive(replyId))
             message?.takeIf(String::isNotBlank)?.let { append(",\"message\":").append(JsonPrimitive(it)) }
+            // Sent to every server: one before agent_note_reply_sources_v1 reads only the fields it knows.
+            sources?.let { append(",\"sources\":").append(JsonPrimitive(it)) }
             strokesJson?.let { append(",\"strokes\":").append(JsonParser.parseString(it).toString()) }
             append(",\"image\":{\"media_type\":").append(JsonPrimitive(mediaType)).append(",\"data_base64\":\"")
         }.toByteArray(StandardCharsets.UTF_8)
@@ -237,6 +265,35 @@ class AgentNotesClient(
             ?.takeIf(JsonElement::isJsonArray)?.asJsonArray
             ?.mapNotNullTo(linkedSetOf()) { it.takeIf(JsonElement::isJsonPrimitive)?.asString }
             .orEmpty()
+
+    override fun registerPush(token: String, app: String): Boolean {
+        val body = JsonObject().apply {
+            addProperty("provider", PUSH_PROVIDER)
+            addProperty("token", token)
+            addProperty("app", app)
+        }.toString().toByteArray(StandardCharsets.UTF_8)
+        val json = requestJson("PUT", PUSH_REGISTRATION_PATH, body = body, label = "push-register")
+        return json.get("registered")?.takeIf { it.isJsonPrimitive }?.asBoolean == true
+    }
+
+    override fun unregisterPush(token: String?): Int {
+        val body = token?.let {
+            JsonObject().apply {
+                addProperty("provider", PUSH_PROVIDER)
+                addProperty("token", it)
+            }.toString().toByteArray(StandardCharsets.UTF_8)
+        }
+        val json = requestJson("DELETE", PUSH_REGISTRATION_PATH, body = body, label = "push-unregister")
+        return json.get("removed")?.takeIf { it.isJsonPrimitive }?.asInt ?: 0
+    }
+
+    override fun sendTestPush(): PushTestResult {
+        val json = requestJson("POST", "/v1/push/test", body = "{}".toByteArray(StandardCharsets.UTF_8), label = "push-test")
+        val sent = json.get("sent")?.takeIf { it.isJsonPrimitive }?.asInt ?: 0
+        val results = json.get("results")?.takeIf(JsonElement::isJsonArray)?.asJsonArray
+            ?.map { if (it.isJsonPrimitive) it.asString else it.toString() }.orEmpty()
+        return PushTestResult(sent, results)
+    }
 
     override fun createNote(note: AgentNote, imageBytes: ByteArray, strokeCount: Int): AgentNote {
         // Streamed like a reply: the base64 of the page is written straight into the request.
@@ -385,6 +442,8 @@ class AgentNotesClient(
 
     companion object {
         const val BASE_PATH = "/v1/agent-notes"
+        const val PUSH_REGISTRATION_PATH = "/v1/push/registration"
+        const val PUSH_PROVIDER = "fcm"
         const val MAX_IMAGE_BYTES = 20L * 1024 * 1024
         private const val MAX_JSON_BYTES = 8L * 1024 * 1024
 

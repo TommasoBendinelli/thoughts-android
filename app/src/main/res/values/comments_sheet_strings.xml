@@ -24,4 +24,63 @@
     <string name="agent_edits_load_failed">Could not load agent edits. Close this panel and try again.</string>
     <string name="agent_edits_no_matches">No agent edits match this search</string>
     <string name="no_agent_edits">No agent edits</string>
+    <!-- Selection mode of Agent edits: a long press selects; Accept or Reject decides every selected edit. -->
+    <string name="agent_edits_select_all">Select all</string>
+    <string name="agent_edits_select_all_description">Select all agent edits shown</string>
+    <string name="agent_edits_cancel_selection">Cancel selection</string>
+    <string name="agent_edits_reject">Reject</string>
+    <plurals name="agent_edits_accept_selected_description">
+        <item quantity="one">Accept the selected proposal</item>
+        <item quantity="other">Accept %d proposals</item>
+    </plurals>
+    <plurals name="agent_edits_reject_selected_description">
+        <item quantity="one">Reject the selected proposal</item>
+        <item quantity="other">Reject %d proposals</item>
+    </plurals>
+    <string name="agent_edits_row_selected">Selected</string>
+    <string name="agent_edits_row_not_selected">Not selected</string>
+    <string name="agent_edits_row_select">Select</string>
+    <string name="agent_edits_row_deselect">Deselect</string>
+    <string name="agent_edits_row_accept_pending">Accept pending</string>
+    <string name="agent_edits_row_reject_pending">Reject pending</string>
+    <!-- Outcome of a bulk decision, as on the Mac's Annotations overview. -->
+    <plurals name="agent_edits_bulk_accepted">
+        <item quantity="one">%d proposal accepted</item>
+        <item quantity="other">%d proposals accepted</item>
+    </plurals>
+    <plurals name="agent_edits_bulk_rejected">
+        <item quantity="one">%d proposal rejected</item>
+        <item quantity="other">%d proposals rejected</item>
+    </plurals>
+    <string name="agent_edits_bulk_none_accepted">None accepted</string>
+    <string name="agent_edits_bulk_none_rejected">None rejected</string>
+    <plurals name="agent_edits_bulk_all_accepted">
+        <item quantity="one">Proposal accepted — sent with the next Sync.</item>
+        <item quantity="other">%d proposals accepted — sent with the next Sync.</item>
+    </plurals>
+    <plurals name="agent_edits_bulk_all_rejected">
+        <item quantity="one">Proposal rejected — sent with the next Sync.</item>
+        <item quantity="other">%d proposals rejected — sent with the next Sync.</item>
+    </plurals>
+    <plurals name="agent_edits_bulk_undecided">
+        <item quantity="one">%1$d left undecided: %2$s</item>
+        <item quantity="other">%1$d left undecided: %2$s</item>
+    </plurals>
+    <string name="agent_edits_bulk_separator">" · "</string>
+    <string name="agent_edits_bulk_reason_count">%1$s (%2$d)</string>
+    <string name="agent_edits_skip_already_decided">already decided</string>
+    <string name="agent_edits_skip_unknown_object">not known to this phone yet</string>
+    <string name="agent_edits_skip_source_missing">source not on this phone</string>
+    <string name="agent_edits_skip_source_changed">source changed on this phone</string>
+    <string name="agent_edits_skip_not_saved">could not be saved: %1$s</string>
+    <string name="agent_edits_bulk_failed">Could not save the decisions: %1$s</string>
+    <plurals name="agent_edits_bulk_accept_undone">
+        <item quantity="one">Acceptance undone — proposal restored.</item>
+        <item quantity="other">Acceptance undone — %d proposals restored.</item>
+    </plurals>
+    <plurals name="agent_edits_bulk_reject_undone">
+        <item quantity="one">Rejection undone — proposal restored.</item>
+        <item quantity="other">Rejection undone — %d proposals restored.</item>
+    </plurals>
+    <string name="agent_edits_bulk_undo_failed">Could not undo the decisions: %1$s</string>
 </resources>

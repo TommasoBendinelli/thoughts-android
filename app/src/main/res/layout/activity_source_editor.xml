@@ -193,7 +193,7 @@
                         android:textColor="?attr/colorOnErrorContainer"
                         android:visibility="gone" />
 
-                    <!-- Fedora's side. -->
+                    <!-- The server's side. -->
                     <com.google.android.material.card.MaterialCardView
                         android:id="@+id/sourceConflictFedoraPanel"
                         style="@style/Widget.Material3.CardView.Outlined"

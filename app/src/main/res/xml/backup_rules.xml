@@ -6,4 +6,6 @@
     <exclude domain="sharedpref" path="read_aloud_voice.xml" />
     <!-- "Receive agent notes on this phone" belongs to this phone. -->
     <exclude domain="sharedpref" path="agent_notes_device.xml" />
+    <!-- Push registration (its token belongs to this installation). -->
+    <exclude domain="sharedpref" path="agent_notes_push.xml" />
 </full-backup-content>

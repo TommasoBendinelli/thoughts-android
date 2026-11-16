@@ -59,6 +59,18 @@ class AgentNoteSyncTest {
             return postReply(noteId, replyId, imageBytes, mediaType, strokesJson, message)
         }
 
+        /** What each posted reply said the answering agent may use (null: the field left out). */
+        val sources = mutableMapOf<String, String?>()
+
+        override fun postReply(
+            noteId: String, replyId: String, imageBytes: ByteArray, mediaType: String, strokesJson: String?, message: String?,
+            photo: AgentNoteReplyPhotoUpload?, sources: String?,
+        ): AgentNoteReply {
+            postFailure?.invoke(replyId)?.let { throw it }
+            this.sources[replyId] = sources
+            return postReply(noteId, replyId, imageBytes, mediaType, strokesJson, message, photo).copy(sources = sources)
+        }
+
         override fun delete(noteId: String) = Unit
     }
 
@@ -241,6 +253,33 @@ class AgentNoteSyncTest {
         assertEquals(0, sync.flushOutbox())
         assertTrue(store.reply("r2")!!.rejected)
         assertEquals(listOf("r1"), api.posted)
+    }
+
+    @Test fun aQueuedReplyIsSentWithTheSourcesItWasWrittenWith() {
+        // Written offline with "Linked PDF only"; the user has chosen otherwise since, which is not this reply's choice.
+        val written = LocalAgentNoteReply(
+            replyId = "r1", noteId = "a", createdAtMillis = 1, mediaType = "image/png", imageWidth = 1, imageHeight = 1,
+            strokeCount = 0, message = "Only from the paper", sent = false, sources = AgentNoteReplySources.LINKED_PDF.apiValue,
+        )
+        store.queueReply(written, byteArrayOf(1), null)
+        api.postFailure = { IOException("offline") }
+        assertEquals(0, sync.flushOutbox())
+        // After a restart the outbox still has it.
+        assertEquals("linked_pdf", AgentNoteStore.under(folder.root).reply("r1")?.sources)
+
+        api.postFailure = null
+        assertEquals(1, AgentNoteSync(api, AgentNoteStore.under(folder.root)).flushOutbox())
+        assertEquals(mapOf("r1" to "linked_pdf"), api.sources.toMap())
+        // The server's record is kept with it.
+        assertEquals(AgentNoteReplySources.LINKED_PDF, store.reply("r1")?.server?.sourcesChoice)
+        assertEquals(AgentNoteReplySources.LINKED_PDF, store.reply("r1")?.sourcesChoice)
+
+        // A reply queued before the choice existed goes without the field, as it always did.
+        queue("r2", 2)
+        assertEquals(1, sync.flushOutbox())
+        assertTrue(api.sources.containsKey("r2"))
+        assertNull(api.sources["r2"])
+        assertNull(store.reply("r2")?.sourcesChoice)
     }
 
     @Test fun aPhotoNeedsItsMediaType() {

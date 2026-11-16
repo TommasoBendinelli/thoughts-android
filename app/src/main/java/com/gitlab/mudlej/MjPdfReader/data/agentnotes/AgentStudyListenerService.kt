@@ -27,7 +27,8 @@ import com.gitlab.mudlej.MjPdfReader.ui.agentnotes.AgentNotesListActivity
 /**
  * Keeps the agent-notes long-poll running while Thoughts is in the background (the user is
  * reading the agent's answer on the Mac). Started only by user actions in the foreground (Copy for
- * agent, opening a note, sending a reply), never while [AgentNotesReceiving] is off; stops itself [LISTEN_MILLIS] after the last of them, or
+ * agent, opening a note, sending a reply), never while [AgentNotesReceiving] is off or push
+ * ([AgentNotesPush]) delivers the notes; stops itself [LISTEN_MILLIS] after the last of them, or
  * from its notification's Stop action. In [AgentStudyMode] it goes on for [STUDY_MODE_IDLE_MILLIS]
  * after Study mode was last used (those actions, a note from the agent, the screen coming on),
  * stops then with Study mode still on, and starts again when Thoughts is opened or a capture is taken.
@@ -48,8 +49,9 @@ class AgentStudyListenerService : Service() {
             )
         }.onFailure { Log.w(AgentNotes.TAG, "study listener refused: ${it.javaClass.simpleName}") }.isSuccess
         if (intent?.action == ACTION_STOP) AgentStudyMode.clear(this)
-        // A start already queued when the user turned "Receive agent notes on this phone" off.
-        if (intent?.action == ACTION_STOP || !foreground || !AgentNotesReceiving.isOn(this)) {
+        // A start already queued when the user turned "Receive agent notes on this phone" off, or
+        // when push began to deliver the notes (a restart by Android included).
+        if (intent?.action == ACTION_STOP || !foreground || !AgentNotesReceiving.isOn(this) || AgentNotesPush.isActive(this)) {
             listenUntilElapsed = 0L
             stop()
             return START_NOT_STICKY
@@ -198,8 +200,13 @@ class AgentStudyListenerService : Service() {
          * in the foreground; Android refuses a background start, and then only the foreground loop runs.
          */
         fun start(context: Context) {
-            if (!AgentNotesReceiving.isOn(context)) {
-                Log.i(AgentNotes.TAG, "study listener not started: this phone does not receive agent notes")
+            val receiving = AgentNotesReceiving.isOn(context)
+            if (!agentNotesListenerShouldStart(receiving, pushActive = receiving && AgentNotesPush.isActive(context))) {
+                Log.i(
+                    AgentNotes.TAG,
+                    if (receiving) "study listener not started: push delivers agent notes"
+                    else "study listener not started: this phone does not receive agent notes",
+                )
                 return
             }
             if (AgentStudyMode.isOn(context)) {

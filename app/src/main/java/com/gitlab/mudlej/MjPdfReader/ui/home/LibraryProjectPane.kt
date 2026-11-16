@@ -613,19 +613,33 @@ class LibraryProjectPane(
         else Toast.makeText(context, "Tap Sync to download this PDF", Toast.LENGTH_SHORT).show()
     }
 
-    private fun itemForFile(file: File): HomeItem? = items.firstOrNull { it.fileName == file.name }
+    /** The Library's item for [file], as its document rows open it; the Home search opens the same. */
+    internal fun itemForFile(file: File): HomeItem? = items.firstOrNull { it.fileName == file.name }
         ?: if (file.isFile) HomeItem.fromScan(ScannedPdfEntry(file.absolutePath, file.length(), file.lastModified(), null)) else null
 
-    private fun open(doc: JsonObject) {
-        if ((doc.get("start_page")?.asInt ?: 1) <= 0) {
-            Toast.makeText(context, "Tap Sync to build this document", Toast.LENGTH_SHORT).show(); return
-        }
-        val file = doc.text("local_path").takeIf { it.isNotEmpty() }?.let(::File) ?: File(PhoneRenderQueue.defaultCanonicalPdfDirectory(), doc.text("filename"))
-        val item = itemForFile(file)
-        if (item != null) functions.onProjectDocumentClicked(item, ((doc.get("start_page")?.asInt ?: 1) - 1).coerceAtLeast(0),
-            documentId = doc.text("document_id"), displayTitle = doc.text("name"))
-        else Toast.makeText(context, "Tap Sync to download this PDF", Toast.LENGTH_SHORT).show()
+    private fun open(doc: JsonObject) = openLibraryProjectDocument(context, doc, ::itemForFile) { item, pageIndex ->
+        functions.onProjectDocumentClicked(item, pageIndex, documentId = doc.text("document_id"), displayTitle = doc.text("name"))
     }
+}
+
+/**
+ * Opens a Project's document as its Library row does: its PDF at its first page (or at
+ * [pageIndex]), or a word on why it cannot open yet (not built, not downloaded: Sync brings it).
+ */
+internal fun openLibraryProjectDocument(
+    context: Context,
+    doc: JsonObject,
+    itemForFile: (File) -> HomeItem?,
+    pageIndex: Int? = null,
+    open: (item: HomeItem, pageIndex: Int) -> Unit,
+) {
+    val startPage = libraryProjectDocumentStartPage(doc)
+    if (startPage <= 0) {
+        Toast.makeText(context, "Tap Sync to build this document", Toast.LENGTH_SHORT).show(); return
+    }
+    val item = itemForFile(libraryProjectDocumentFile(doc, PhoneRenderQueue.defaultCanonicalPdfDirectory()))
+    if (item != null) open(item, pageIndex ?: (startPage - 1).coerceAtLeast(0))
+    else Toast.makeText(context, "Tap Sync to download this PDF", Toast.LENGTH_SHORT).show()
 }
 
 /** The server's agent conversations with this phone's pending removals laid over them. */

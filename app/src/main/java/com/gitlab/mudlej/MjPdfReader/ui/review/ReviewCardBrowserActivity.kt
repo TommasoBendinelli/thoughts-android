@@ -84,7 +84,9 @@ class ReviewCardBrowserActivity : AppCompatActivity() {
     private var allCards: List<ReviewBrowserCard> = emptyList()
     private var loaded = false
     private val selectedIds = mutableSetOf<String>()
-    private var shownCards: List<ReviewBrowserCard> = emptyList()
+    /** The list on screen and its count; see [ReviewCardBrowserDisplay]. */
+    private val display by lazy { ReviewCardBrowserDisplay { cards, shown -> adapter.submitList(cards, shown) } }
+    private val shownCards: List<ReviewBrowserCard> get() = display.shownCards
     private var deleting = false
     private var deckScope: String? = null
     private var selectedProjectId: String? = null
@@ -416,36 +418,37 @@ class ReviewCardBrowserActivity : AppCompatActivity() {
         val result = reviewCardBrowserResult(projectCards(), deckScope, query, filter, sort, sortDescending) {
             it.stateLabel(this)
         }
-        shownCards = result.cards
-        updateColumnWidths()
-        selectedIds.retainAll(shownCards.map { it.card.id }.toSet())
-        adapter.submitList(result.cards) {
+        val activeFilter = listOfNotNull(
+            selectedProject()?.let(::projectLabel),
+            filter.takeIf { it != ReviewCardBrowserFilter.ALL }?.let { getString(it.labelRes()) },
+        ).joinToString(" · ")
+        // The count, the empty message, the column widths and the selection change when the list
+        // shows these cards, not when it is handed them: until then the previous cards stay on screen.
+        display.show(result) {
+            updateColumnWidths()
+            selectedIds.retainAll(shownCards.map { it.card.id }.toSet())
             if (firstVisiblePosition != RecyclerView.NO_POSITION && result.cards.isNotEmpty()) {
                 layoutManager.scrollToPositionWithOffset(
                     firstVisiblePosition.coerceAtMost(result.cards.lastIndex),
                     firstVisibleOffset,
                 )
             }
+            updateSelection()
+            // The count sits under the title in the toolbar.
+            supportActionBar?.subtitle = if (activeFilter.isEmpty()) {
+                getString(R.string.review_card_browser_shown, result.cards.size, result.totalInScope)
+            } else {
+                getString(R.string.review_card_browser_shown_filtered, result.cards.size, result.totalInScope, activeFilter)
+            }
+            val message = when {
+                result.cards.isNotEmpty() -> null
+                result.totalInScope == 0 -> getString(R.string.review_card_browser_empty)
+                else -> getString(R.string.review_card_browser_no_matches)
+            }
+            binding.reviewCardBrowserMessagePanel.visibility = if (message == null) View.GONE else View.VISIBLE
+            binding.reviewCardBrowserMessage.text = message
+            binding.reviewCardBrowserRetry.visibility = View.GONE
         }
-        updateSelection()
-        val activeFilter = listOfNotNull(
-            selectedProject()?.let(::projectLabel),
-            filter.takeIf { it != ReviewCardBrowserFilter.ALL }?.let { getString(it.labelRes()) },
-        ).joinToString(" · ")
-        // The count sits under the title in the toolbar.
-        supportActionBar?.subtitle = if (activeFilter.isEmpty()) {
-            getString(R.string.review_card_browser_shown, result.cards.size, result.totalInScope)
-        } else {
-            getString(R.string.review_card_browser_shown_filtered, result.cards.size, result.totalInScope, activeFilter)
-        }
-        val message = when {
-            result.cards.isNotEmpty() -> null
-            result.totalInScope == 0 -> getString(R.string.review_card_browser_empty)
-            else -> getString(R.string.review_card_browser_no_matches)
-        }
-        binding.reviewCardBrowserMessagePanel.visibility = if (message == null) View.GONE else View.VISIBLE
-        binding.reviewCardBrowserMessage.text = message
-        binding.reviewCardBrowserRetry.visibility = View.GONE
     }
 
     private fun updateSelection() {
@@ -549,9 +552,8 @@ class ReviewCardBrowserActivity : AppCompatActivity() {
 
     private fun showLoadFailure(error: Throwable) {
         loaded = false
-        shownCards = emptyList()
+        display.clear()
         selectedIds.clear()
-        adapter.submitList(emptyList())
         updateSelection()
         supportActionBar?.subtitle = null
         binding.reviewCardBrowserMessagePanel.visibility = View.VISIBLE

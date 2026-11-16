@@ -2,6 +2,7 @@
 
 package com.gitlab.mudlej.MjPdfReader.data
 
+import com.gitlab.mudlej.MjPdfReader.data.agentnotes.AgentNoteReplySources
 import com.gitlab.mudlej.MjPdfReader.ui.reader.AgentPromptTemplates
 import android.content.SharedPreferences
 import com.gitlab.mudlej.MjPdfReader.ui.home.HomeTab
@@ -262,6 +263,24 @@ class PreferencesTest {
         assertEquals(previous + "Also speak French.\n", Preferences(shared).getAgentPromptTemplate(study))
         preferences.setAgentPromptTemplate(study, previous)
         assertFalse(shared.contains(Preferences.studyModePromptTemplateKey))
+    }
+
+    @Test
+    fun replySourcesStartWithEverythingAndKeepTheLastChoice() {
+        val shared = InMemorySharedPreferences(emptyMap())
+        // Until the user chooses, agents may use what they use today.
+        assertEquals(AgentNoteReplySources.LIBRARY_AND_MENTAL_MODEL, Preferences(shared).getAgentNoteReplySources())
+
+        Preferences(shared).setAgentNoteReplySources(AgentNoteReplySources.LINKED_PDF)
+        // The next note, and the app after a restart (a new Preferences over the same store), keep it.
+        assertEquals(AgentNoteReplySources.LINKED_PDF, Preferences(shared).getAgentNoteReplySources())
+        assertEquals("linked_pdf", shared.getString(Preferences.agentNoteReplySourcesKey, null))
+        Preferences(shared).setAgentNoteReplySources(AgentNoteReplySources.NONE)
+        assertEquals(AgentNoteReplySources.NONE, Preferences(shared).getAgentNoteReplySources())
+
+        // A value this build does not know (a later build's, say) reads as the default.
+        val unknown = InMemorySharedPreferences(mapOf(Preferences.agentNoteReplySourcesKey to "something_new"))
+        assertEquals(AgentNoteReplySources.DEFAULT, Preferences(unknown).getAgentNoteReplySources())
     }
 
     @Test

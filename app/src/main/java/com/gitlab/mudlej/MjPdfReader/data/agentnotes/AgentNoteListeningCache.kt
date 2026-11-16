@@ -37,7 +37,8 @@ class AgentNoteListeningCache(
     /** Keeps what the server said about [noteId] (a `/listening` answer, or the answer to a choice). */
     @Synchronized
     fun keep(noteId: String, answer: AgentNoteListeningAnswer) {
-        if (answer.state == AgentNoteListening.UNKNOWN) return
+        // An answer that names a session a waker wakes says something, whatever the listeners say.
+        if (answer.state == AgentNoteListening.UNKNOWN && answer.wake == null) return
         kept[noteId] = Kept(answer, nowMillis())
     }
 
@@ -51,13 +52,18 @@ class AgentNoteListeningCache(
 
     /**
      * Keeps what the server said when it took a reply to [noteId]: whether an agent listens and
-     * which. A reply's answer does not carry the choice or the candidates, so those of the answer
-     * kept so far stay with it.
+     * which, and who a reply waker wakes ([wake]). A reply's answer does not carry the choice or the
+     * candidates, so those of the answer kept so far stay with it.
      */
     @Synchronized
-    fun keepAfterReply(noteId: String, state: AgentNoteListening, coverer: AgentNoteCoverer?): AgentNoteListeningAnswer? {
-        if (state == AgentNoteListening.UNKNOWN) return null
-        val merged = (kept[noteId]?.answer ?: AgentNoteListeningAnswer(state)).copy(state = state, coverer = coverer)
+    fun keepAfterReply(
+        noteId: String,
+        state: AgentNoteListening,
+        coverer: AgentNoteCoverer?,
+        wake: AgentNoteWake? = null,
+    ): AgentNoteListeningAnswer? {
+        if (state == AgentNoteListening.UNKNOWN && wake == null) return null
+        val merged = (kept[noteId]?.answer ?: AgentNoteListeningAnswer(state)).copy(state = state, coverer = coverer, wake = wake)
         kept[noteId] = Kept(merged, nowMillis())
         return merged
     }

@@ -10,8 +10,9 @@ import com.gitlab.mudlej.MjPdfReader.data.sync.FedoraRepository
 import com.gitlab.mudlej.MjPdfReader.ui.source.ProposalTexExcerpt
 
 /**
- * Deciding an agent proposal from the PDF view: the proposal sheet's Accept and Reject and the
- * ✓ on the page take the same checks and the same way to Fedora.
+ * Deciding an agent proposal from the PDF view: the proposal sheet's Accept and Reject, the
+ * ✓ on the page and the Agent edits sheet's bulk Accept and Reject ([AgentProposalBulkDecider])
+ * take the same checks and the same way to Fedora.
  */
 internal object AgentProposalDecider {
 
@@ -38,8 +39,19 @@ internal object AgentProposalDecider {
      * it waits for Sync or was applied. Otherwise the sheet says why.
      */
     fun decidable(objectSha256: String, sourceFound: Boolean, sourceChanged: Boolean, decision: AgentProposalDecision?): Boolean =
-        sourceFound && !sourceChanged && objectSha256.matches(SHA256) &&
-            decision?.phase !in setOf(AgentProposalDecisionPhase.PENDING, AgentProposalDecisionPhase.APPLIED)
+        undecidableReason(objectSha256, sourceFound, sourceChanged, decision) == null
+
+    /** Why a proposal cannot be decided here ([decidable] is false), the first that applies. */
+    enum class Undecidable { ALREADY_DECIDED, UNKNOWN_OBJECT, SOURCE_MISSING, SOURCE_CHANGED }
+
+    /** The reason [decidable] is false, or null when the proposal can be decided here. */
+    fun undecidableReason(objectSha256: String, sourceFound: Boolean, sourceChanged: Boolean, decision: AgentProposalDecision?): Undecidable? = when {
+        decision?.phase in setOf(AgentProposalDecisionPhase.PENDING, AgentProposalDecisionPhase.APPLIED) -> Undecidable.ALREADY_DECIDED
+        !objectSha256.matches(SHA256) -> Undecidable.UNKNOWN_OBJECT
+        !sourceFound -> Undecidable.SOURCE_MISSING
+        sourceChanged -> Undecidable.SOURCE_CHANGED
+        else -> null
+    }
 
     /** Queues [action] ("accept" or "disregard") for Sync, which sends it to Fedora; returns its operation ID. */
     suspend fun decide(context: Context, proposal: OfflineAgentProposal, action: String): String =

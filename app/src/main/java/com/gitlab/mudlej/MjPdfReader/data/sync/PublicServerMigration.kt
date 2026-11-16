@@ -143,6 +143,8 @@ internal object PublicServerMigration {
                     // Capabilities are cached per address; carry them over so nothing waits for the
                     // next Sync to learn them again.
                     ReviewSourceCapabilityStore(appContext).copy(from, to)
+                    // Push is registered per address: register at the new one.
+                    com.gitlab.mudlej.MjPdfReader.data.agentnotes.AgentNotesPush.serverChanged(appContext)
                 },
             )
         }.getOrElse { error ->

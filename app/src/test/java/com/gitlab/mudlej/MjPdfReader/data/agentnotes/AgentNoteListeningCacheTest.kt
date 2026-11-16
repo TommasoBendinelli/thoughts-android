@@ -175,6 +175,24 @@ class AgentNoteListeningCacheTest {
     }
 
     @Test
+    fun theSessionAWakerWakesIsKeptWithTheAnswer() {
+        val wake = AgentNoteWake(AgentNoteWake.WILL_BE_WOKEN, AgentNoteCoverer.SENDER, "mac", "Chapter draft", "closed")
+        cache.keep("note-1", AgentNoteListeningAnswer(AgentNoteListening.LISTENING, AgentNoteCoverer(AgentNoteCoverer.RESPONDER),
+            answerBy = replyAgent, candidates = listOf(sender, replyAgent)))
+        val after = cache.keepAfterReply("note-1", AgentNoteListening.LISTENING, AgentNoteCoverer(AgentNoteCoverer.RESPONDER), wake)
+        assertEquals(wake, after?.wake)
+        assertEquals(replyAgent, cache.fresh("note-1")?.answerBy)
+        // The next reply's answer names nobody to wake: none is kept.
+        assertNull(cache.keepAfterReply("note-1", AgentNoteListening.LISTENING, null)?.wake)
+        // An answer that cannot tell who listens is still kept when it names a session to wake.
+        cache.keep("note-3", AgentNoteListeningAnswer(AgentNoteListening.UNKNOWN, wake = wake))
+        assertEquals(wake, cache.fresh("note-3")?.wake)
+        assertEquals(wake, cache.keepAfterReply("note-4", AgentNoteListening.UNKNOWN, null, wake)?.wake)
+        cache.keep("note-5", AgentNoteListeningAnswer.UNKNOWN)
+        assertNull(cache.fresh("note-5"))
+    }
+
+    @Test
     fun theServersCapabilitiesAreAskedOnceAndAgainLaterOnlyWhileOneIsMissing() {
         var clock = 0L
         var fetches = 0

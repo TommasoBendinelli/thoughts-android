@@ -45,6 +45,10 @@ import com.gitlab.mudlej.MjPdfReader.core.ui.confirmDialog
 import com.gitlab.mudlej.MjPdfReader.data.*
 import com.gitlab.mudlej.MjPdfReader.data.render.PhoneRenderQueue
 import com.gitlab.mudlej.MjPdfReader.data.render.PdfWarmCacheWorker
+import com.gitlab.mudlej.MjPdfReader.data.review.ReviewCardMerge
+import com.gitlab.mudlej.MjPdfReader.data.review.ReviewCardMergeClient
+import com.gitlab.mudlej.MjPdfReader.data.review.ReviewCardMergeException
+import com.gitlab.mudlej.MjPdfReader.data.review.ReviewCardMergeUnsupportedException
 import com.gitlab.mudlej.MjPdfReader.data.review.ReviewStore
 import com.gitlab.mudlej.MjPdfReader.data.source.OfflineAgentProposal
 import com.gitlab.mudlej.MjPdfReader.data.source.OfflineSourceBundleStore
@@ -201,6 +205,8 @@ class MainActivity : AppCompatActivity(), ReaderUi, DocumentTabsHost {
                     // the proposals marked on the page must follow it without a reload.
                     if (loadedAgentProposalFilename != null) loadAgentProposalOverlays(force = true, keepVisible = true)
                     if (::reviewSessionController.isInitialized) reviewSessionController.onSyncFinished()
+                    // A merge (here or on another device) shows in the open Review Cards sheet.
+                    if (::reader.isInitialized) reader.readerNavigationController.refreshReviewCards()
                     // Feedback made on another device, or settled by this Sync.
                     if (::documentFeedbackController.isInitialized) documentFeedbackController.refresh()
                 }
@@ -758,10 +764,59 @@ class MainActivity : AppCompatActivity(), ReaderUi, DocumentTabsHost {
                                 else getString(R.string.html_attachment_card_placement, anchor.path.substringAfterLast('/'))
                             }),
                         reviewable = attachment != null || item.card.pdfSha256.equals(hash, ignoreCase = true),
+                        reviewCount = item.reviewCount,
                     )
                 }
             ReviewCardsSheetContent(cards, retired)
         }
+    }
+
+    /**
+     * Merge cards from the Review Cards sheet: the server merges them (the phone has no source
+     * outbox), then a Sync brings the merged card here; the open sheet follows when it ends.
+     */
+    internal suspend fun mergeReviewCardsFromSheet(
+        items: List<ReviewCardsSheetItem>,
+        keepCardId: String,
+        question: String,
+    ): ReviewCardsSheetMergeOutcome = withContext(Dispatchers.IO) {
+        val ids = items.map { it.cardId }
+        val known = ReviewStore(applicationContext).browserCards().associateBy { it.card.id }
+        val cards = ids.mapNotNull { known[it]?.card }
+        if (cards.size != ids.size) {
+            return@withContext ReviewCardsSheetMergeOutcome.Refused(getString(R.string.review_cards_sheet_merge_too_few))
+        }
+        val plan = when (val check = ReviewCardMerge.check(cards)) {
+            is ReviewCardMerge.Check.Ready -> check.plan
+            is ReviewCardMerge.Check.Refused -> return@withContext ReviewCardsSheetMergeOutcome.Refused(getString(
+                when (check.refusal) {
+                    ReviewCardMerge.Refusal.TOO_FEW -> R.string.review_cards_sheet_merge_too_few
+                    ReviewCardMerge.Refusal.TOO_MANY -> R.string.review_cards_sheet_merge_too_many
+                    ReviewCardMerge.Refusal.RETIRED -> R.string.review_cards_sheet_merge_retired
+                    ReviewCardMerge.Refusal.NOT_IN_SOURCE -> R.string.review_cards_sheet_merge_not_in_source
+                    ReviewCardMerge.Refusal.SEVERAL_SOURCES -> R.string.review_cards_sheet_merge_several_sources
+                },
+            ))
+        }
+        val client = ReviewCardMergeClient({ ThoughtsServerSecretStore(applicationContext).config() }, log = { Log.i(TAG, it) })
+        try {
+            client.merge(plan, keepCardId, question)
+        } catch (unsupported: ReviewCardMergeUnsupportedException) {
+            return@withContext ReviewCardsSheetMergeOutcome.Refused(getString(R.string.review_cards_sheet_merge_unsupported))
+        } catch (refused: ReviewCardMergeException) {
+            Log.w(TAG, "Review card merge refused: status=${refused.status} code=${refused.code}")
+            return@withContext ReviewCardsSheetMergeOutcome.Refused(
+                if (refused.code == "not_configured") getString(R.string.review_cards_sheet_merge_not_configured)
+                else refused.message ?: getString(R.string.review_cards_sheet_merge_offline),
+            )
+        } catch (offline: java.io.IOException) {
+            Log.w(TAG, "Review card merge failed", offline)
+            return@withContext ReviewCardsSheetMergeOutcome.Refused(getString(R.string.review_cards_sheet_merge_offline))
+        }
+        // The merged records are on the server; this Sync brings them (and the rebuilt PDF later).
+        runCatching { SyncCommandCoordinator(applicationContext).start(target = null) }
+            .onFailure { Log.w(TAG, "Could not start the Sync after a card merge", it) }
+        ReviewCardsSheetMergeOutcome.Merged(getString(R.string.review_cards_sheet_merged, ids.size))
     }
 
     /** A retired card picked in the Review Cards sheet: it has no place on this PDF, so its details. */

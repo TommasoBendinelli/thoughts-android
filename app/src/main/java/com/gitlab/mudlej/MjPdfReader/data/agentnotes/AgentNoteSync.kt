@@ -85,6 +85,16 @@ class AgentNoteSync(
     }
 
     /**
+     * A push said a note is waiting: asks the inbox now without waiting, like [periodicCheck]. While
+     * the live loop holds its long poll ([liveLoopRunning]) the server answers that request with the
+     * note, so this one steps aside; otherwise it waits for a request in flight (the periodic job's)
+     * and asks after it, so a note that came after that request started is not missed. Either way a
+     * note is stored and returned once ([AgentNoteStore.hasNote] under the inbox lock).
+     */
+    fun pushCheck(liveLoopRunning: Boolean): List<AgentNote> =
+        if (liveLoopRunning) tryPollInbox(wait = 0).orEmpty() else pollInbox(wait = 0)
+
+    /**
      * Sends every queued reply. Returns how many the server confirmed. A network failure stops the
      * round (the next one retries); a permanent refusal marks that reply and goes on.
      */
@@ -114,7 +124,8 @@ class AgentNoteSync(
             AgentNoteReplyPhotoUpload(bytes, mediaType, reply.photoCapture)
         }
         return try {
-            val server = api.postReply(reply.noteId, reply.replyId, image, reply.mediaType, strokes, reply.message, photo)
+            // The choice it was written with, not the one made since.
+            val server = api.postReply(reply.noteId, reply.replyId, image, reply.mediaType, strokes, reply.message, photo, reply.sources)
             store.markReplySent(reply.replyId, server)
             refreshNoteAfterReply(reply.noteId)
             server

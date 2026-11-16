@@ -229,7 +229,7 @@
     <string name="sync">Sync</string>
     <string name="fedora_update_complete">Updated from the server</string>
     <string name="fedora_update_retrying">The server is unavailable; the update will retry automatically</string>
-    <string name="fedora_update_not_configured">Configure the private Thoughts server first</string>
+    <string name="fedora_update_not_configured">Configure your Thoughts server first</string>
     <string name="pick_file">Pick File</string>
     <string name="toast_pick_file_error">Unable to pick file! Check your file manager on your phone.</string>
     <string name="toast_http_code_error">Remote server responded with an error.</string>
@@ -462,7 +462,7 @@
     <string name="edit_tex_source">Edit source (.tex)</string>
     <string name="open_tex_source">Open source (.tex)</string>
     <string name="source_editor_resolving">Fetching this source from the server…</string>
-    <string name="source_editor_fetch_failed">Couldn’t fetch this source from the Thoughts server; the request is saved, so check the connection and reopen the editor.</string>
+    <string name="source_editor_fetch_failed">Couldn’t fetch this source from the server; the request is saved, so check the connection to your Thoughts server and reopen the editor.</string>
     <string name="source_editor_verification_failed">The server returned source content that failed verification; nothing was opened, and the saved request can be retried.</string>
     <string name="source_editor_cached_status">Showing the cached source while the server checks for updates.</string>
     <string name="source_editor_offline_status">Offline source ready. Save keeps edits on this phone until you Sync.</string>
@@ -478,7 +478,7 @@
     <string name="source_editor_saved">Source synced to the server; the PDF update was queued automatically.</string>
     <string name="source_editor_save_failed">Couldn’t save the source edit.</string>
     <string name="source_editor_stale">The canonical server source changed after this draft was opened.</string>
-    <string name="source_editor_conflict">The phone and server copies of this source changed the same text. Open Resolve TeX conflict from Pending Changes.</string>
+    <string name="source_editor_conflict">This phone and the server changed the same text of the source. Open Resolve TeX conflict from Pending Changes.</string>
     <string name="source_conflict_loading">Loading and verifying every preserved version from the server…</string>
     <string name="source_conflict_load_failed">Couldn’t load the preserved TeX conflict: %1$s</string>
     <string name="source_conflict_tab_resolve">Resolve</string>
@@ -521,7 +521,7 @@
     <string name="source_conflict_done_title">All conflicts resolved</string>
     <string name="source_conflict_done_message">The final text is below, and you can still edit it. Tap Save resolution to keep it.</string>
     <string name="source_conflict_show_raw">Show raw text</string>
-    <string name="source_conflict_show_raw_hint">The whole file with its conflict markers (&lt;&lt;&lt;&lt;&lt;&lt;&lt; server, =======, &gt;&gt;&gt;&gt;&gt;&gt;&gt; phone). You can edit it directly.</string>
+    <string name="source_conflict_show_raw_hint">The whole file with its conflict markers: &lt;&lt;&lt;&lt;&lt;&lt;&lt; starts the server’s lines, ======= separates them from this phone’s, &gt;&gt;&gt;&gt;&gt;&gt;&gt; ends the conflict. You can edit it directly.</string>
     <string name="source_conflict_malformed_explanation">This conflict’s markers are incomplete, so its two versions can’t be told apart and the buttons can’t resolve it. Tap Edit manually to fix it in the raw text: keep the lines you want and delete every marker line.</string>
     <string name="source_conflict_editor_description">TeX conflict editor with conflict markers. Server lines have a red background and phone lines have a green background.</string>
     <string name="source_conflict_editor_at_position">TeX conflict editor, conflict %1$d of %2$d. Server lines have a red background and phone lines have a green background.</string>
@@ -590,9 +590,9 @@
     <string name="source_editor_load_mac">Load server version</string>
     <string name="source_editor_syncing">Syncing source changes with the server…</string>
     <string name="source_editor_sync_waiting">Saved on this phone; waiting for a network connection or the server.</string>
-    <string name="source_editor_sync_retrying">Sync with the server will retry automatically. The source request is safely stored on this phone.</string>
-    <string name="source_editor_sync_paused">Sync with the server is paused. The source request is safely stored on this phone.</string>
-    <string name="source_editor_sync_not_configured">Source request saved on this phone. Configure the Thoughts server, then retry.</string>
+    <string name="source_editor_sync_retrying">Server sync will retry automatically. The source request is safely stored on this phone.</string>
+    <string name="source_editor_sync_paused">Server sync paused. The source request is safely stored on this phone.</string>
+    <string name="source_editor_sync_not_configured">Source request saved on this phone. Configure your Thoughts server, then retry.</string>
     <string name="source_editor_retry_sync">Retry sync</string>
     <string name="source_editor_unsaved_title">Save source changes?</string>
     <string name="source_editor_unsaved_message">Save keeps the change on this phone until you Sync. Discard closes without saving the latest text.</string>
@@ -755,7 +755,7 @@
     <string name="keep_screen_on">Keep Screen On</string>
     <string name="keep_screen_on_summary">Prevent the screen from sleeping while reading.</string>
     <string name="space_between_pages">Show a Gap Between Pages</string>
-    <string name="privacy_info">Thoughts has no ads, telemetry, or account system. PDFs, comments, priorities, and a place that a comment already has are stored in private app storage and exchanged only with the Thoughts server you configure when you request an update. The app does not ask for your location.\n\nPermissions:\n- <b>Internet</b>: reach your private Thoughts server and open PDF links\n- <b>Storage</b>: import files selected outside the app’s private cache</string>
+    <string name="privacy_info">Thoughts has no ads, telemetry, or account system. PDFs, comments, priorities, and a place that a comment already has are stored in private app storage and exchanged only with the Thoughts server you configure when you request an update. The app does not ask for your location.\n\nPermissions:\n- <b>Internet</b>: reach your Thoughts server and open PDF links\n- <b>Storage</b>: import files selected outside the app’s private cache</string>
     <string name="switch_theme">Toggle PDF Theme</string>
     <string name="switch_to_light_mode">Light Mode</string>
     <string name="switch_to_dark_mode">Dark Mode</string>
@@ -1105,10 +1105,10 @@
     <string name="home_rebuild_queued">PDF rebuild queued on this phone.</string>
     <string name="home_rebuild_already_queued">That rebuild is already queued.</string>
     <string name="home_rebuild_queue_failed">Couldn’t write the rebuild request.</string>
-    <string name="home_rebuild_server_not_configured">PDF build request saved on this phone. Configure the Thoughts server to send it.</string>
-    <string name="home_rebuild_sync_start_failed">The PDF build request is safely queued, but Android couldn’t start the sync with the server.</string>
-    <string name="home_sync_server_not_configured">Configure the Thoughts server before updating.</string>
-    <string name="home_sync_start_failed">Android couldn’t start the sync with the server.</string>
+    <string name="home_rebuild_server_not_configured">PDF build request saved on this phone. Configure your Thoughts server to send it.</string>
+    <string name="home_rebuild_sync_start_failed">The PDF build request is safely queued, but Android couldn’t start the update from the server.</string>
+    <string name="home_sync_server_not_configured">Configure your Thoughts server before updating.</string>
+    <string name="home_sync_start_failed">Android couldn’t start the update from the server.</string>
     <string name="home_sync_already_queued">A sync is already queued or running.</string>
     <plurals name="home_sync_elapsed_seconds">
         <item quantity="one">%1$d second elapsed</item>
@@ -1209,7 +1209,7 @@
     <string name="document_status_sync_failed">Error</string>
     <string name="document_status_comments_attention">Error</string>
     <string name="document_status_syncing">Syncing…</string>
-    <!-- Fedora is building the document's new PDF; the previous PDF stays until it arrives. -->
+    <!-- The server is building the document's new PDF; the previous PDF stays until it arrives. -->
     <string name="document_status_updating">Updating…</string>
     <string name="document_sync_never">Never synced</string>
     <string name="document_status_error">Error</string>
@@ -1311,7 +1311,7 @@
     </plurals>
     <string name="home_render_status_all">All PDFs</string>
     <string name="home_render_status_queued">Waiting for the server</string>
-    <string name="home_render_status_queued_details">The request is safely saved on this phone and will be sent directly to the Thoughts server when the network is available.</string>
+    <string name="home_render_status_queued_details">The request is safely saved on this phone and will be sent directly to the server when the network is available.</string>
     <string name="home_render_status_blocked">Sync blocked</string>
     <string name="home_render_status_checking">Checking for changes</string>
     <string name="home_render_status_rebuilding">Rebuilding on the server</string>
@@ -1324,7 +1324,7 @@
     <string name="home_render_phase_validating">Validating</string>
     <string name="home_render_status_current_work">Current work: %1$s</string>
     <string name="home_render_status_waiting">Waiting for the server</string>
-    <string name="home_render_status_sync_progress">Update from the server %1$d/%2$d</string>
+    <string name="home_render_status_sync_progress">Server update %1$d/%2$d</string>
     <string name="home_render_status_out_of_sync">Out of sync</string>
     <string name="home_render_status_ready_on_fedora">Ready on the server</string>
     <string name="home_render_status_updated">Updated</string>
@@ -1352,7 +1352,7 @@
     <string name="pdf_build_log_title">Server build log</string>
     <string name="pdf_build_log_title_pdf">%1$s build log</string>
     <string name="pdf_build_log_loading">Loading the build log saved on this phone…</string>
-    <string name="pdf_build_log_loaded">Cached server build log · %1$s</string>
+    <string name="pdf_build_log_loaded">Saved server build log · %1$s</string>
     <string name="pdf_build_log_failed">Couldn’t read the locally saved build log: %1$s</string>
     <string name="pdf_build_log_missing">This error has no verified server build log.</string>
     <string name="pdf_build_log_missing_local">This build log was not saved on this phone.</string>
@@ -1575,7 +1575,7 @@
     <string name="home_empty_all_title">No PDFs found</string>
     <string name="home_empty_all_message">No PDF files were found on this device.</string>
     <string name="home_source_index_waiting_title">Waiting for server PDF index</string>
-    <string name="home_source_index_waiting_message">Pull down to refresh after the Thoughts server delivers the source-linked PDF list.</string>
+    <string name="home_source_index_waiting_message">Pull down to refresh after the server delivers the source-linked PDF list.</string>
     <string name="home_continue_reading">Continue Reading</string>
     <string name="home_recents">Recents</string>
     <string name="home_chip_to_read">To Read</string>
@@ -1717,7 +1717,7 @@
     <string name="keep_shared_copies_title">Keep Copies of Shared Files</string>
     <string name="keep_shared_copies_summary">When a PDF arrives through a temporary share from another app, save a copy in Documents/Thoughts so it stays available.</string>
 
-    <string name="source_pdf_server_owned_save_copy">This PDF is maintained by the Thoughts server. Phone-only PDF edits must be saved as a separate copy.</string>
+    <string name="source_pdf_server_owned_save_copy">This PDF is maintained by the server. Phone-only PDF edits must be saved as a separate copy.</string>
     <string name="put_in_library">Put in Library…</string>
     <string name="library_import_failed">The PDF could not be added to the Library.</string>
     <string name="library_import_name_conflict_title">Choose another PDF name</string>
@@ -1744,8 +1744,8 @@
     <string name="comment_author_title">Comment author name</string>
     <string name="comment_author_hint">Your name</string>
     <string name="comment_author_message">Written into the comments, replies and notes you create on this phone. Leave blank for the default.</string>
-    <string name="thoughts_server_title">Server</string>
-    <string name="thoughts_server_not_configured">Not configured · Updates from the server are unavailable</string>
+    <string name="thoughts_server_title">Thoughts server</string>
+    <string name="thoughts_server_not_configured">Not configured · server updates are unavailable</string>
     <string name="thoughts_server_dialog_message">Enter your Thoughts server’s HTTPS address and this phone’s device token (created on the server with <i>thoughts-admin create-device</i>). The token is encrypted with Android Keystore and the server is the sole Thoughts document transport.</string>
     <string name="thoughts_server_url_hint">Server URL</string>
     <string name="thoughts_server_token_hint">Device token</string>
@@ -1804,7 +1804,7 @@
     <string name="sync_transfer_prompt_both">This synchronization will upload about %1$s and download about %2$s. Continue using mobile data?</string>
     <string name="sync_transfer_continue_mobile">Continue on mobile</string>
     <string name="sync_transfer_wait_wifi">Wait for Wi-Fi</string>
-    <string name="fedora_document_sync_requires_library">Add this PDF to the Thoughts Library before syncing it.</string>
+    <string name="fedora_document_sync_requires_library">Add this PDF to the server’s Library before syncing it.</string>
     <string name="sync_battery_title">Let sync finish in the background</string>
     <string name="sync_battery_explanation">Android’s battery restrictions can interrupt a sync when you lock your phone or switch apps. Allow background sync so Thoughts can finish the syncs you start. This can increase background battery use. Your Wi-Fi and mobile-data choices still apply.</string>
     <string name="sync_battery_allow">Allow background sync</string>
@@ -1845,9 +1845,9 @@
     <string name="copy_document_tab_name">Copy document name</string>
     <string name="copy_document_tab_project_name">Copy project name</string>
     <string name="copy_document_for_agent">Copy for agent</string>
-    <string name="agent_prompt_study_mode">Study mode prompt</string>
+    <string name="agent_prompt_study_mode">Study session prompt</string>
     <string name="settings_agent_prompts">Agent notes and prompts</string>
-    <string name="settings_agent_prompts_summary">Whether this phone receives agent notes; what review cards and study mode copy to paste into Claude or Codex</string>
+    <string name="settings_agent_prompts_summary">Whether this phone receives agent notes and push; what review cards and study sessions copy to paste into Claude or Codex</string>
     <string name="agent_notes_receive_title" translatable="false">Receive agent notes on this phone</string>
     <string name="agent_notes_receive_summary_on" translatable="false">On: notes from your agent arrive here</string>
     <string name="agent_notes_receive_summary_off" translatable="false">Off: agent notes from the Mac go to your other phone</string>
@@ -1966,17 +1966,44 @@
     <string name="agent_notes_listening" translatable="false">Listening for agent notes</string>
     <string name="agent_notes_listening_detail" translatable="false">You get a notification for each note from your agent. Stops 30 minutes after your last agent action.</string>
     <string name="agent_notes_listening_stop" translatable="false">Stop</string>
-    <string name="agent_notes_study_mode_listening_detail" translatable="false">Study mode. Pauses after %1$d minutes without a capture, reply or note; resumes when you open Thoughts.</string>
-    <string name="agent_notes_study_mode" translatable="false">Study mode</string>
-    <string name="agent_notes_study_mode_detail" translatable="false">Listens for notes from your agent until you turn it off; pauses after an hour without use and resumes when you open Thoughts</string>
-    <string name="agent_notes_study_mode_on_title" translatable="false">Study mode is on</string>
-    <string name="agent_notes_study_mode_ready_listening" translatable="false">Listening for notes from your agent until you turn study mode off; it pauses after an hour without use and resumes when you open Thoughts</string>
+    <string name="agent_notes_study_mode_listening_detail" translatable="false">Instant notes. Pauses after %1$d minutes without a capture, reply or note; resumes when you open Thoughts.</string>
+    <string name="agent_notes_study_mode" translatable="false">Instant notes</string>
+    <string name="agent_notes_study_mode_detail" translatable="false">Notes pop up even when Thoughts is closed; pauses after an hour without use</string>
+    <string name="agent_notes_study_mode_on_title" translatable="false">Instant notes are on</string>
+    <string name="agent_notes_study_mode_ready_listening" translatable="false">Listening for notes from your agent until you turn instant notes off; it pauses after an hour without use and resumes when you open Thoughts</string>
     <string name="agent_notes_study_mode_ready_notifications" translatable="false">Notifications are allowed</string>
     <string name="agent_notes_study_mode_missing_notifications" translatable="false">Notifications are off, so notes arrive silently when Thoughts is not on screen</string>
-    <string name="agent_notes_study_mode_prompt_copied" translatable="false">The study-mode prompt is on the clipboard: paste it into your agent conversation once, so it watches the glasses photos and answers with notes.</string>
+    <string name="agent_notes_study_mode_prompt_copied" translatable="false">The prompt is on the clipboard: paste it into a new Claude session. Replies and glasses captures already reach an agent without it.</string>
     <string name="agent_notes_study_mode_copy_again" translatable="false">Copy again</string>
-    <string name="agent_notes_study_mode_copy_prompt" translatable="false">Copy the study-mode prompt</string>
     <string name="agent_notes_study_mode_open_notification_settings" translatable="false">Notification settings</string>
+    <!-- Push for agent notes (server capability push_fcm_v1). -->
+    <string name="agent_notes_study_session" translatable="false">Study session</string>
+    <string name="agent_notes_start_study_session" translatable="false">Start a new study session</string>
+    <string name="agent_notes_push_arrives" translatable="false">Notes arrive instantly</string>
+    <string name="agent_notes_page_tools" translatable="false">Agent tools under the page</string>
+    <string name="agent_notes_page_tools_detail" translatable="false">Send the page on screen to your agent, or draw on it first</string>
+    <string name="agent_notes_push_title" translatable="false">Push</string>
+    <string name="agent_notes_push_active" translatable="false">Active: notes arrive instantly</string>
+    <string name="agent_notes_push_off" translatable="false">Off: %1$s</string>
+    <string name="agent_notes_push_off_not_built" translatable="false">this version of Thoughts was built without push</string>
+    <string name="agent_notes_push_off_no_play_services" translatable="false">Google Play services are not available on this phone</string>
+    <string name="agent_notes_push_off_not_receiving" translatable="false">this phone does not receive agent notes</string>
+    <string name="agent_notes_push_off_no_server" translatable="false">no server is set up</string>
+    <string name="agent_notes_push_off_checking" translatable="false">checking whether the server can send pushes</string>
+    <string name="agent_notes_push_off_server_without_push" translatable="false">the server cannot send pushes</string>
+    <string name="agent_notes_push_off_registering" translatable="false">registering this phone with the server</string>
+    <string name="agent_notes_push_off_refused" translatable="false">the server refused this phone\'s registration</string>
+    <string name="agent_notes_push_off_no_token" translatable="false">no push address from Google yet; trying again</string>
+    <string name="agent_notes_push_off_unreachable" translatable="false">the server could not be reached; trying again</string>
+    <string name="agent_notes_push_checking" translatable="false">Checking push with the server…</string>
+    <string name="agent_notes_push_test" translatable="false">Send a test push</string>
+    <string name="agent_notes_push_test_summary" translatable="false">The server sends a push to this phone only</string>
+    <string name="agent_notes_push_test_sent" translatable="false">The server sent the test push; it arrives in a few seconds</string>
+    <string name="agent_notes_push_test_none" translatable="false">The server has no push registration for this phone yet</string>
+    <string name="agent_notes_push_test_off" translatable="false">Push is off on the server</string>
+    <string name="agent_notes_push_test_failed" translatable="false">Could not reach the server</string>
+    <string name="agent_notes_push_test_notification" translatable="false">Push works: a test from the server</string>
+    <string name="agent_notes_fetching" translatable="false">Fetching agent notes</string>
     <string name="agent_notes_overlay_not_now" translatable="false">Not now</string>
     <string name="agent_note_canvas_description" translatable="false">Note image. Scroll or draw with one finger, as the selected tool says; pan and zoom with two.</string>
     <string name="agent_note_undo" translatable="false">Undo</string>
@@ -2001,6 +2028,7 @@
     <string name="agent_note_sent_plain" translatable="false">Sent ✓</string>
     <!-- Who answers a reply while a note is listening (server agent_note_owners_v1: listeners name their role). -->
     <string name="agent_note_sent_answered_by" translatable="false">Sent ✓ · answered by %1$s</string>
+    <string name="agent_note_sent_will_be_woken" translatable="false">Sent ✓ · %1$s will be woken</string>
     <string name="agent_note_answered_by" translatable="false">Answered by: %1$s</string>
     <string name="agent_note_coverer_reply_agent" translatable="false">Thoughts reply agent</string>
     <string name="agent_note_coverer_sender" translatable="false">the agent that sent it</string>
@@ -2022,6 +2050,17 @@
     <string name="agent_note_answer_agent_unknown" translatable="false">The server no longer knows that agent. The choice stays as it was.</string>
     <string name="agent_note_answer_mark_listening" translatable="false">Listening</string>
     <string name="agent_note_answer_mark_not_listening" translatable="false">Not listening</string>
+    <string name="agent_note_answer_mark_woken" translatable="false">Will be woken</string>
+    <string name="agent_note_answer_mark_offline" translatable="false">Offline</string>
+    <!-- The line under a note's title when a reply waker wakes the session that answers (server agent_note_wakers_v1). -->
+    <string name="agent_note_machine_mac" translatable="false">the Mac</string>
+    <string name="agent_note_machine_server" translatable="false">the server</string>
+    <string name="agent_note_wake_fallback" translatable="false">The study session</string>
+    <string name="agent_note_wake_woken" translatable="false">%1$s will be woken on %2$s</string>
+    <string name="agent_note_wake_fallback_woken" translatable="false">%1$s will be woken</string>
+    <string name="agent_note_wake_busy" translatable="false">%1$s answers when it finishes its current task</string>
+    <string name="agent_note_wake_offline" translatable="false">%1$s is offline; the study session answers at %2$s if it is still offline</string>
+    <string name="agent_note_wake_offline_later" translatable="false">%1$s is offline; the study session answers later if it is still offline</string>
     <string name="agent_note_sent_nobody_listening" translatable="false">Saved with the note, but no agent is listening</string>
     <string name="agent_note_reply_copied" translatable="false">Reply copied: paste it in the conversation</string>
     <string name="agent_note_message_expand" translatable="false">Show the whole message</string>
@@ -2054,6 +2093,20 @@
     <string name="agent_note_link_no_app" translatable="false">No app on this phone can open this link.</string>
     <string name="agent_note_too_many_strokes" translatable="false">Too many strokes or numbers to send. Undo or erase some first.</string>
     <string name="agent_note_comment_hint" translatable="false">Comment for the agent (optional)</string>
+    <!-- What the agent that answers a reply may use to ground its answer (the reply's sources; the last choice holds for every reply). -->
+    <string name="agent_note_sources_chip" translatable="false">Sources: %1$s</string>
+    <string name="agent_note_sources_chip_description" translatable="false">Choose what the agent may use to answer. Now: %1$s</string>
+    <string name="agent_note_sources_choice_title" translatable="false">What the agent may use</string>
+    <string name="agent_note_sources_none" translatable="false">No Thoughts documents</string>
+    <string name="agent_note_sources_none_detail" translatable="false">Only this note and your reply, nothing from your Library</string>
+    <string name="agent_note_sources_linked_pdf" translatable="false">Linked PDF only</string>
+    <string name="agent_note_sources_linked_pdf_detail" translatable="false">Only the PDF this note is linked to</string>
+    <string name="agent_note_sources_linked_pdf_named_detail" translatable="false">Only %1$s, the PDF this note is linked to</string>
+    <string name="agent_note_sources_linked_pdf_none_detail" translatable="false">Only the PDF a note is linked to; this one is linked to none</string>
+    <string name="agent_note_sources_library" translatable="false">All documents</string>
+    <string name="agent_note_sources_library_detail" translatable="false">Every document of your Library, without the Mental Model</string>
+    <string name="agent_note_sources_library_and_mental_model" translatable="false">All documents + Mental Model</string>
+    <string name="agent_note_sources_library_and_mental_model_detail" translatable="false">Your Library and your Mental Model, as agents answer without a choice</string>
     <string name="agent_notes_empty" translatable="false">No agent notes yet. When an agent sends you a note while you study, it appears here.</string>
     <string name="agent_notes_offline" translatable="false">Offline: showing the notes saved on this phone.</string>
     <string name="agent_note_delete_title" translatable="false">Delete agent note?</string>

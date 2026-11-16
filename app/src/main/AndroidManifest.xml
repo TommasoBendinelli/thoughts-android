@@ -70,6 +70,8 @@
             android:name=".data.agentnotes.AgentStudyListenerService"
             android:exported="false"
             android:foregroundServiceType="dataSync" />
+        <!-- Push for agent notes: its service and Firebase settings are in src/push/AndroidManifest.xml,
+             added only to a build with push (app/build.gradle, thoughtsPush). -->
         <service android:name=".ui.html.OfflineHtmlService" android:exported="false" android:foregroundServiceType="specialUse">
             <property android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE" android:value="User-opened offline HTML attachments served exclusively to the local browser until the user closes them." />
         </service>

@@ -126,3 +126,13 @@ apksigner sign --ks your-keystore.jks --out mj-pdf.apk app-arm64-v8a-release-uns
 ```
 
 `apksigner` is in the SDK's `build-tools` directory.
+
+## 8. Optional: Push for Agent Notes
+
+Without any setup the app builds without push: no Firebase or Google Play services library is compiled in, agent notes arrive while Thoughts is open, and the "Instant notes" switch keeps a listener running in the background. To let your server push notes to the phone through Firebase Cloud Messaging, create a Firebase project with an Android app for each application ID you build (`org.tbend.thoughts`, and `org.tbend.thoughts.sandbox` for tests), download its `google-services.json` and keep it outside the repository:
+
+```text
+~/.config/thoughts/firebase/google-services.json
+```
+
+or pass another path with `-PthoughtsFirebaseConfig=/path/to/google-services.json`. With that file present the build includes push (Firebase Cloud Messaging and Google Play services); `-PthoughtsPush=off` leaves push out anyway and `-PthoughtsPush=on` puts it in even without the file (push then stays off at run time). The build prints one line per run saying whether push is on or off for each variant; it never prints the values. The server must advertise the `push_fcm_v1` capability.

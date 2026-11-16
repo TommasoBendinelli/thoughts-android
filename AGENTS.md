@@ -37,6 +37,8 @@ Values that belong to one deployment come from `-P<name>=<value>` or the ignored
 | `thoughtsLegacyMjPdfAuthor` | empty | Author name the old MJ PDF reader build wrote: a plain-UUID yellow note by it is attributed to that reader. Empty: rule off. |
 | `thoughtsStudyCaptureFolder` | `~/glasses` | Default of the study-mode capture folder (`{mentra_folder}`). |
 | `thoughtsRecallPredictorUrl`, `thoughtsRecallPredictorToken` | empty | The agent recall prediction service; without both the feature is off. |
+| `thoughtsFirebaseConfig` | `~/.config/thoughts/firebase/google-services.json` | The Firebase config for push of agent notes, kept outside the repository; only on/off is printed. |
+| `thoughtsPush` | `on` when that file exists, else `off` | `off`: no Firebase or Google Play services code in the build (`src/nopush`); `on`: push compiled in (`src/push` and its manifest), active once the build has a config for its application ID. |
 
 ## Unit tests
 

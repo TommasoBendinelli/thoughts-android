@@ -66,7 +66,7 @@ These permissions provide specific features:
 * *Internet*: for Sync with your Thoughts server and for opening PDFs through links
 * *Storage / all-files access*: for scanning, opening, and managing the PDFs on your device
 
-The app has no location permission and uses no Google Maps, Places or Play services library: the place picker for comments was removed. A place that a comment got from an earlier version is kept with the comment and can only be removed.
+The app has no location permission and uses no Google Maps or Places library: the place picker for comments was removed. A place that a comment got from an earlier version is kept with the comment and can only be removed. The default build has no Google Play services or Firebase library either; only a build with push for agent notes (see [How to build](#how-to-build)) adds Firebase Cloud Messaging and Google Play services.
 
 The app includes ACRA, a crash reporter. It sends nothing unless you press SEND on the dialog that appears after a crash, and it needs an endpoint configured at build time; its configuration is [in the code](app/src/main/java/com/gitlab/mudlej/MjPdfReader/App.kt).
 
@@ -109,6 +109,9 @@ python3 build_dependencies/install_patched_libs.py
 - To set up a build environment from a fresh Linux install, see [SETUP.md](SETUP.md).
 - To rebuild the native libraries (PDFium, FreeType, libpng, and the JNI bridge), use the scripts in [build_dependencies](build_dependencies/).
 - After editing `mainJNILib.cpp`, go to `PdfiumAndroid/src/main/jni` and run `ndk-build`.
+
+### Push for agent notes (optional)
+By default the app is built without push: no Firebase or Google Play services code is compiled in, and the app checks for new agent notes as before (while it is open, and through the "Instant notes" listener). For push you need your own Firebase project with an Android app for each application ID you build, and its `google-services.json` outside the repository, at `~/.config/thoughts/firebase/google-services.json` or the path given with `-PthoughtsFirebaseConfig=<path>`. With that file the build includes push; `-PthoughtsPush=off` or `-PthoughtsPush=on` overrides the choice. Details are in [SETUP.md](SETUP.md#8-optional-push-for-agent-notes).
 
 The repository has these modules:
 

@@ -24,7 +24,7 @@ import org.junit.Assert.fail
 import org.junit.Test
 import org.junit.runner.RunWith
 
-/** Settings > Agent notes and prompts: the card template, the study-mode prompt and the Mentra folder, each with Reset to default. */
+/** Settings > Agent notes and prompts: the card template, the study-session prompt and the Mentra folder, each with Reset to default. */
 @RunWith(AndroidJUnit4::class)
 class AgentPromptsSettingsInstrumentedTest {
     @Test fun templatesAndMentraFolderAreEditedSavedAndReset() {
@@ -75,7 +75,7 @@ class AgentPromptsSettingsInstrumentedTest {
                 awaitUi("Agent prompts page") { preference(Preferences.agentPromptTemplateKey) != null }
                 scenario.onActivity {
                     assertEquals("Copy for agent", preference(Preferences.agentPromptTemplateKey)!!.title)
-                    assertEquals("Study mode prompt", preference(Preferences.studyModePromptTemplateKey)!!.title)
+                    assertEquals("Study session prompt", preference(Preferences.studyModePromptTemplateKey)!!.title)
                     assertEquals("Default", preference(Preferences.agentPromptTemplateKey)!!.summary)
                     assertEquals(AgentPromptTemplates.DEFAULT_MENTRA_FOLDER, preference(Preferences.mentraPhotoFolderKey)!!.summary)
                 }

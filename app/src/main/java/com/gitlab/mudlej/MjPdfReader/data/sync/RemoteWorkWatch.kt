@@ -12,6 +12,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
@@ -178,10 +179,100 @@ internal suspend fun remoteWorkCheck(ports: RemoteWorkPorts, syncWasRunning: Boo
     return true
 }
 
+/** What [RemoteStatePause] needs, so it runs against fakes in tests. */
+internal interface RemoteStatePausePorts {
+    /** A monotonic clock. */
+    fun elapsedMillis(): Long
+    suspend fun sleep(millis: Long)
+    /** Whether the server holds Sync state requests ([SYNC_STATE_WAIT_CAPABILITY]). */
+    suspend fun stateWaitsAvailable(): Boolean
+    /** One held `GET /v2/sync/state?wait_ms=` with the kept ETag ([waitForSyncState]). */
+    suspend fun awaitStateChange(waitMillis: Long): SyncStateWait
+    fun log(message: String) = Unit
+}
+
+/**
+ * The pause of [RemoteWorkWatch] between two checks when it does not wait on a pending build.
+ *
+ * When the server holds Sync state requests, the pause is one such request: the server answers
+ * as soon as its state changes (a build another device caused has finished, a proposal arrived),
+ * and the next check runs at once, instead of up to 20 s later. Nothing changing, the server
+ * answers after [holdMillis] (25 s) and the check takes that answer without asking again
+ * ([ConditionalAnswer.takeConfirmed]): one request per 25 s instead of one per 20 s.
+ *
+ * Everything else stays as it was. The request is held only while no Sync runs ([pause] gets
+ * `mayHold` false then). When a held-back Sync may start sooner than the interval, the request
+ * ends then, so that Sync starts on time. Without the capability, or once a held request failed or
+ * was answered at once (an older server, one that holds too many or is stopping), the pause is a
+ * plain [intervalMillis] for [plainAfterFailureMillis], as it always was.
+ */
+internal class RemoteStatePause(
+    private val ports: RemoteStatePausePorts,
+    private val intervalMillis: Long,
+    private val holdMillis: Long = SYNC_STATE_LONGEST_WAIT_MILLIS,
+    private val plainAfterFailureMillis: Long = 2 * 60_000L,
+) {
+    private var plainUntil = Long.MIN_VALUE
+
+    /** Waits until the next check: at most [pauseMillis] when the pause is plain or a held Sync is due. */
+    suspend fun pause(pauseMillis: Long, mayHold: Boolean) {
+        val started = ports.elapsedMillis()
+        if (mayHold && started >= plainUntil) {
+            val outcome = try {
+                if (ports.stateWaitsAvailable()) {
+                    ports.awaitStateChange(if (pauseMillis < intervalMillis) pauseMillis else holdMillis)
+                } else {
+                    null
+                }
+            } catch (error: CancellationException) {
+                throw error
+            } catch (error: Exception) {
+                SyncStateWait.FAILED
+            }
+            when (outcome) {
+                null -> Unit
+                SyncStateWait.CHANGED, SyncStateWait.UNCHANGED -> return
+                SyncStateWait.NOT_HELD, SyncStateWait.FAILED -> {
+                    plainUntil = ports.elapsedMillis() + plainAfterFailureMillis
+                    ports.log("held Sync state request ${outcome.name.lowercase()}; plain pauses for a while")
+                }
+            }
+        }
+        val remaining = pauseMillis - (ports.elapsedMillis() - started)
+        if (remaining > 0) ports.sleep(remaining)
+    }
+}
+
+/**
+ * The loop of [RemoteWorkWatch] until it is cancelled (Thoughts leaves the screen): a [check]
+ * ([remoteWorkCheck]), which says whether a Sync was running, then the [pause] before the next. A
+ * check that fails is reported to [failed] and the loop goes on.
+ */
+internal suspend fun watchRemoteWork(
+    check: suspend (syncWasRunning: Boolean) -> Boolean,
+    pause: suspend (syncRunning: Boolean) -> Unit,
+    failed: (Exception) -> Unit = {},
+) {
+    // The first idle check after the app comes up records a baseline.
+    var syncWasRunning = true
+    while (currentCoroutineContext().isActive) {
+        try {
+            syncWasRunning = check(syncWasRunning)
+        } catch (error: CancellationException) {
+            throw error
+        } catch (error: Exception) {
+            failed(error)
+        }
+        pause(syncWasRunning)
+    }
+}
+
 /**
  * An agent's proposals and new PDF builds reach Fedora without this phone knowing, and the phone
  * synced only when asked. While Thoughts is on screen this asks Fedora every 20 seconds and runs
- * a Sync when it holds work the phone has not pulled; the Sync also sends local changes.
+ * a Sync when it holds work the phone has not pulled; the Sync also sends local changes. When the
+ * server can hold the question until its state changes ([RemoteStatePause]), the pause between
+ * two checks is that one held request (up to 25 s), and a change starts the check at once.
  *
  * Sync does not wait for Fedora's PDF builds: it leaves the builds still running in
  * [PendingFedoraBuildStore], and this watch asks Fedora about each of them on every check
@@ -240,18 +331,12 @@ object RemoteWorkWatch : Application.ActivityLifecycleCallbacks {
         job = scope.launch {
             com.gitlab.mudlej.MjPdfReader.data.StartupReadiness.awaitMaintenanceWindow()
             val repository = FedoraRepository(app)
-            // The first idle check after the app comes up records a baseline.
-            var syncWasRunning = true
-            while (isActive) {
-                try {
-                    syncWasRunning = check(app, repository, syncWasRunning)
-                } catch (error: CancellationException) {
-                    throw error
-                } catch (error: Exception) {
-                    Log.w(TAG, "remote work check failed: ${error.javaClass.simpleName}")
-                }
-                awaitNextCheck(app, repository, syncWasRunning)
-            }
+            val statePause = RemoteStatePause(StatePausePorts(repository), INTERVAL_MILLIS)
+            watchRemoteWork(
+                check = { syncWasRunning -> check(app, repository, syncWasRunning) },
+                pause = { syncRunning -> awaitNextCheck(app, repository, statePause, syncRunning) },
+                failed = { error -> Log.w(TAG, "remote work check failed: ${error.javaClass.simpleName}") },
+            )
         }
     }
 
@@ -260,22 +345,41 @@ object RemoteWorkWatch : Application.ActivityLifecycleCallbacks {
      * sooner ([nextRemoteCheckDelayMillis]). It is spent waiting on Fedora for a pending build to
      * end while one is pending and no Sync runs, so its PDF is fetched as soon as it is built (the
      * next check, at once, sees it finished) rather than up to 20 s later. A build ends the pause
-     * early once: should that check not start its Sync, the next pause is a plain one.
+     * early once: should that check not start its Sync, the next pause is not spent on it. Any
+     * other pause is a held Sync state request where the server offers one ([RemoteStatePause]).
      */
-    private suspend fun awaitNextCheck(app: Application, repository: FedoraRepository, syncRunning: Boolean) {
+    private suspend fun awaitNextCheck(
+        app: Application,
+        repository: FedoraRepository,
+        statePause: RemoteStatePause,
+        syncRunning: Boolean,
+    ) {
         val started = android.os.SystemClock.elapsedRealtime()
         val pause = runCatching {
             nextRemoteCheckDelayMillis(Ports(app, repository).loadState().pace, System.currentTimeMillis(), INTERVAL_MILLIS)
         }.getOrDefault(INTERVAL_MILLIS)
         val pending = if (syncRunning) null else runCatching { PendingFedoraBuildStore(app).builds().firstOrNull() }.getOrNull()
-        val ended = pending != null && pending.buildId != endedEarlyFor && ThoughtsNetworkPolicy.requiredVpnActive(app) &&
-            runCatching { repository.awaitBuildEnd(pending.buildId, pause.toInt()) }.getOrNull() == true
-        if (ended) {
-            endedEarlyFor = pending?.buildId
+        val reachable = ThoughtsNetworkPolicy.requiredVpnActive(app)
+        if (pending == null || pending.buildId == endedEarlyFor || !reachable) {
+            statePause.pause(pause, mayHold = !syncRunning && reachable)
+            return
+        }
+        if (runCatching { repository.awaitBuildEnd(pending.buildId, pause.toInt()) }.getOrNull() == true) {
+            endedEarlyFor = pending.buildId
             return
         }
         val remaining = pause - (android.os.SystemClock.elapsedRealtime() - started)
         if (remaining > 0) delay(remaining)
+    }
+
+    private class StatePausePorts(private val repository: FedoraRepository) : RemoteStatePausePorts {
+        override fun elapsedMillis(): Long = android.os.SystemClock.elapsedRealtime()
+        override suspend fun sleep(millis: Long) = delay(millis)
+        override suspend fun stateWaitsAvailable(): Boolean = repository.holdsStateWaits()
+        override suspend fun awaitStateChange(waitMillis: Long): SyncStateWait = repository.awaitRemoteChange(waitMillis)
+        override fun log(message: String) {
+            Log.i(TAG, message)
+        }
     }
 
     /** One check ([remoteWorkCheck]); returns what the next check takes as "a Sync was running". */

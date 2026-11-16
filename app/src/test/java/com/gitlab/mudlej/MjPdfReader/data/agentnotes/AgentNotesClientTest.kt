@@ -281,6 +281,64 @@ class AgentNotesClientTest {
         assertArrayEquals(photo, Base64.getDecoder().decode(sent["data_base64"].asString))
     }
 
+    @Test fun theReplyCarriesWhatTheAgentMayUse() {
+        val server = server { request ->
+            val sent = JsonParser.parseString(request.text).asJsonObject["sources"] ?: com.google.gson.JsonNull.INSTANCE
+            json("""{"reply_id":"r-4","note_id":"n-1","sources":$sent}""", 201)
+        }
+        val client = client(server.baseUrl)
+        val png = Random(5).nextBytes(100)
+        val reply = client.postReply("n-1", "r-4", png, "image/png", null, "From the paper only", null, "linked_pdf")
+        val request = server.requests.single()
+        assertEquals(request.body.size.toString(), request.headers["content-length"])
+        val body = JsonParser.parseString(request.text).asJsonObject
+        assertEquals(setOf("reply_id", "message", "sources", "image"), body.keySet())
+        assertEquals("linked_pdf", body["sources"].asString)
+        assertArrayEquals(png, Base64.getDecoder().decode(body.getAsJsonObject("image")["data_base64"].asString))
+        // The server's record says it back.
+        assertEquals("linked_pdf", reply.sources)
+        assertEquals(AgentNoteReplySources.LINKED_PDF, reply.sourcesChoice)
+
+        // With a picture too, both images stay whole.
+        val photo = Random(6).nextBytes(301)
+        client.postReply("n-1", "r-5", png, "image/png", null, null, AgentNoteReplyPhotoUpload(photo, "image/jpeg", null), "none")
+        val withPhoto = JsonParser.parseString(server.requests.last().text).asJsonObject
+        assertEquals(setOf("reply_id", "sources", "image", "photo"), withPhoto.keySet())
+        assertEquals("none", withPhoto["sources"].asString)
+        assertArrayEquals(photo, Base64.getDecoder().decode(withPhoto.getAsJsonObject("photo")["data_base64"].asString))
+
+        // Without one (a reply queued before the choice), the field is left out and the server's null is no choice.
+        val older = client.postReply("n-1", "r-6", png, "image/png", null, null, null, null)
+        assertFalse(JsonParser.parseString(server.requests.last().text).asJsonObject.has("sources"))
+        assertNull(older.sources)
+        assertNull(older.sourcesChoice)
+    }
+
+    @Test fun aReplyRecordKeepsItsSourcesThroughARoundTrip() {
+        fun parse(text: String) = AgentNoteReply.fromJson(JsonParser.parseString(text).asJsonObject)
+        val chosen = parse("""{"reply_id":"r-1","note_id":"n-1","sources":"library"}""")
+        assertEquals(AgentNoteReplySources.LIBRARY, chosen.sourcesChoice)
+        assertEquals(chosen, AgentNoteReply.fromJson(chosen.toJson()))
+        // An older server says nothing, or null: no choice, and the stored record gets no field (notes are not rewritten).
+        for (older in listOf("""{"reply_id":"r-2","note_id":"n-1"}""", """{"reply_id":"r-2","note_id":"n-1","sources":null}""")) {
+            val reply = parse(older)
+            assertNull(reply.sources)
+            assertFalse(reply.toJson().has("sources"))
+        }
+        // A value this phone does not know yet survives as it came, without being taken for a choice.
+        val newer = parse("""{"reply_id":"r-3","note_id":"n-1","sources":"something_new"}""")
+        assertEquals("something_new", newer.sources)
+        assertNull(newer.sourcesChoice)
+        assertEquals("something_new", AgentNoteReply.fromJson(newer.toJson()).sources)
+        // Inside a note record too.
+        val note = AgentNote.fromJson(JsonParser.parseString(noteJson("n-7", 7)).asJsonObject.apply {
+            getAsJsonArray("replies")[0].asJsonObject.addProperty("sources", "none")
+        })
+        assertEquals(AgentNoteReplySources.NONE, AgentNote.fromJson(note.toJson()).replies.single().sourcesChoice)
+        assertEquals(listOf("none", "linked_pdf", "library", "library_and_mental_model"), AgentNoteReplySources.entries.map { it.apiValue })
+        assertEquals(AgentNoteReplySources.LIBRARY_AND_MENTAL_MODEL, AgentNoteReplySources.DEFAULT)
+    }
+
     @Test fun replyAnswerSaysWhetherAnAgentListens() {
         val server = server { request ->
             when (request.path) {
