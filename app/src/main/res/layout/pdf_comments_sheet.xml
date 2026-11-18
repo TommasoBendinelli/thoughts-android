@@ -160,16 +160,45 @@
             android:orientation="vertical"
             android:paddingHorizontal="16dp"
             android:paddingBottom="16dp">
-            <com.google.android.material.button.MaterialButton
-                android:id="@+id/commentsBack"
-                style="@style/Widget.Material3.Button.TextButton"
-                android:layout_width="wrap_content"
+            <!-- Back to the list, and ‹ › to the previous or next item of the list as shown. -->
+            <LinearLayout
+                android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:minHeight="48dp"
-                android:text="@string/comments_back_to_list"
-                app:strokeWidth="0dp"
-                app:backgroundTint="@android:color/transparent"
-                app:icon="@drawable/ic_chevron_left" />
+                android:gravity="center_vertical"
+                android:orientation="horizontal">
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/commentsBack"
+                    style="@style/Widget.Material3.Button.TextButton"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:minHeight="48dp"
+                    android:text="@string/comments_back_to_list"
+                    app:strokeWidth="0dp"
+                    app:backgroundTint="@android:color/transparent"
+                    app:icon="@drawable/ic_chevron_left" />
+                <Space
+                    android:layout_width="0dp"
+                    android:layout_height="0dp"
+                    android:layout_weight="1" />
+                <androidx.appcompat.widget.AppCompatImageButton
+                    android:id="@+id/commentsPrevious"
+                    android:layout_width="48dp"
+                    android:layout_height="48dp"
+                    android:background="?attr/selectableItemBackgroundBorderless"
+                    android:contentDescription="@string/previous_comment"
+                    android:padding="12dp"
+                    android:src="@drawable/ic_chevron_left"
+                    app:tint="?attr/colorOnSurface" />
+                <androidx.appcompat.widget.AppCompatImageButton
+                    android:id="@+id/commentsNext"
+                    android:layout_width="48dp"
+                    android:layout_height="48dp"
+                    android:background="?attr/selectableItemBackgroundBorderless"
+                    android:contentDescription="@string/next_comment"
+                    android:padding="12dp"
+                    android:src="@drawable/ic_chevron_right"
+                    app:tint="?attr/colorOnSurface" />
+            </LinearLayout>
             <TextView
                 android:id="@+id/commentsDetailMetadata"
                 android:layout_width="match_parent"

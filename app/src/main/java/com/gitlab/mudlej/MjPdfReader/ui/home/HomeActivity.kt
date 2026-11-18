@@ -223,7 +223,7 @@ class HomeActivity : AppCompatActivity(), HomeItemFunctions {
     private lateinit var diaryTab: DiaryTabController
     private lateinit var libraryTab: LibraryTabController
     private lateinit var reviewTab: ReviewTabController
-    private lateinit var abTestingTab: AbTestingTabController
+    private lateinit var annotationsTab: OverviewTabController
     private lateinit var reviewStore: ReviewStore
     private lateinit var syncOperationStore: SyncOperationStore
     private lateinit var pendingChangesObserver: PendingChangesFileObserver
@@ -475,7 +475,19 @@ class HomeActivity : AppCompatActivity(), HomeItemFunctions {
             onPendingChangesChanged = ::scheduleRenderStatusRefresh,
             onHideSearch = ::hideHomeSearch,
         )
-        abTestingTab = AbTestingTabController(this)
+        // The Annotations tab: comments by document, as on the Mac. Its own list, apart from Comment issues.
+        annotationsTab = OverviewTabController(
+            this,
+            lifecycleScope,
+            commentCatalogue,
+            phoneRenderQueue,
+            pref,
+            onOpenComment = ::openOverviewComment,
+            onDataChanged = ::refresh,
+            onPendingChangesChanged = ::scheduleRenderStatusRefresh,
+            onHideSearch = ::hideHomeSearch,
+            onShowSearch = ::showHomeSearch,
+        )
         notesTab = OverviewTabController(
             this,
             lifecycleScope,
@@ -506,7 +518,8 @@ class HomeActivity : AppCompatActivity(), HomeItemFunctions {
         observeLatestGlobalOperation()
         applyCachedFedoraStatus(renderStatusSnapshot)
         reviewTab = ReviewTabController(
-            onStartReview = ::startPdfReview,
+            onStartReview = { pdfStem -> startPdfReview(pdfStem) },
+            onStartEntry = { kind, projectId -> startPdfReview(kind = kind, projectId = projectId) },
             onBrowseCards = { pdfStem ->
                 startActivity(ReviewCardBrowserActivity.intent(this, pdfStem))
             },
@@ -572,12 +585,16 @@ class HomeActivity : AppCompatActivity(), HomeItemFunctions {
         onBackPressedDispatcher.addCallback(this, searchBackCallback)
         binding.homeSearchButton.setOnClickListener { showHomeSearch() }
         binding.homeMenuButton.setOnClickListener { menuDialog.show() }
+        // Agent notes is in this menu: its dot says a new note waits (no notification while Thoughts is open).
+        com.gitlab.mudlej.MjPdfReader.ui.agentnotes.AgentNotesDot.bind(
+            this, binding.homeMenuAgentNotesDot, binding.homeMenuButton, R.string.home_menu_title)
         binding.syncStatusButton.setOnClickListener { showSyncMenu() }
         binding.openPdfFab.setOnClickListener {
             when (currentTab()) {
                 HomeTab.NOTES -> notesTab.showActions(binding.openPdfFab)
+                HomeTab.ANNOTATIONS -> annotationsTab.showActions(binding.openPdfFab)
                 HomeTab.LIBRARY -> com.gitlab.mudlej.MjPdfReader.ui.reader.ReaderSessionNavigation.open(this)
-                HomeTab.DIARY, HomeTab.REVIEW, HomeTab.AB_TESTING -> Unit
+                HomeTab.DIARY, HomeTab.REVIEW -> Unit
             }
         }
         binding.addNoteFab.setOnClickListener { openQuickNote() }
@@ -612,8 +629,7 @@ class HomeActivity : AppCompatActivity(), HomeItemFunctions {
     }
 
     private fun setupPager() {
-        val tabs = visibleHomeTabs(AbTestingTabController.isConfigured)
-        binding.homePager.adapter = HomeTabsAdapter(tabs) { tab, swipeRefresh ->
+        binding.homePager.adapter = HomeTabsAdapter { tab, swipeRefresh ->
             val recyclerView = swipeRefresh.findViewById<androidx.recyclerview.widget.RecyclerView>(
                 R.id.pageRecyclerView
             )
@@ -622,7 +638,7 @@ class HomeActivity : AppCompatActivity(), HomeItemFunctions {
                 HomeTab.DIARY -> diaryTab.attach(swipeRefresh)
                 HomeTab.LIBRARY -> libraryTab.attach(recyclerView)
                 HomeTab.REVIEW -> reviewTab.attach(swipeRefresh)
-                HomeTab.AB_TESTING -> abTestingTab.attach(swipeRefresh)
+                HomeTab.ANNOTATIONS -> annotationsTab.attach(swipeRefresh)
             }
             setupPullToRefresh(tab, swipeRefresh)
         }
@@ -638,22 +654,18 @@ class HomeActivity : AppCompatActivity(), HomeItemFunctions {
                     HomeTab.DIARY -> R.string.home_tab_diary
                     HomeTab.LIBRARY -> R.string.home_tab_library
                     HomeTab.REVIEW -> R.string.home_tab_review
-                    HomeTab.AB_TESTING -> R.string.home_tab_ab_testing
+                    HomeTab.ANNOTATIONS -> R.string.home_tab_annotations
                 }
             )
         }.attach()
 
-        val initialTab = initialHomeTab(pref.getHomeTab(), tabs)
-        binding.homePager.setCurrentItem(initialTab.ordinal, false)
-        binding.homePager.isUserInputEnabled = initialTab != HomeTab.AB_TESTING
+        binding.homePager.setCurrentItem(pref.getHomeTab().ordinal, false)
         binding.homePager.registerOnPageChangeCallback(object : ViewPager2.OnPageChangeCallback() {
             override fun onPageSelected(position: Int) {
                 pref.setHomeTab(HomeTab.entries[position])
-                // The rating page has sliders and sentence marks, so a sideways drag stays in the page.
-                binding.homePager.isUserInputEnabled = HomeTab.entries[position] != HomeTab.AB_TESTING
-                if (HomeTab.entries[position] == HomeTab.AB_TESTING) abTestingTab.onSelected()
                 selectionController.finish()
                 notesTab.finishSelection()
+                annotationsTab.finishSelection()
                 updateReviewBackState()
                 updateHomeFab()
                 renderSelectedTab()
@@ -669,9 +681,13 @@ class HomeActivity : AppCompatActivity(), HomeItemFunctions {
         // The Diary's field is on the page itself, so it needs neither button.
         val covered = isHomeSearchShowing() || isCommentIssuesShowing()
         binding.addNoteFab.visibility = if (!covered && tab == HomeTab.NOTES) View.VISIBLE else View.GONE
-        binding.openPdfFab.visibility = if (!covered && tab == HomeTab.LIBRARY) View.VISIBLE else View.GONE
-        binding.openPdfFab.setImageResource(R.drawable.ic_elevated_pdf)
-        binding.openPdfFab.contentDescription = getString(R.string.home_open_pdf_viewer)
+        binding.openPdfFab.visibility =
+            if (!covered && (tab == HomeTab.LIBRARY || tab == HomeTab.ANNOTATIONS)) View.VISIBLE else View.GONE
+        // On Annotations the button opens the list's actions: add, sort, filter, undo and redo.
+        val annotations = tab == HomeTab.ANNOTATIONS
+        binding.openPdfFab.setImageResource(if (annotations) R.drawable.ic_more_horizontal else R.drawable.ic_elevated_pdf)
+        binding.openPdfFab.contentDescription =
+            getString(if (annotations) R.string.overview_actions else R.string.home_open_pdf_viewer)
         binding.openPdfFab.setOnLongClickListener(null)
         androidx.core.view.ViewCompat.removeAccessibilityAction(
             binding.openPdfFab,
@@ -895,7 +911,7 @@ class HomeActivity : AppCompatActivity(), HomeItemFunctions {
 
     /** Comment data changed: the comment-backed tabs and the Comment issues list render again. */
     private fun markCommentTabsDirty(vararg others: HomeTab) {
-        tabRenderTracker.markDirty(HomeTab.NOTES, HomeTab.DIARY, *others)
+        tabRenderTracker.markDirty(HomeTab.NOTES, HomeTab.DIARY, HomeTab.ANNOTATIONS, *others)
         commentIssuesNeedRender = true
     }
 
@@ -1380,7 +1396,7 @@ class HomeActivity : AppCompatActivity(), HomeItemFunctions {
                 logFirstLibraryRender()
             }
             HomeTab.REVIEW -> reviewTab.renderCurrentState()
-            HomeTab.AB_TESTING -> Unit
+            HomeTab.ANNOTATIONS -> renderCommentList(annotationsTab)
         }
         tabRenderTracker.markRendered(tab)
     }
@@ -1478,9 +1494,6 @@ class HomeActivity : AppCompatActivity(), HomeItemFunctions {
                         swipeRefresh.isRefreshing = false
                     }
                 }
-                PullToRefreshAction.RELOAD_PAGE -> abTestingTab.reload {
-                    swipeRefresh.isRefreshing = false
-                }
             }
         }
     }
@@ -1494,12 +1507,19 @@ class HomeActivity : AppCompatActivity(), HomeItemFunctions {
         }
     }
 
-    private fun startPdfReview(pdfStem: String? = null) {
+    /**
+     * Starts a review session: of one PDF ([pdfStem], every kind of card), or Library-wide from the
+     * Study ([kind] knowledge) or Projects ([kind] project, optionally one [projectId]) entry, which
+     * then offers only that entry's cards (protocol/review-card-kinds.md section 7).
+     */
+    private fun startPdfReview(pdfStem: String? = null, kind: String? = null, projectId: String? = null) {
         lifecycleScope.launch {
             val card = withContext(Dispatchers.IO) {
                 reviewStore.dueCards(
                     pdfStem = pdfStem,
                     canonicalPdfSha256ByFilename = canonicalReviewPdfHashes(sourceIndexSnapshot),
+                    kind = kind.takeIf { pdfStem == null },
+                    projectId = projectId.takeIf { pdfStem == null },
                 ).firstOrNull()
             }
             if (card == null) {
@@ -1516,6 +1536,10 @@ class HomeActivity : AppCompatActivity(), HomeItemFunctions {
                 reviewIntent.putExtra(EXTRA_FROM_HOME, true)
                 reviewIntent.putExtra(EXTRA_REVIEW_CARD_ID, card.id)
                 pdfStem?.let { reviewIntent.putExtra(EXTRA_REVIEW_PDF_STEM, it) }
+                if (pdfStem == null) {
+                    kind?.let { reviewIntent.putExtra(EXTRA_REVIEW_KIND, it) }
+                    projectId?.let { reviewIntent.putExtra(EXTRA_REVIEW_PROJECT_ID, it) }
+                }
                 startActivity(reviewIntent)
             }
         }
@@ -1667,9 +1691,9 @@ class HomeActivity : AppCompatActivity(), HomeItemFunctions {
             return searchResultsAdapter.currentList
         }
         return when (currentTab()) {
-            HomeTab.DIARY, HomeTab.NOTES -> emptyList()
+            HomeTab.DIARY, HomeTab.NOTES, HomeTab.ANNOTATIONS -> emptyList()
             HomeTab.LIBRARY -> libraryTab.currentGridItems()
-            HomeTab.REVIEW, HomeTab.AB_TESTING -> emptyList()
+            HomeTab.REVIEW -> emptyList()
         }
     }
 
@@ -1678,7 +1702,7 @@ class HomeActivity : AppCompatActivity(), HomeItemFunctions {
             return SelectionContext.SEARCH
         }
         return when (currentTab()) {
-            HomeTab.DIARY, HomeTab.NOTES, HomeTab.AB_TESTING -> SelectionContext.OVERVIEW
+            HomeTab.DIARY, HomeTab.NOTES, HomeTab.ANNOTATIONS -> SelectionContext.OVERVIEW
             HomeTab.LIBRARY -> SelectionContext.LIBRARY
             HomeTab.REVIEW -> SelectionContext.REVIEW
         }
@@ -3066,6 +3090,10 @@ class HomeActivity : AppCompatActivity(), HomeItemFunctions {
         const val EXTRA_LOGICAL_COMMENT_CONTENTS = "overviewLogicalCommentContents"
         const val EXTRA_REVIEW_CARD_ID = "pdfReviewCardId"
         const val EXTRA_REVIEW_PDF_STEM = "pdfReviewPdfStem"
+        /** The kind of card a Library-wide session offers: `knowledge` (Study) or `project` (Projects). */
+        const val EXTRA_REVIEW_KIND = "pdfReviewKind"
+        /** The one Project whose project cards a Projects session offers. */
+        const val EXTRA_REVIEW_PROJECT_ID = "pdfReviewProjectId"
         const val EXTRA_CITATION_MESSAGE = "citationMessage"
         private const val COMMENT_REFRESH_DEBOUNCE_MS = 120L
         private const val REFRESH_COALESCE_MS = 16L

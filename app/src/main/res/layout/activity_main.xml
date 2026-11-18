@@ -144,6 +144,19 @@
                     app:tint="?attr/colorOnSurface" />
             </LinearLayout>
 
+            <!-- A project card's mark: "Project card · Changed since you last saw it" (review-card-kinds). -->
+            <TextView
+                android:id="@+id/reviewKindMark"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="2dp"
+                android:textColor="?attr/colorPrimary"
+                android:textSize="12sp"
+                android:textStyle="bold"
+                android:visibility="gone"
+                tools:text="Project card · Changed since you last saw it"
+                tools:visibility="visible" />
+
             <com.google.android.material.textfield.TextInputLayout
                 android:id="@+id/reviewQuestionEditLayout"
                 style="@style/Widget.Material3.TextInputLayout.OutlinedBox"
@@ -161,41 +174,6 @@
                     android:maxLength="500"
                     android:maxLines="3" />
             </com.google.android.material.textfield.TextInputLayout>
-
-            <!-- Edit card: the note, shown and hidden together with the question. -->
-            <com.google.android.material.textfield.TextInputLayout
-                android:id="@+id/reviewNoteEditLayout"
-                style="@style/Widget.Material3.TextInputLayout.OutlinedBox"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="8dp"
-                android:hint="@string/review_card_note_hint"
-                android:visibility="gone"
-                app:helperText="@string/review_card_note_help">
-
-                <com.google.android.material.textfield.TextInputEditText
-                    android:id="@+id/reviewNoteEdit"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:gravity="top|start"
-                    android:inputType="textCapSentences|textMultiLine"
-                    android:maxLines="3" />
-            </com.google.android.material.textfield.TextInputLayout>
-
-            <TextView
-                android:id="@+id/reviewNote"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="8dp"
-                android:background="?attr/selectableItemBackground"
-                android:ellipsize="end"
-                android:maxLines="3"
-                android:minHeight="48dp"
-                android:gravity="center_vertical"
-                android:textColor="?attr/colorOnSurfaceVariant"
-                android:textSize="13sp"
-                android:visibility="gone"
-                tools:text="Note: Additional context for this card." />
 
             <!-- Review in two steps: while the answer is hidden, the groups asked before it (sliders,
                  nothing picked) and a before note; once it is shown, one line with what was picked,
@@ -357,43 +335,16 @@
                 android:orientation="horizontal">
 
                 <com.google.android.material.button.MaterialButton
-                    android:id="@+id/reviewFlipButton"
-                    style="@style/Widget.Material3.Button.OutlinedButton"
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:insetTop="2dp"
-                    android:insetBottom="2dp"
-                    android:minHeight="40dp"
-                    android:layout_marginEnd="4dp"
-                    android:layout_weight="1"
-                    android:paddingHorizontal="4dp"
-                    android:text="@string/review_flip"
-                    android:visibility="gone" />
-
-                <com.google.android.material.button.MaterialButton
                     android:id="@+id/reviewRevealButton"
-                    style="@style/Widget.Material3.Button.OutlinedButton"
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
                     android:insetTop="2dp"
                     android:insetBottom="2dp"
                     android:minHeight="40dp"
                     android:layout_marginEnd="4dp"
-                    android:layout_weight="1"
+                    android:layout_weight="1.4"
                     android:paddingHorizontal="4dp"
                     android:text="@string/review_reveal" />
-
-                <com.google.android.material.button.MaterialButton
-                    android:id="@+id/reviewSetKnowledgeButton"
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:insetTop="2dp"
-                    android:insetBottom="2dp"
-                    android:minHeight="40dp"
-                    android:layout_weight="1.4"
-                    android:maxLines="1"
-                    android:paddingHorizontal="4dp"
-                    android:text="@string/review_set_knowledge" />
 
                 <com.google.android.material.button.MaterialButton
                     android:id="@+id/reviewDoneButton"
@@ -547,6 +498,15 @@
                 android:text="@string/manual_review_region_instructions"
                 android:textColor="?attr/colorOnSurfaceVariant"
                 android:textSize="13sp" />
+
+            <!-- Shown when the selection is a section heading: the card hides the whole section. -->
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/manualReviewOnlySelectionButton"
+                style="@style/Widget.Material3.Button.TextButton"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/section_review_only_selection"
+                android:visibility="gone" />
 
             <LinearLayout
                 android:id="@+id/manualReviewAreaActions"

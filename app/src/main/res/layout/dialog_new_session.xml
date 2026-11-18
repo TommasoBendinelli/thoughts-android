@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Written for Thoughts. License is GPLv3. -->
+<!-- New session (Agent notes, top right; the reader's Study session panel): what the new session may
+     use, chosen before its prompt is pasted, and what to do with the prompt on the clipboard. -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:paddingHorizontal="24dp"
+    android:paddingTop="8dp">
+
+    <FrameLayout
+        android:id="@+id/newSessionSourcesRow"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:background="?attr/selectableItemBackground"
+        android:clickable="true"
+        android:focusable="true"
+        android:minHeight="48dp">
+
+        <com.google.android.material.chip.Chip
+            android:id="@+id/newSessionSources"
+            style="@style/Widget.Material3.Chip.Assist"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center_vertical|start"
+            android:clickable="false"
+            android:duplicateParentState="true"
+            android:ellipsize="end"
+            android:focusable="false"
+            android:importantForAccessibility="noHideDescendants"
+            android:maxLines="1"
+            app:chipIcon="@drawable/ic_library_documents"
+            app:chipIconSize="16dp"
+            app:chipIconTint="?attr/colorOnSurfaceVariant"
+            app:closeIcon="@drawable/ic_small_arrow_down"
+            app:closeIconSize="18dp"
+            app:closeIconTint="?attr/colorOnSurfaceVariant"
+            app:closeIconVisible="true" />
+    </FrameLayout>
+
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="@string/agent_notes_session_sources_hint"
+        android:textAppearance="?attr/textAppearanceBodySmall"
+        android:textColor="?attr/colorOnSurfaceVariant" />
+
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="16dp"
+        android:text="@string/agent_notes_study_mode_prompt_copied"
+        android:textAppearance="?attr/textAppearanceBodyMedium"
+        android:textColor="?attr/colorOnSurfaceVariant" />
+</LinearLayout>

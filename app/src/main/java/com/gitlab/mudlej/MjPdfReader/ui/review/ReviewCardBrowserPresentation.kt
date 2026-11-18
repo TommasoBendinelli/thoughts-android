@@ -193,6 +193,7 @@ internal fun ReviewHistoryEntry.technicalText(): String = buildList {
     updatedAt?.let { add("updated_at=$it") }
     retractedEventId?.let { add("retracted_event_id=$it") }
     undoneEventId?.let { add("undone_event_id=$it") }
+    reviewKind?.let { add("review_kind=$it") }
     add("retracted=$retracted")
     add("effective=$effective")
     add("pending_sync=$pendingSync")
@@ -320,6 +321,8 @@ internal fun ReviewBrowserCard.linkingLabelRes(sourceAvailable: Boolean?): Int {
 }
 
 internal fun ReviewHistoryEntry.historyMarkRes(): Int = when {
+    // Kind choices are queue actions too (protocol/review-card-kinds.md section 5).
+    queueAction == com.gitlab.mudlej.MjPdfReader.data.review.ReviewKinds.SET_REVIEW_KIND -> reviewKindChoiceText(reviewKind)
     // Retirement events are queue actions, never answers (protocol/review-card-retire.md).
     queueAction == com.gitlab.mudlej.MjPdfReader.data.review.ReviewRetire.RETIRE -> R.string.review_history_retire
     queueAction == com.gitlab.mudlej.MjPdfReader.data.review.ReviewRetire.RESTORE -> R.string.review_history_restore
@@ -434,3 +437,9 @@ internal fun ReviewBrowserCard.placementPending(): Boolean =
     card.reanchorState in setOf("queued", "retry", "running", "updating") ||
         card.reanchorReason == "pdf_placement_pending" ||
         (state == ReviewBrowserState.STALE && card.reanchorState != "needs_attention")
+
+/**
+ * How long the "retired" bar with its Undo stays (milliseconds): a card is retired with one tap and no
+ * question, so the bar gives time to notice a stray tap and take it back.
+ */
+internal const val REVIEW_RETIRE_UNDO_MILLIS = 8_000

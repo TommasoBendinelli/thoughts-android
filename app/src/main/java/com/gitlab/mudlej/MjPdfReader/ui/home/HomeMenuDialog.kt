@@ -36,14 +36,14 @@ class HomeMenuDialog(
 
         bindLibraryDetails(binding)
 
+        com.gitlab.mudlej.MjPdfReader.ui.agentnotes.AgentNotesDot.showNow(activity, binding.agentNotesRowDot)
         binding.agentNotesRow.setOnClickListener {
             dialog.dismiss()
             activity.startActivity(com.gitlab.mudlej.MjPdfReader.ui.agentnotes.AgentNotesListActivity.intent(activity))
         }
-        // "Instant notes", or "Notes arrive instantly" while push delivers them; "Start a new study session".
+        // "Instant notes" while push does not deliver notes; a new study session starts from Agent notes.
         StudyModeControls.bind(
-            activity, pref, binding.studyModeSwitch, detail = null, pushLine = binding.pushActiveLine,
-            startSession = binding.startStudySessionRow, dismiss = dialog::dismiss,
+            activity, pref, binding.studyModeSwitch, detail = null, pushLine = null, startSession = null, dismiss = dialog::dismiss,
         )
         binding.settingsRow.setOnClickListener {
             dialog.dismiss()

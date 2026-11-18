@@ -233,7 +233,7 @@ class ReviewSkipBannerInstrumentedTest {
                     ReviewSessionController::class.java.getDeclaredMethod("showCard", ReviewCard::class.java,
                         ReviewInterval::class.java, Map::class.java).apply { isAccessible = true }
                         .invoke(controller, first, ReviewInterval.suggested(null, null), emptyMap<String, Int>())
-                    binding.reviewSetKnowledgeButton.performClick()
+                    binding.reviewRevealButton.performClick()
                 }
                 if (timingAction == null) skip()
                 else if (timingAction != "skip") tagAndNext(timingAction, amount = "3")
@@ -253,7 +253,7 @@ class ReviewSkipBannerInstrumentedTest {
                 scenario.onActivity {
                     assertNoBanner()
                     assertEquals(View.VISIBLE, binding.reviewOptionsButton.visibility)
-                    if (hasNextCard && !wholeDocument) assertEquals(View.VISIBLE, binding.reviewSetKnowledgeButton.visibility)
+                    if (hasNextCard && !wholeDocument) assertEquals(View.VISIBLE, binding.reviewRevealButton.visibility)
                     else assertEquals(View.VISIBLE, binding.reviewDoneButton.visibility)
                 }
                 SystemClock.sleep(1200)
@@ -284,7 +284,7 @@ class ReviewSkipBannerInstrumentedTest {
                 if (wholeDocument) assertTrue(store.dueCards().isEmpty())
                 if (nextAction != null) {
                     scenario.onActivity {
-                        binding.reviewSetKnowledgeButton.performClick()
+                        binding.reviewRevealButton.performClick()
                     }
                     if (nextAction == "skip") skip()
                     else tagAndNext(nextAction)

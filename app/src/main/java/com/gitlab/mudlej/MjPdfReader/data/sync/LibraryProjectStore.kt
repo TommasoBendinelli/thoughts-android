@@ -33,7 +33,7 @@ class LibraryProjectStore(private val context: Context, stateDirectory: File? = 
         val output = state.startWrite()
         try { output.write(value.toString().toByteArray()); state.finishWrite(output) }
         catch (error: Exception) { state.failWrite(output); throw error }
-        finally { PROJECTS.invalidate() }
+        finally { PROJECTS.invalidate(); REVIEW_KINDS.invalidate() }
         PendingChangesSignal.notifyChanged()
     }
 
@@ -102,6 +102,17 @@ class LibraryProjectStore(private val context: Context, stateDirectory: File? = 
         PROJECTS.get(state.baseFile, SourceFolderNames.generation) { computeProjects() }
     }
 
+    /**
+     * The catalogue as review card kinds read it (protocol/review-card-kinds.md): each Project's kind
+     * and documents, queued changes applied (a Project's new kind counts at once, before Sync). Kept
+     * while the state file is unchanged, like [projects], and never copied: it cannot be changed.
+     */
+    fun reviewKindCatalogue(): com.gitlab.mudlej.MjPdfReader.data.review.ReviewKindCatalogue = synchronized(lock) {
+        REVIEW_KINDS.get(state.baseFile, SourceFolderNames.generation) {
+            com.gitlab.mudlej.MjPdfReader.data.review.ReviewKindCatalogue(computeProjects())
+        }
+    }
+
     /** Reads the catalogue now, on the caller's (background) thread, so that the next [projects] need not. */
     fun warm() {
         runCatching { projects() }
@@ -131,15 +142,9 @@ class LibraryProjectStore(private val context: Context, stateDirectory: File? = 
     fun enqueue(action: String, project: JsonObject, values: JsonObject = JsonObject()) = synchronized(lock) {
         // Reject before saving: a queued change is replayed onto the catalogue on every read.
         if (action == "include_source") requireIncludableSource(project, values.get("source_file")?.asString.orEmpty())
+        if (action == SET_REVIEW_KIND) requireReviewKindChange(project, values)
         val state = read()
-        val request = values.deepCopy().apply {
-            addProperty("operation_id", UUID.randomUUID().toString())
-            addProperty("project_id", project.get("id").asString)
-            addProperty("base_revision", project.get("revision")?.asInt ?: 0)
-            addProperty("action", action)
-            if (action == "include_source") addProperty("new_document_id", UUID.randomUUID().toString())
-            if (action == "import_folder") addProperty("document_id", UUID.randomUUID().toString())
-        }
+        val request = libraryProjectChangeRequest(action, project, values)
         // Preserve the pre-Sync catalogue so queued changes survive a process restart.
         val catalogue = state.getAsJsonArray("projects")
         if (action != "create" && catalogue.none { it.asJsonObject.get("id") == project.get("id") }) catalogue.add(project.deepCopy())
@@ -404,6 +409,7 @@ class LibraryProjectStore(private val context: Context, stateDirectory: File? = 
                 })
             }
             "rename_document" -> renameLibraryDocument(project, op.get("document_id").asString, op.get("name").asString)
+            SET_REVIEW_KIND -> applyProjectReviewKind(project, op)
             "remove_document" -> {
                 val documentId = op.get("document_id").asString
                 project.add("documents", JsonArray().apply {
@@ -443,9 +449,45 @@ class LibraryProjectStore(private val context: Context, stateDirectory: File? = 
 
     companion object {
         private const val MAX_HTML_BYTES = 100_000_000L
+        /** A Project's default card kind (protocol/review-card-kinds.md section 2.3). */
+        const val SET_REVIEW_KIND = "set_review_kind"
         private val lock = Any()
         private val PROJECTS = com.gitlab.mudlej.MjPdfReader.data.ParsedFileCache<JsonArray> { it.deepCopy() }
+        private val REVIEW_KINDS = com.gitlab.mudlej.MjPdfReader.data.ParsedFileCache<com.gitlab.mudlej.MjPdfReader.data.review.ReviewKindCatalogue> { it }
     }
+}
+
+/**
+ * The queued request for [action] on [project]: [values] plus the operation's identity, the
+ * Project, the revision it was made on and the action, as the server takes it.
+ */
+internal fun libraryProjectChangeRequest(action: String, project: JsonObject, values: JsonObject): JsonObject = values.deepCopy().apply {
+    addProperty("operation_id", UUID.randomUUID().toString())
+    addProperty("project_id", project.get("id").asString)
+    addProperty("base_revision", project.get("revision")?.asInt ?: 0)
+    addProperty("action", action)
+    if (action == "include_source") addProperty("new_document_id", UUID.randomUUID().toString())
+    if (action == "import_folder") addProperty("document_id", UUID.randomUUID().toString())
+}
+
+/**
+ * A Project's default card kind (protocol/review-card-kinds.md section 2.3) is `knowledge` or
+ * `project`, and only a server with `review_card_kinds_v1` takes the change: its catalogue entry has
+ * `review_kind` then, also offline.
+ */
+internal fun requireReviewKindChange(project: JsonObject, values: JsonObject) {
+    require(values.get("review_kind")?.takeIf { it.isJsonPrimitive }?.asString in setOf("knowledge", "project")) {
+        "Choose knowledge cards or project cards"
+    }
+    require(project.has("review_kind")) { "Card kinds need a server update" }
+}
+
+/**
+ * Shows a queued `set_review_kind` until Sync: the Project's kind is the new one. Its cards with a
+ * kind of their own keep it, the others follow at once; no card record changes.
+ */
+internal fun applyProjectReviewKind(project: JsonObject, op: JsonObject) {
+    project.add("review_kind", op.get("review_kind").deepCopy())
 }
 
 /** Rule R over a stored Project state (catalogue, queued changes, staged imports); null when unchanged. */

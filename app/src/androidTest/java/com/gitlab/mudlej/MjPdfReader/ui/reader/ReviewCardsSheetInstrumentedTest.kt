@@ -77,7 +77,8 @@ class ReviewCardsSheetInstrumentedTest {
                 activity.setTurnScreenOn(true)
                 activity.window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
                 binding = ActivityMainBinding.bind(activity.findViewById<ViewGroup>(android.R.id.content).getChildAt(0))
-                sheet = ReviewCardsSheetController(activity, binding, activity.lifecycleScope, {}, { items }, { highlighted += it }, { opened = it }) {}
+                sheet = ReviewCardsSheetController(activity, binding, activity.lifecycleScope, {}, { ReviewCardsSheetContent(items) },
+                    { highlighted += it }, { opened = it }, openChanged = {})
             }
             val loaded = SystemClock.uptimeMillis() + 15_000
             var pages = 0

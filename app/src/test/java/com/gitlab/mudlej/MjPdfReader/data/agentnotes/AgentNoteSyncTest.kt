@@ -352,21 +352,21 @@ class AgentNoteSyncTest {
         assertTrue(api.inboxCalls.isEmpty())
     }
 
-    @Test fun aNewNoteWaitsOnTheNoteScreenAndNotifiesElsewhere() {
+    @Test fun aNewNoteOnlyWaitsWhileThoughtsIsOpenAndNotifiesOtherwise() {
         val a = note("a", 1)
         val b = note("b", 2)
-        // On a note's screen: the New note button, no notification over the note being read.
-        val onNote = agentNoteArrival(listOf(a, b), onNoteScreen = true)
-        assertEquals(listOf(a, b), onNote.waiting)
-        assertTrue(onNote.notify.isEmpty())
+        // Thoughts open, on any screen: the New note button and the unseen dot, no notification.
+        val open = agentNoteArrival(listOf(a, b), appOpen = true)
+        assertEquals(listOf(a, b), open.waiting)
+        assertTrue(open.notify.isEmpty())
 
-        // Anywhere else, Thoughts in front or not: a notification, and the button later.
-        val elsewhere = agentNoteArrival(listOf(a, b), onNoteScreen = false)
-        assertEquals(listOf(a, b), elsewhere.notify)
-        assertEquals(listOf(a, b), elsewhere.waiting)
+        // Thoughts closed or in the background: a notification, and the button and dot later.
+        val closed = agentNoteArrival(listOf(a, b), appOpen = false)
+        assertEquals(listOf(a, b), closed.notify)
+        assertEquals(listOf(a, b), closed.waiting)
 
         // The note already on screen is neither announced nor waiting.
-        val shown = agentNoteArrival(listOf(b), onNoteScreen = true, shownNoteId = "b")
+        val shown = agentNoteArrival(listOf(b), appOpen = true, shownNoteId = "b")
         assertTrue(shown.waiting.isEmpty())
         assertTrue(shown.notify.isEmpty())
     }
@@ -386,13 +386,13 @@ class AgentNoteSyncTest {
     @Test fun aPageTheUserSentFromAnotherDeviceIsNeverAnnounced() {
         val agent = note("a", 1)
         val page = macPage("p", 2)
-        for (onNoteScreen in listOf(true, false)) {
-            val arrival = agentNoteArrival(listOf(agent, page), onNoteScreen)
+        for (appOpen in listOf(true, false)) {
+            val arrival = agentNoteArrival(listOf(agent, page), appOpen)
             // No New note button and no notification for the user's own page; the agent's note still arrives.
             assertEquals(listOf(agent), arrival.waiting)
-            assertEquals(if (onNoteScreen) emptyList() else listOf(agent), arrival.notify)
+            assertEquals(if (appOpen) emptyList() else listOf(agent), arrival.notify)
         }
-        val alone = agentNoteArrival(listOf(page), onNoteScreen = false)
+        val alone = agentNoteArrival(listOf(page), appOpen = false)
         assertTrue(alone.waiting.isEmpty())
         assertTrue(alone.notify.isEmpty())
     }
@@ -405,7 +405,7 @@ class AgentNoteSyncTest {
         assertTrue(store.note("p")!!.isPhonePage)
         assertEquals(listOf("p" to "delivered"), api.receipts)
         assertEquals(4L, store.inboxCursor())
-        assertTrue(agentNoteArrival(stored, onNoteScreen = false).notify.isEmpty())
+        assertTrue(agentNoteArrival(stored, appOpen = false).notify.isEmpty())
     }
 
     @Test fun draftRoundTrip() {

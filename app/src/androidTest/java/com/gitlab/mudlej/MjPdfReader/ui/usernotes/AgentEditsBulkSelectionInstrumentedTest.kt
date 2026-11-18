@@ -178,6 +178,73 @@ class AgentEditsBulkSelectionInstrumentedTest {
         throw AssertionError("Timed out waiting for $what")
     }
 
+    /** ‹ › in an open agent edit step through the list as shown; the title says "Agent edit 2/4". */
+    @Test fun arrowsStepThroughTheAgentEditsWithTheirPosition() {
+        File(context.noBackupFilesDir, "thoughts-sync/battery-prompt-seen-v1").apply { parentFile!!.mkdirs(); writeText("shown\n") }
+        seedBundle()
+        val pdf = writePdf()
+        val intent = Intent(context, MainActivity::class.java).apply {
+            action = Intent.ACTION_VIEW
+            setDataAndType(Uri.fromFile(pdf), "application/pdf")
+            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        }
+        ActivityScenario.launch<MainActivity>(intent).use { scenario ->
+            lateinit var activity: MainActivity
+            lateinit var binding: ActivityMainBinding
+            scenario.onActivity { activity = it }
+            waitFor("the PDF") {
+                binding = ActivityMainBinding.bind(activity.findViewById<ViewGroup>(android.R.id.content).getChildAt(0))
+                binding.pdfView.pageCount > 0
+            }
+            instrumentation.runOnMainSync {
+                val reader = MainActivity::class.java.getDeclaredField("reader").apply { isAccessible = true }.get(activity) as ReaderComposition
+                reader.readerNavigationController.showAgentEdits()
+            }
+            fun sheet(): View = binding.commentSheetHost
+            fun list() = sheet().findViewById<RecyclerView>(R.id.commentsList)
+            fun title() = sheet().findViewById<TextView>(R.id.commentsTitle).text.toString()
+            fun button(id: Int) = sheet().findViewById<View>(id)
+            fun explanation() = sheet().findViewById<TextView>(R.id.commentsDetailText).text.toString()
+            waitFor("four agent edits") { list()?.adapter?.itemCount == 4 && list().findViewHolderForAdapterPosition(0) != null }
+
+            instrumentation.runOnMainSync { list().findViewHolderForAdapterPosition(0)!!.itemView.performClick() }
+            waitFor("Agent edit 1/4") { title() == "Agent edit 1/4" }
+            instrumentation.runOnMainSync {
+                assertEquals(explanations.getValue(1), explanation())
+                assertFalse("No previous edit before the first", button(R.id.commentsPrevious).isEnabled)
+                assertTrue(button(R.id.commentsNext).isEnabled)
+                assertEquals("Next agent edit", button(R.id.commentsNext).contentDescription)
+            }
+            capture("arrows-1-first.png")
+
+            instrumentation.runOnMainSync { button(R.id.commentsNext).performClick() }
+            waitFor("Agent edit 2/4") { title() == "Agent edit 2/4" }
+            instrumentation.runOnMainSync {
+                assertEquals(explanations.getValue(2), explanation())
+                assertTrue(button(R.id.commentsPrevious).isEnabled)
+            }
+            capture("arrows-2-second.png")
+
+            instrumentation.runOnMainSync { button(R.id.commentsNext).performClick() }
+            waitFor("Agent edit 3/4") { title() == "Agent edit 3/4" }
+            instrumentation.runOnMainSync { button(R.id.commentsNext).performClick() }
+            waitFor("Agent edit 4/4") { title() == "Agent edit 4/4" }
+            instrumentation.runOnMainSync {
+                assertEquals(explanations.getValue(4), explanation())
+                assertFalse("No next edit after the last", button(R.id.commentsNext).isEnabled)
+            }
+            capture("arrows-3-last.png")
+
+            instrumentation.runOnMainSync { button(R.id.commentsPrevious).performClick() }
+            waitFor("back to Agent edit 3/4") { title() == "Agent edit 3/4" }
+            instrumentation.runOnMainSync { assertEquals(explanations.getValue(3), explanation()) }
+
+            // All agent edits returns to the list with its usual title.
+            instrumentation.runOnMainSync { button(R.id.commentsBack).performClick() }
+            waitFor("the list") { title() == activity.getString(R.string.agent_edits_title) }
+        }
+    }
+
     @Test fun selectionModeAcceptsRejectsAndUndoesEverySelectedEdit() {
         File(context.noBackupFilesDir, "thoughts-sync/battery-prompt-seen-v1").apply { parentFile!!.mkdirs(); writeText("shown\n") }
         seedBundle()

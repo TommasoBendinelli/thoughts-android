@@ -88,7 +88,7 @@ class OfflineHtmlInstrumentedTest {
             }
         }
         try {
-            val link = if (localCopy) "file:///Users/other-computer/plot.html" else "thoughts-html:$path"
+            val link = if (localCopy) "file:///Users/example-other/plot.html" else "thoughts-html:$path"
             if (localCopy) LocalHtmlAttachments(File(context.filesDir, "local-html-attachments"))
                 .save(name, link, html.inputStream())
             val file = File(context.cacheDir, name).apply { writeBytes(linkedPdf(link)) }

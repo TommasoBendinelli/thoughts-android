@@ -40,6 +40,17 @@ class PreferencesTest {
     }
 
     @Test
+    fun removedAbTestingTabMigratesToAnnotationsInItsPlace() {
+        val sharedPreferences = InMemorySharedPreferences(
+            mapOf(Preferences.homeTabKey to "AB_TESTING")
+        )
+
+        assertEquals(HomeTab.ANNOTATIONS, Preferences(sharedPreferences).getHomeTab())
+        assertEquals(4, HomeTab.ANNOTATIONS.ordinal)
+        assertEquals(HomeTab.ANNOTATIONS.name, sharedPreferences.getString(Preferences.homeTabKey, null))
+    }
+
+    @Test
     fun freshInstallOpensTheDiary() {
         assertEquals(HomeTab.DIARY, Preferences(InMemorySharedPreferences(emptyMap())).getHomeTab())
     }

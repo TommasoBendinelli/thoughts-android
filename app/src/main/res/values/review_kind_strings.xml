@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Written for Thoughts. License is GPLv3. Knowledge cards and project cards (protocol/review-card-kinds.md). -->
+<resources>
+    <!-- A card's menu (review, card details). -->
+    <string name="review_kind_make_project" translatable="false">Make project card</string>
+    <string name="review_kind_make_knowledge" translatable="false">Make knowledge card</string>
+    <string name="review_kind_follow_project" translatable="false">Follow the Project (%1$s)</string>
+    <string name="review_kind_knowledge" translatable="false">Knowledge</string>
+    <string name="review_kind_project" translatable="false">Project</string>
+    <!-- The mark on a project card, in review and in card lists. -->
+    <string name="review_kind_project_mark" translatable="false">Project card</string>
+    <string name="review_kind_changed" translatable="false">Changed since you last saw it</string>
+    <!-- History, and the bar after a choice. -->
+    <string name="review_history_made_project" translatable="false">Made a project card</string>
+    <string name="review_history_made_knowledge" translatable="false">Made a knowledge card</string>
+    <string name="review_history_follows_project" translatable="false">Follows the Project\'s kind</string>
+    <!-- Card details. -->
+    <string name="review_card_details_kind_own_project" translatable="false">Project card, by its own choice. It comes back at least once a week and at once when its passage changes.</string>
+    <string name="review_card_details_kind_project" translatable="false">Project card, as its Project. It comes back at least once a week and at once when its passage changes.</string>
+    <string name="review_card_details_kind_own_knowledge" translatable="false">Knowledge card, by its own choice</string>
+    <string name="review_card_details_kind_knowledge" translatable="false">Knowledge card</string>
+    <!-- The interval cell of a project card: it comes back within a week whatever the interval. -->
+    <string name="review_kind_interval_capped" translatable="false">%1$s chosen; a project card comes back within a week</string>
+    <!-- Review tab: the two entries. -->
+    <string name="review_entry_study" translatable="false">Study · %1$d due</string>
+    <string name="review_entry_projects" translatable="false">Projects · %1$d due</string>
+    <string name="review_entry_all_projects" translatable="false">All Projects</string>
+    <string name="review_entry_project_due" translatable="false">%1$s · %2$d due</string>
+    <string name="review_entry_projects_scope" translatable="false">%1$s ▾</string>
+    <string name="review_entry_projects_scope_description" translatable="false">Projects reviewed: %1$s. Choose another Project</string>
+    <string name="review_entry_choose_project" translatable="false">Project cards to review</string>
+    <string name="review_entry_none_due_study" translatable="false">No knowledge cards are due.</string>
+    <string name="review_entry_none_due_projects" translatable="false">No project cards are due.</string>
+    <!-- A Project's menu. -->
+    <string name="library_project_card_kind" translatable="false">Card kind: %1$s…</string>
+    <string name="library_project_kind_knowledge" translatable="false">Knowledge cards</string>
+    <string name="library_project_kind_project" translatable="false">Project cards</string>
+    <string name="library_project_card_kind_title" translatable="false">Card kind of %1$s</string>
+    <string name="library_project_retire_cards" translatable="false">Retire project cards…</string>
+    <plurals name="library_project_retire_cards_title" translatable="false">
+        <item quantity="one">Retire 1 project card</item>
+        <item quantity="other">Retire %d project cards</item>
+    </plurals>
+    <string name="library_project_retire_cards_message" translatable="false">The active project cards of %1$s leave review. Each card keeps its history and can be restored to review. Knowledge cards are not touched.</string>
+    <string name="library_project_retire_cards_action" translatable="false">Retire</string>
+    <plurals name="library_project_retired_cards" translatable="false">
+        <item quantity="one">Retired 1 project card</item>
+        <item quantity="other">Retired %d project cards</item>
+    </plurals>
+</resources>

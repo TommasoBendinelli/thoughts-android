@@ -104,11 +104,11 @@ class ReviewRecallPredictionTest {
 
     @Test fun withoutBothUrlAndTokenNothingIsAsked() {
         assertNull(ReviewRecallPrediction.Config.of(null, "t"))
-        assertNull(ReviewRecallPrediction.Config.of("http://100.64.0.10:8798/recall-prediction", " "))
+        assertNull(ReviewRecallPrediction.Config.of("http://server.example.ts.net:8798/recall-prediction", " "))
         assertNull(ReviewRecallPrediction.Config.of("", ""))
         assertNull(ReviewRecallPrediction.Config.of("ftp://host/x", "t"))
-        val config = checkNotNull(ReviewRecallPrediction.Config.of(" http://100.64.0.10:8798/recall-prediction ", " secret "))
-        assertEquals("http://100.64.0.10:8798/recall-prediction", config.url)
+        val config = checkNotNull(ReviewRecallPrediction.Config.of(" http://server.example.ts.net:8798/recall-prediction ", " secret "))
+        assertEquals("http://server.example.ts.net:8798/recall-prediction", config.url)
         assertEquals("secret", config.token)
         // Never printed.
         assertFalse(config.toString().contains("secret"))
@@ -125,7 +125,7 @@ class ReviewRecallPredictionTest {
     }
 
     @Test fun theRequestIsAPostWithTheTokenAndAnythingButA200Fails() {
-        val config = checkNotNull(ReviewRecallPrediction.Config.of("http://100.64.0.10:8798/recall-prediction", "secret"))
+        val config = checkNotNull(ReviewRecallPrediction.Config.of("http://server.example.ts.net:8798/recall-prediction", "secret"))
         val body = JsonObject().apply { addProperty("card_id", "card-1") }
         var connection: FakeConnection? = null
         val logged = mutableListOf<String>()

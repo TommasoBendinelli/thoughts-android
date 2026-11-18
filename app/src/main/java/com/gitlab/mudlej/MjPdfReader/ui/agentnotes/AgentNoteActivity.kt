@@ -48,6 +48,7 @@ import com.gitlab.mudlej.MjPdfReader.core.ui.AppSnackbar
 import com.gitlab.mudlej.MjPdfReader.data.agentnotes.AgentNote
 import com.gitlab.mudlej.MjPdfReader.data.agentnotes.AgentNoteDraft
 import com.gitlab.mudlej.MjPdfReader.data.agentnotes.AgentNoteInbox
+import com.gitlab.mudlej.MjPdfReader.data.agentnotes.AgentNoteUnseen
 import com.gitlab.mudlej.MjPdfReader.data.agentnotes.AgentNoteCoverer
 import com.gitlab.mudlej.MjPdfReader.data.agentnotes.AGENT_NOTE_ANSWER_BY_CAPABILITY
 import com.gitlab.mudlej.MjPdfReader.data.agentnotes.AgentNoteAgent
@@ -55,6 +56,7 @@ import com.gitlab.mudlej.MjPdfReader.data.agentnotes.AgentNoteListening
 import com.gitlab.mudlej.MjPdfReader.data.agentnotes.AgentNoteListeningAnswer
 import com.gitlab.mudlej.MjPdfReader.data.agentnotes.AgentNoteListeningCache
 import com.gitlab.mudlej.MjPdfReader.data.agentnotes.AgentNoteReplySources
+import com.gitlab.mudlej.MjPdfReader.data.agentnotes.AgentNoteStore
 import com.gitlab.mudlej.MjPdfReader.data.agentnotes.AgentNoteServerCapabilities
 import com.gitlab.mudlej.MjPdfReader.data.agentnotes.AgentNoteWake
 import com.gitlab.mudlej.MjPdfReader.data.agentnotes.AgentNotesHttpException
@@ -71,7 +73,7 @@ import com.gitlab.mudlej.MjPdfReader.data.glasses.GlassesCameraProblem
 import com.gitlab.mudlej.MjPdfReader.data.glasses.GlassesPhoto
 import androidx.preference.PreferenceManager
 import com.gitlab.mudlej.MjPdfReader.data.agentnotes.agentNoteSampleSize
-import com.gitlab.mudlej.MjPdfReader.data.agentnotes.conversationNotes
+import com.gitlab.mudlej.MjPdfReader.data.agentnotes.arrowNotes
 import com.gitlab.mudlej.MjPdfReader.databinding.ActivityAgentNoteBinding
 import com.gitlab.mudlej.MjPdfReader.ui.agents.AgentConversationLinks
 import com.google.android.material.color.MaterialColors
@@ -102,7 +104,11 @@ sealed interface AgentNoteScreenState {
         /** Read-only reply: what the answering agent was allowed to use, when the reply says. */
         val replySources: AgentNoteReplySources? = null,
     ) : AgentNoteScreenState
-    /** [takingPicture]: Send with picture is waiting for the glasses' photo. */
+    /**
+     * A reply on its way: [takingPicture] while Send with picture waits for the glasses' photo, then
+     * while it is saved and sent. The note stays usable meanwhile (the reply took the drawing and
+     * comment as they were when Send was pressed); only Send waits.
+     */
     class Sending(val ready: Ready, val takingPicture: Boolean = false) : AgentNoteScreenState
     /**
      * A reply went out (or is queued): the note stays open, drawings kept, ready for another reply.
@@ -324,37 +330,71 @@ class AgentNoteViewModel(application: Application) : AndroidViewModel(applicatio
     private fun currentReady(): AgentNoteScreenState.Ready? = when (val state = mutableState.value) {
         is AgentNoteScreenState.Ready -> state
         is AgentNoteScreenState.Sent -> state.ready
+        // Drawing goes on while a reply is on its way: its draft is kept like any other.
+        is AgentNoteScreenState.Sending -> state.ready
         else -> null
     }
 
     /**
      * Sends the reply; [withPicture] first takes a picture with the glasses and sends it with the
-     * reply. When no picture comes nothing is sent ([pictureFailure] says why) and everything stays.
+     * reply. It runs in the background: the reply takes the drawing and the comment as they are now
+     * (the comment field empties at once), and the note stays usable while the picture is taken and
+     * the reply is sent. When no picture comes nothing is sent ([pictureFailure] says why) and the
+     * comment comes back unless a new one was typed. Whether a send started.
      */
-    fun send(withPicture: Boolean = false) {
-        val ready = currentReady() ?: return
-        if (ready.readOnly) return
+    fun send(withPicture: Boolean = false): Boolean {
+        // One reply at a time: Send waits while the previous one is on its way.
+        if (mutableState.value is AgentNoteScreenState.Sending) return false
+        val ready = currentReady() ?: return false
+        if (ready.readOnly) return false
         val picture = withPicture && !ready.note.isPhonePage
         mutableState.value = AgentNoteScreenState.Sending(ready, takingPicture = picture)
         val app = getApplication<Application>()
         val comment = message.trim().takeIf(String::isNotEmpty)
         val strokes = ready.document.toJson()
+        val revision = ready.document.revision
         val strokeCount = ready.document.strokes.size
         val markerCount = ready.document.markers.size
-        // What the answering agent may use, as chosen when Send is pressed: the reply keeps it, also while queued.
-        val sources = Preferences(PreferenceManager.getDefaultSharedPreferences(app)).getAgentNoteReplySources()
+        // The drawing as it is now: drawing on goes into the next reply, not this one.
+        val drawing = runCatching { AnnotationDocument.fromJson(strokes) }.getOrNull()?.takeIf {
+            it.imageWidth == ready.document.imageWidth && it.imageHeight == ready.document.imageHeight
+        } ?: ready.document
+        // The comment goes with this reply; the field is free for the next one at once.
+        message = ""
+        messageDirty = false
+        /** The screen still shows this note (it may have moved on while the reply was on its way). */
+        fun stillShown() = currentReady() === ready
+        /**
+         * The reply holds the drawing: its draft goes, unless more was drawn or typed while it was on
+         * its way (that stays a draft, saved as usual).
+         */
+        fun settleDraft(store: AgentNoteStore) {
+            if (ready.document.revision != revision || message.isNotBlank()) return
+            store.clearDraft(ready.note.noteId)
+            ready.document.markSaved()
+        }
+        /** Nothing was sent: the comment comes back unless a new one was typed meanwhile. */
+        fun keepComment() {
+            if (comment != null && message.isBlank()) {
+                message = comment
+                messageDirty = true
+            }
+        }
         AgentNotes.ioScope.launch {
             val photo: GlassesPhoto? = if (!picture) null else try {
                 glassesCamera(app).takePhoto()
             } catch (error: GlassesCameraException) {
                 Log.w(AgentNotes.TAG, "glasses picture failed: ${error.problem}")
-                mutableState.value = ready
-                pictureFailure.value = error.problem
+                if (stillShown()) {
+                    keepComment()
+                    mutableState.value = ready
+                    pictureFailure.value = error.problem
+                }
                 return@launch
             }
-            if (photo != null) mutableState.value = AgentNoteScreenState.Sending(ready)
+            if (photo != null && stillShown()) mutableState.value = AgentNoteScreenState.Sending(ready)
             val result = try {
-                val composite = AnnotationCanvasView.renderComposite(ready.bitmap, ready.document)
+                val composite = AnnotationCanvasView.renderComposite(ready.bitmap, drawing)
                 val png = ByteArrayOutputStream().use { output ->
                     composite.compress(Bitmap.CompressFormat.PNG, 100, output)
                     output.toByteArray()
@@ -371,18 +411,18 @@ class AgentNoteViewModel(application: Application) : AndroidViewModel(applicatio
                         AgentNotes.api(app).createNote(page, png, strokeCount)
                     } catch (error: IOException) {
                         Log.w(AgentNotes.TAG, "page note not sent: ${error.javaClass.simpleName}")
-                        mutableState.value = ready
-                        pageSendFailure.value = true
+                        if (stillShown()) {
+                            keepComment()
+                            mutableState.value = ready
+                            pageSendFailure.value = true
+                        }
                         return@launch
                     }
                     val store = AgentNotes.store(app)
                     if (first) store.updateNote(created)
-                    store.clearDraft(ready.note.noteId)
-                    ready.document.markSaved()
-                    message = ""
-                    messageDirty = false
+                    settleDraft(store)
                     Log.i(AgentNotes.TAG, "page note sent bytes=${png.size} strokes=$strokeCount")
-                    mutableState.value = AgentNoteScreenState.Sent(ready, delivered = true)
+                    if (stillShown()) mutableState.value = AgentNoteScreenState.Sent(ready, delivered = true)
                     return@launch
                 }
                 val local = LocalAgentNoteReply(
@@ -397,18 +437,15 @@ class AgentNoteViewModel(application: Application) : AndroidViewModel(applicatio
                     sent = false,
                     photoMediaType = photo?.mediaType,
                     photoCapture = photo?.capture,
-                    sources = sources.apiValue,
+                    // What an agent may use is chosen when its session starts (New session), not per reply.
+                    sources = null,
                 )
                 composite.recycle()
                 val store = AgentNotes.store(app)
                 store.queueReply(local, png, strokes, photo?.bytes)
-                store.clearDraft(ready.note.noteId)
-                ready.document.markSaved()
-                // The comment went with this reply; the field starts empty for the next one.
-                message = ""
-                messageDirty = false
+                settleDraft(store)
                 Log.i(AgentNotes.TAG, "agent note reply queued bytes=${png.size} strokes=$strokeCount markers=$markerCount " +
-                    "photo=${photo?.bytes?.size ?: 0} sources=${sources.apiValue}")
+                    "photo=${photo?.bytes?.size ?: 0}")
                 val server = AgentNotes.sync(app).sendReply(local)
                 if (server != null && (server.listening != AgentNoteListening.UNKNOWN || server.wake != null)) {
                     mutableCoverer.value = server.coverer
@@ -424,13 +461,16 @@ class AgentNoteViewModel(application: Application) : AndroidViewModel(applicatio
                 Log.w(AgentNotes.TAG, "agent note reply could not be saved: ${error.javaClass.simpleName}")
                 null
             }
+            if (!stillShown()) return@launch
             if (result != null) {
                 mutableState.value = result
             } else {
+                keepComment()
                 mutableState.value = ready
                 sendFailure.value = true
             }
         }
+        return true
     }
 
     /** Set when saving the reply itself failed (not a network failure). */
@@ -473,8 +513,8 @@ class AgentNoteViewModel(application: Application) : AndroidViewModel(applicatio
  */
 /**
  * Agent notes, one window for all of them (launchMode singleTask): a note that arrives, or is
- * opened from the list, replaces the one on screen, and the bar's arrows step through the notes
- * of the same conversation. Each note keeps its own view model, so its drawing and comment stay
+ * opened from the list, replaces the one on screen, and the bar's arrows step through all notes in
+ * the order they were sent, whichever chat sent them. Each note keeps its own view model, so its drawing and comment stay
  * when you step away and back. The window is one tab next to the reader's documents, and shows
  * their tab strip too, so switching between the note and a PDF is one tap either way.
  */
@@ -492,7 +532,7 @@ class AgentNoteActivity : AppCompatActivity(), AnnotationCanvasView.Listener, Do
     /** Set while the comment field is filled from the view model, so that is not a user edit. */
     private var fillingComment = false
     private var noteTitle: String? = null
-    /** The notes of this note's conversation, oldest first (the arrows' order), and this note's place in them. */
+    /** All notes, oldest first (the arrows' order), and this note's place in them. */
     private var conversation: List<AgentNote> = emptyList()
     private var position = -1
     /** Notes that arrived and were not opened yet, oldest first: the New note button. */
@@ -519,7 +559,7 @@ class AgentNoteActivity : AppCompatActivity(), AnnotationCanvasView.Listener, Do
             insets
         }
         setSupportActionBar(binding.agentNoteToolbar)
-        // Home on the left, the note's title, and the arrows to the conversation's other notes on the right.
+        // Home on the left, the note's title, and the arrows to the previous and next note sent on the right.
         supportActionBar?.setDisplayHomeAsUpEnabled(true)
         supportActionBar?.setHomeAsUpIndicator(R.drawable.ic_home)
         if (noteId.isBlank()) {
@@ -546,7 +586,7 @@ class AgentNoteActivity : AppCompatActivity(), AnnotationCanvasView.Listener, Do
             repeatOnLifecycle(Lifecycle.State.STARTED) {
                 AgentNoteInbox.waiting.collect { notes ->
                     waiting = notes.filter { it.noteId != noteId }
-                    // A note of this conversation is one arrow away as soon as it is here.
+                    // A note that arrives is one arrow away as soon as it is here.
                     boundReady?.let { loadConversation(it.note) }
                     invalidateOptionsMenu()
                 }
@@ -595,6 +635,7 @@ class AgentNoteActivity : AppCompatActivity(), AnnotationCanvasView.Listener, Do
         updateSubtitle()
         AgentNoteNotifier.cancel(this, noteId)
         AgentNoteInbox.opened(noteId)
+        AgentNoteUnseen.opened(this, noteId)
         if (replyId == null) AgentStudyListenerService.start(this)
         viewModel.load(noteId, replyId)
         stateJob?.cancel()
@@ -623,6 +664,7 @@ class AgentNoteActivity : AppCompatActivity(), AnnotationCanvasView.Listener, Do
                     shown.pageSendFailure.collect { failed ->
                         if (failed) {
                             shown.pageSendFailure.value = false
+                            fillComment(shown.message)
                             AppSnackbar.make(binding.root, R.string.agent_note_page_send_failed, Snackbar.LENGTH_LONG).show()
                         }
                     }
@@ -631,8 +673,11 @@ class AgentNoteActivity : AppCompatActivity(), AnnotationCanvasView.Listener, Do
                     shown.pictureFailure.collect { problem ->
                         if (problem != null) {
                             shown.pictureFailure.value = null
+                            fillComment(shown.message)
                             AppSnackbar.make(binding.root, agentNotePictureProblemText(problem), Snackbar.LENGTH_LONG)
-                                .setAction(R.string.agent_note_send_without_picture) { shown.send(withPicture = false) }
+                                .setAction(R.string.agent_note_send_without_picture) {
+                                    if (shown.send(withPicture = false)) fillComment("")
+                                }
                                 .show()
                         }
                     }
@@ -641,6 +686,7 @@ class AgentNoteActivity : AppCompatActivity(), AnnotationCanvasView.Listener, Do
                     shown.sendFailure.collect { failed ->
                         if (failed) {
                             shown.sendFailure.value = false
+                            fillComment(shown.message)
                             AppSnackbar.make(binding.root, R.string.agent_note_send_failed, Snackbar.LENGTH_LONG).show()
                         }
                     }
@@ -649,11 +695,11 @@ class AgentNoteActivity : AppCompatActivity(), AnnotationCanvasView.Listener, Do
         }
     }
 
-    /** Finds the notes of this note's conversation for the arrows, from the notes on the phone. */
+    /** Finds the notes for the arrows: all notes on the phone, in the order they were sent. */
     private fun loadConversation(note: AgentNote) {
         val shownId = noteId
         lifecycleScope.launch {
-            val notes = withContext(Dispatchers.IO) { conversationNotes(AgentNotes.store(applicationContext).notes(), note) }
+            val notes = withContext(Dispatchers.IO) { arrowNotes(AgentNotes.store(applicationContext).notes(), note) }
             if (shownId != noteId) return@launch
             conversation = notes
             position = notes.indexOfFirst { it.noteId == note.noteId }
@@ -662,7 +708,7 @@ class AgentNoteActivity : AppCompatActivity(), AnnotationCanvasView.Listener, Do
         }
     }
 
-    /** "2 / 5 · Sent ✓ · waiting for the agent": the place among the conversation's notes, then the note's state. */
+    /** "41 / 57 · Sent ✓ · waiting for the agent": the place among all notes in sending order, then the note's state. */
     private fun updateSubtitle() {
         val place = if (conversation.size > 1 && position >= 0) getString(R.string.agent_note_position, position + 1, conversation.size) else null
         supportActionBar?.subtitle = listOfNotNull(place, statusText).joinToString(" · ").ifBlank { null }
@@ -708,25 +754,25 @@ class AgentNoteActivity : AppCompatActivity(), AnnotationCanvasView.Listener, Do
         }
         binding.agentNoteSend.setOnClickListener {
             hideKeyboard()
-            viewModel.send()
+            if (viewModel.send()) fillComment("")
         }
         binding.agentNoteSendWithPicture.setOnClickListener {
             hideKeyboard()
-            viewModel.send(withPicture = true)
+            if (viewModel.send(withPicture = true)) fillComment("")
         }
         binding.agentNoteOpenConversation.setOnClickListener {
             boundReady?.note?.let { openConversation(it, viewModel.message, replied = false) }
         }
         binding.agentNoteAnswerChange.setOnClickListener { showAnswerChoice() }
-        binding.agentNoteSourcesRow.setOnClickListener { showSourcesChoice() }
+        binding.agentNoteAnsweredByRow.setOnClickListener { showAnswerChoice() }
         // The chip only shows the row's state (Chip makes itself focusable: the row is the one stop), but its
         // arrow takes its own touches: it opens the choice too.
-        binding.agentNoteSources.isFocusable = false
-        binding.agentNoteSources.setOnCloseIconClickListener {
-            if (binding.agentNoteSourcesRow.isEnabled) binding.agentNoteSourcesRow.performClick()
+        binding.agentNoteAnsweredBy.isFocusable = false
+        binding.agentNoteAnsweredBy.setOnCloseIconClickListener {
+            if (binding.agentNoteAnsweredByRow.isEnabled) binding.agentNoteAnsweredByRow.performClick()
         }
-        // A screen reader hears the row as the button it is, with its description (what it does, the choice now).
-        ViewCompat.setAccessibilityDelegate(binding.agentNoteSourcesRow, object : androidx.core.view.AccessibilityDelegateCompat() {
+        // A screen reader hears the row as the button it is, with its description (what it does, who answers now).
+        ViewCompat.setAccessibilityDelegate(binding.agentNoteAnsweredByRow, object : androidx.core.view.AccessibilityDelegateCompat() {
             override fun onInitializeAccessibilityNodeInfo(host: View, info: AccessibilityNodeInfoCompat) {
                 super.onInitializeAccessibilityNodeInfo(host, info)
                 info.className = android.widget.Button::class.java.name
@@ -760,11 +806,11 @@ class AgentNoteActivity : AppCompatActivity(), AnnotationCanvasView.Listener, Do
             }
             is AgentNoteScreenState.Ready -> {
                 bind(state, sending = false)
-                showTakingPicture(false)
+                showSending(null)
             }
             is AgentNoteScreenState.Sending -> {
                 bind(state.ready, sending = true)
-                showTakingPicture(state.takingPicture)
+                showSending(state)
             }
             is AgentNoteScreenState.Sent -> {
                 // The note stays open with the drawing until the agent answers (a new note opens on top).
@@ -801,7 +847,7 @@ class AgentNoteActivity : AppCompatActivity(), AnnotationCanvasView.Listener, Do
     }
 
     private fun bind(ready: AgentNoteScreenState.Ready, sending: Boolean) {
-        binding.agentNoteProgress.visibility = if (sending) View.VISIBLE else View.GONE
+        binding.agentNoteProgress.visibility = View.GONE
         binding.agentNoteStatus.visibility = View.GONE
         if (boundReady !== ready) {
             boundReady = ready
@@ -842,18 +888,13 @@ class AgentNoteActivity : AppCompatActivity(), AnnotationCanvasView.Listener, Do
             binding.agentNoteTools.visibility = if (ready.readOnly) View.GONE else View.VISIBLE
             // A page from the reader is the picture already; an agent's note can get one from the glasses.
             binding.agentNoteSendWithPicture.visibility = if (ready.note.isPhonePage) View.GONE else View.VISIBLE
-            // A page from the reader becomes a new note, not a reply: there is no answering agent to limit.
-            binding.agentNoteSourcesRow.visibility = if (ready.note.isPhonePage) View.GONE else View.VISIBLE
-            updateSourcesChip()
             fillComment(viewModel.message)
             applyTool()
             updateAnswerLine()
         }
-        binding.agentNoteCanvas.isEnabled = !sending
-        binding.agentNoteCommentField.isEnabled = !sending
+        // A reply on its way runs in the background: the note stays usable, only Send waits for it.
         binding.agentNoteSend.isEnabled = !sending
         binding.agentNoteSendWithPicture.isEnabled = !sending
-        binding.agentNoteSourcesRow.isEnabled = !sending
         updateUndoRedo()
     }
 
@@ -883,12 +924,19 @@ class AgentNoteActivity : AppCompatActivity(), AnnotationCanvasView.Listener, Do
         }
     }
 
-    /** "Taking a picture with the glasses…" in the subtitle while Send with picture waits for it. */
-    private fun showTakingPicture(taking: Boolean) {
-        val text = getString(R.string.agent_note_taking_picture)
-        if (taking && statusText != text) statusText = text
-        else if (!taking && statusText == text) statusText = null
-        else return
+    /**
+     * The reply on its way, in the subtitle: "Taking a picture with the glasses…" while Send with
+     * picture waits for it, then "Sending…"; [sending] null takes either away.
+     */
+    private fun showSending(sending: AgentNoteScreenState.Sending?) {
+        val texts = listOf(getString(R.string.agent_note_taking_picture), getString(R.string.agent_note_sending))
+        val text = when {
+            sending == null -> statusText.takeUnless { it in texts }
+            sending.takingPicture -> texts[0]
+            else -> texts[1]
+        }
+        if (text == statusText) return
+        statusText = text
         updateSubtitle()
     }
 
@@ -898,12 +946,15 @@ class AgentNoteActivity : AppCompatActivity(), AnnotationCanvasView.Listener, Do
      * server has not said, or cannot tell.
      */
     private fun updateAnswerLine() {
+        updateAnsweredByChip()
         val ready = boundReady
         val timeFormat = android.text.format.DateFormat.getTimeFormat(this)
         val line = if (ready == null || ready.readOnly || ready.note.isPhonePage) null else agentNoteAnswerLine(
             viewModel.answer.value, viewModel.canChangeAnswerer.value, viewModel.serverReachable.value, ::getString,
         ) { timeFormat.format(java.util.Date(it)) }
-        binding.agentNoteAnswerLine.visibility = if (line == null) View.GONE else View.VISIBLE
+        // Only a line that needs attention shows (nobody listens, its machine is offline); the usual
+        // case takes no room, and who answers is the chip over the comment.
+        binding.agentNoteAnswerLine.visibility = if (line == null || line.usual) View.GONE else View.VISIBLE
         if (line == null || ready == null) return
         val foreground = MaterialColors.getColor(
             binding.agentNoteAnswerLine,
@@ -985,41 +1036,22 @@ class AgentNoteActivity : AppCompatActivity(), AnnotationCanvasView.Listener, Do
             .show()
     }
 
-    /** The chip over the comment: the choice of what the answering agent may use, as it is now for every reply. */
-    private fun updateSourcesChip() {
-        val current = preferences().getAgentNoteReplySources()
-        val string: (Int, Array<out Any>) -> String = { id, args -> getString(id, *args) }
-        binding.agentNoteSources.text = agentNoteReplySourcesChipText(current, string)
-        binding.agentNoteSourcesRow.contentDescription = agentNoteReplySourcesChipDescription(current, string)
-    }
-
     /**
-     * The four choices of what the agent that answers may use, each with its line, the current one
-     * checked. A choice holds for this and every later reply, until changed; a reply already sent
-     * or queued keeps the one it was written with.
+     * The chip over the comment: "Answered by: …" ([agentNoteAnsweredByChipText]). It opens the choice of
+     * who answers when the server lets the user choose and was reached; otherwise it only says who.
      */
-    private fun showSourcesChoice() {
-        val current = preferences().getAgentNoteReplySources()
-        val choices = agentNoteReplySourcesChoices(current, boundReady?.note) { id, args -> getString(id, *args) }
-        val entries = choices.map { choice ->
-            android.text.SpannableStringBuilder(choice.title).apply {
-                append("\n")
-                val start = length
-                append(choice.detail)
-                setSpan(android.text.style.RelativeSizeSpan(0.8f), start, length, android.text.Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
-            }
-        }
-        com.google.android.material.dialog.MaterialAlertDialogBuilder(this)
-            .setTitle(R.string.agent_note_sources_choice_title)
-            .setSingleChoiceItems(entries.toTypedArray<CharSequence>(), choices.indexOfFirst { it.checked }) { dialog, index ->
-                dialog.dismiss()
-                val chosen = choices[index].sources
-                if (chosen == current) return@setSingleChoiceItems
-                preferences().setAgentNoteReplySources(chosen)
-                updateSourcesChip()
-            }
-            .setNegativeButton(android.R.string.cancel, null)
-            .show()
+    private fun updateAnsweredByChip() {
+        val ready = boundReady
+        val text = if (ready == null || ready.readOnly || ready.note.isPhonePage) null
+            else agentNoteAnsweredByChipText(viewModel.answer.value) { id, args -> getString(id, *args) }
+        binding.agentNoteAnsweredByRow.visibility = if (text == null) View.GONE else View.VISIBLE
+        text ?: return
+        val canChoose = viewModel.canChangeAnswerer.value && viewModel.serverReachable.value && viewModel.answer.value != null
+        binding.agentNoteAnsweredBy.text = text
+        binding.agentNoteAnsweredBy.isCloseIconVisible = canChoose
+        binding.agentNoteAnsweredByRow.isEnabled = canChoose
+        binding.agentNoteAnsweredByRow.contentDescription =
+            if (canChoose) getString(R.string.agent_note_answered_by_chip_description, text) else text
     }
 
     /**
@@ -1215,7 +1247,6 @@ class AgentNoteActivity : AppCompatActivity(), AnnotationCanvasView.Listener, Do
     override fun onResume() {
         super.onResume()
         tabs?.refresh(isFullscreen = false)
-        if (boundReady != null) updateSourcesChip()
         // The reader may have taken its step back since: the arrows follow.
         invalidateOptionsMenu()
     }

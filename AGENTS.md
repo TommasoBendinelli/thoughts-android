@@ -31,7 +31,7 @@ Values that belong to one deployment come from `-P<name>=<value>` or the ignored
 |---|---|---|
 | `thoughtsPublicServerUrl` | `https://thoughts.example.org` | Host of generated citation links and of the app-link intent filter; target of the legacy-address migration. A phone always syncs with the server saved in Settings. |
 | `thoughtsLegacyServerHosts` | empty | Former hosts of that server, comma-separated: their links keep opening, and a phone saved with `https://<host>` moves to the public URL once. Empty: no migration. |
-| `thoughtsAbTestingUrl` | empty | Card-pilot rating page for Home's A/B testing tab and Review › Mental Model. Empty: both are hidden. |
+| `thoughtsAbTestingUrl` | empty | Card-pilot site that serves Review › Mental Model (as `<url>mental-model`); named after the A/B testing tab it also served before Home's Comments tab replaced it. Empty: no Mental Model button. |
 | `thoughtsTestServerUrl` | `https://thoughts-test.example.org` | The isolated test service Thoughts Test may talk to, or `http://10.0.2.2:PORT` for a hermetic server on the emulator's host. |
 | `thoughtsOwnerCommentAuthor` | empty | Author name for comments on a phone saved with this build's own server while none is set in Settings. Empty: "Thoughts user". |
 | `thoughtsLegacyMjPdfAuthor` | empty | Author name the old MJ PDF reader build wrote: a plain-UUID yellow note by it is attributed to that reader. Empty: rule off. |

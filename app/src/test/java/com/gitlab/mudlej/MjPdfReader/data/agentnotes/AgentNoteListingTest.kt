@@ -23,27 +23,23 @@ class AgentNoteListingTest {
         url?.let { addProperty("conversation_url", it) }
     }
 
-    @Test fun theArrowsStepThroughTheConversationsNotesOldestFirst() {
+    @Test fun theArrowsStepThroughEveryNoteInSendingOrder() {
         val study = from("conv-1")
         val notes = listOf(
-            note("c", 3).copy(origin = study),
-            note("other", 4).copy(origin = from("conv-2")),
-            note("a", 1).copy(origin = study),
-            note("gone", 2).copy(origin = study, deleted = true),
-            note("b", 2).copy(origin = study),
-            note("none", 5),
+            note("c", 4).copy(origin = study),
+            note("other", 5).copy(origin = from("conv-2")),
+            note("a", 2).copy(origin = study),
+            note("gone", 3).copy(origin = study, deleted = true),
+            note("b", 3).copy(origin = study),
+            note("none", 6),
             note("none-earlier", 1),
         )
-        assertEquals(listOf("a", "b", "c"), conversationNotes(notes, notes.first { it.noteId == "b" }).map { it.noteId })
-        // Notes naming no conversation (sent from a chat through the connector) step through each other.
-        assertEquals(listOf("none-earlier", "none"), conversationNotes(notes, notes.first { it.noteId == "none" }).map { it.noteId })
-        // A note not stored yet still counts.
-        assertEquals(listOf("a", "b", "c", "new"),
-            conversationNotes(notes, note("new", 9).copy(origin = study)).map { it.noteId })
-        // A conversation known only by its link groups by the link.
-        val link = "https://claude.ai/code/session_01BcDeFgHjKmNpQrStUvWxYz"
-        val linked = listOf(note("x", 1).copy(origin = from(null, link)), note("y", 2).copy(origin = from(null, link)))
-        assertEquals(listOf("x", "y"), conversationNotes(linked, linked.last()).map { it.noteId })
+        // Whichever chat sent them, and from whichever note: one order, oldest first, deleted ones left out.
+        val all = listOf("none-earlier", "a", "b", "c", "other", "none")
+        assertEquals(all, arrowNotes(notes, notes.first { it.noteId == "b" }).map { it.noteId })
+        assertEquals(all, arrowNotes(notes, notes.first { it.noteId == "none" }).map { it.noteId })
+        // A note not stored yet still counts, in its place.
+        assertEquals(all + "new", arrowNotes(notes, note("new", 9).copy(origin = study)).map { it.noteId })
     }
 
     @Test fun mergesServerAndCacheNewestFirst() {

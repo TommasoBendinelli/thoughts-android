@@ -176,11 +176,11 @@ class PdfBuildErrorPagesTest {
                 listOf(
                     PhoneRenderJobStatus(
                         requestId = "request",
-                        target = "TraceBench.pdf",
+                        target = "Benchmark.pdf",
                         stage = PhoneRenderStage.FAILED,
                         message = "Renderer exited",
                         failedDocuments = listOf(
-                            failure("TraceBench.pdf", "source.tex", "LaTeX failed")
+                            failure("Benchmark.pdf", "source.tex", "LaTeX failed")
                         ),
                         logReference = "server-object:log",
                         buildId = "build-id",
@@ -190,12 +190,12 @@ class PdfBuildErrorPagesTest {
         )
 
         val page = pages.single()
-        assertEquals("TraceBench.pdf", page.pdfFilename)
+        assertEquals("Benchmark.pdf", page.pdfFilename)
         assertEquals("source.tex", page.source)
         assertEquals("LaTeX failed", page.message)
         assertEquals("server-object:log", page.logReference)
         assertEquals("build-id", page.buildId)
-        assertEquals("TraceBench.pdf", page.actionTarget)
+        assertEquals("Benchmark.pdf", page.actionTarget)
     }
 
     @Test

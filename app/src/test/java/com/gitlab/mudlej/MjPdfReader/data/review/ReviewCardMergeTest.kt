@@ -17,7 +17,10 @@ import java.time.Instant
 import java.util.concurrent.CopyOnWriteArrayList
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotEquals
+import org.junit.Assert.assertNull
+import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
 import org.junit.Assert.fail
 import org.junit.Test
@@ -38,9 +41,19 @@ class ReviewCardMergeTest {
         })
     }
 
-    private fun card(id: String, anchor: JsonObject? = anchor(), retiredAt: Instant? = null, wholeDocument: Boolean = false) =
-        ReviewCard(id, "approved", "manual", "c".repeat(64), 1, "d".repeat(64), "Question $id", RectF(), null, "succeeded",
-            sourceAnchor = anchor, retiredAt = retiredAt, wholeDocument = wholeDocument)
+    private fun card(
+        id: String,
+        anchor: JsonObject? = anchor(),
+        retiredAt: Instant? = null,
+        wholeDocument: Boolean = false,
+        pdfStem: String = "manual",
+        page: Int = 1,
+    ) = ReviewCard(id, "approved", pdfStem, "c".repeat(64), page, "d".repeat(64), "Question $id", RectF(), null, "succeeded",
+        sourceAnchor = anchor, retiredAt = retiredAt, wholeDocument = wholeDocument)
+
+    /** A card of an imported PDF: no source behind it, its answer only highlighted on the PDF. */
+    private fun pdfCard(id: String, pdfStem: String = "manual", retiredAt: Instant? = null, wholeDocument: Boolean = false, page: Int = 1) =
+        card(id, anchor = null, retiredAt = retiredAt, wholeDocument = wholeDocument, pdfStem = pdfStem, page = page)
 
     @Test fun cardsOfOneSourceAreReady() {
         val check = ReviewCardMerge.check(listOf(card("one"), card("two", anchor(sha = current)), card("three")))
@@ -49,6 +62,25 @@ class ReviewCardMergeTest {
         assertEquals(source, plan.source)
         // The version most passages were read from.
         assertEquals(read, plan.expectedSourceSha256)
+        assertEquals(false, plan.onPdf)
+    }
+
+    @Test fun cardsOfOnePdfAreReadyForAPdfMerge() {
+        val check = ReviewCardMerge.check(listOf(pdfCard("one"), pdfCard("two", page = 3), pdfCard("three")))
+        val plan = (check as ReviewCardMerge.Check.Ready).plan
+        assertTrue(plan.onPdf)
+        assertEquals(listOf("one", "two", "three"), plan.cardIds)
+        assertNull(plan.source)
+        assertNull(plan.expectedSourceSha256)
+        // An anchor without segments is no source passage either.
+        val emptyAnchor = JsonObject().apply { addProperty("version", 2); add("segments", JsonArray()) }
+        assertTrue(((ReviewCardMerge.check(listOf(pdfCard("one"), card("two", emptyAnchor))) as ReviewCardMerge.Check.Ready).plan).onPdf)
+    }
+
+    @Test fun aPlanNamesBothTheSourceAndItsVersionOrNeither() {
+        assertTrue(ReviewCardMerge.Plan.pdf(listOf("one", "two")).onPdf)
+        assertThrows(IllegalArgumentException::class.java) { ReviewCardMerge.Plan(listOf("one", "two"), source, null) }
+        assertThrows(IllegalArgumentException::class.java) { ReviewCardMerge.Plan(listOf("one", "two"), null, read) }
     }
 
     @Test fun whatCannotBeMergedIsRefusedBeforeAsking() {
@@ -57,9 +89,27 @@ class ReviewCardMergeTest {
         assertEquals(ReviewCardMerge.Refusal.TOO_FEW, refusal(card("one"), card("one")))
         assertEquals(ReviewCardMerge.Refusal.TOO_MANY, refusal(*Array(21) { card("c$it") }))
         assertEquals(ReviewCardMerge.Refusal.RETIRED, refusal(card("one"), card("two", retiredAt = Instant.EPOCH)))
-        assertEquals(ReviewCardMerge.Refusal.NOT_IN_SOURCE, refusal(card("one"), card("two", anchor = null)))
         assertEquals(ReviewCardMerge.Refusal.NOT_IN_SOURCE, refusal(card("one"), card("two", wholeDocument = true)))
         assertEquals(ReviewCardMerge.Refusal.SEVERAL_SOURCES, refusal(card("one"), card("two", anchor("docs-test/tex/other.tex"))))
+    }
+
+    @Test fun cardsOfANoteAndCardsOfAPdfAreNotMergedTogether() {
+        fun refusal(vararg cards: ReviewCard) = (ReviewCardMerge.check(cards.toList()) as ReviewCardMerge.Check.Refused).refusal
+        assertEquals(ReviewCardMerge.Refusal.MIXED, refusal(card("one"), pdfCard("two")))
+        assertEquals(ReviewCardMerge.Refusal.MIXED, refusal(pdfCard("one"), pdfCard("two"), card("three")))
+    }
+
+    @Test fun whatCannotBeMergedOnThePdfIsRefusedBeforeAsking() {
+        fun refusal(vararg cards: ReviewCard) = (ReviewCardMerge.check(cards.toList()) as ReviewCardMerge.Check.Refused).refusal
+        assertEquals(ReviewCardMerge.Refusal.TOO_FEW, refusal(pdfCard("one"), pdfCard("one")))
+        assertEquals(ReviewCardMerge.Refusal.TOO_MANY, refusal(*Array(21) { pdfCard("c$it") }))
+        assertEquals(ReviewCardMerge.Refusal.RETIRED, refusal(pdfCard("one"), pdfCard("two", retiredAt = Instant.EPOCH)))
+        // A whole-document card has no areas of its own; a card without a place on the PDF has none either.
+        assertEquals(ReviewCardMerge.Refusal.NOT_IN_SOURCE, refusal(pdfCard("one"), pdfCard("two", wholeDocument = true)))
+        assertEquals(ReviewCardMerge.Refusal.NOT_IN_SOURCE, refusal(pdfCard("one"), pdfCard("two", page = 0)))
+        assertEquals(ReviewCardMerge.Refusal.NOT_IN_SOURCE, refusal(card("one"), pdfCard("two", page = 0)))
+        assertEquals(ReviewCardMerge.Refusal.SEVERAL_DOCUMENTS, refusal(pdfCard("one"), pdfCard("two", pdfStem = "other")))
+        assertEquals(ReviewCardMerge.Refusal.SEVERAL_DOCUMENTS, refusal(pdfCard("one", pdfStem = ""), pdfCard("two", pdfStem = "")))
     }
 
     @Test fun theMostReviewedCardIsKeptByDefault() {
@@ -201,7 +251,87 @@ class ReviewCardMergeTest {
             client(fake).merge(plan, "two", "Merged question")
             fail("An older server cannot merge")
         } catch (expected: ReviewCardMergeUnsupportedException) {
+            assertFalse(expected.onPdf)
             assertTrue(fake.requests.none { it.method == "POST" })
         }
+    }
+
+    // ------------------------------------------------------------------ merging cards of a PDF
+
+    private val pdfPlan = ReviewCardMerge.Plan.pdf(listOf("one", "two"))
+    private val bothHealth = Reply(200, """{"capabilities":["review_card_merge_v1","review_card_merge_pdf_v1"]}""")
+    private val mergedOnPdf = Reply(200, """{"schema_version":1,"accepted":true,"terminal":true,"state":"merged","replayed":false,
+        "kind":"pdf","source":null,"source_sha256":null,
+        "kept_card_id":"two","deleted_card_ids":["one"],"question":"Merged question","passages":3}""")
+
+    @Test fun aPdfMergeSendsNoSource() {
+        val fake = server { if (it.path == "/v1/health") bothHealth else mergedOnPdf }
+        val result = client(fake).merge(pdfPlan, "two", " Merged question ")
+        assertEquals("two", result.keptCardId)
+        assertEquals(listOf("one"), result.deletedCardIds)
+        assertEquals(3, result.passages)
+        assertEquals("pdf", result.kind)
+        assertTrue(result.onPdf)
+        val post = fake.requests.single { it.method == "POST" }
+        assertEquals(ReviewCardMerge.PATH, post.path)
+        assertEquals("Bearer device-token", post.headers["authorization"])
+        val body = JsonParser.parseString(post.body).asJsonObject
+        assertEquals(setOf("request_id", "card_ids", "keep_card_id", "question"), body.keySet())
+        assertEquals(listOf("one", "two"), body.getAsJsonArray("card_ids").map { it.asString })
+        assertEquals("two", body.get("keep_card_id").asString)
+        assertEquals("Merged question", body.get("question").asString)
+    }
+
+    @Test fun aSourceMergeSaysItsKind() {
+        val fake = server {
+            if (it.path == "/v1/health") bothHealth
+            else Reply(200, """{"accepted":true,"kind":"source","kept_card_id":"two","deleted_card_ids":["one"],"passages":2}""")
+        }
+        val result = client(fake).merge(plan, "two", "Merged question")
+        assertEquals("source", result.kind)
+        assertFalse(result.onPdf)
+        // A server from before PDF merges does not say.
+        assertNull(ReviewCardMergeResult("two", listOf("one"), "Merged question", 2, false).kind)
+    }
+
+    @Test fun aPdfMergeNeedsTheServersPdfMerging() {
+        // A server that merges cards of a note but not of a PDF is not asked to merge cards of a PDF.
+        val older = server { health }
+        try {
+            client(older).merge(pdfPlan, "two", "Merged question")
+            fail("This server cannot merge cards of a PDF")
+        } catch (expected: ReviewCardMergeUnsupportedException) {
+            assertTrue(expected.onPdf)
+            assertTrue(older.requests.none { it.method == "POST" })
+        }
+        // A merge of cards of a note still needs review_card_merge_v1 itself.
+        val pdfOnly = server { Reply(200, """{"capabilities":["review_card_merge_pdf_v1"]}""") }
+        try {
+            client(pdfOnly).merge(plan, "two", "Merged question")
+            fail("This server cannot merge cards of a note")
+        } catch (expected: ReviewCardMergeUnsupportedException) {
+            assertFalse(expected.onPdf)
+            assertTrue(pdfOnly.requests.none { it.method == "POST" })
+        }
+        // With both, either merge is asked.
+        val both = server { if (it.path == "/v1/health") bothHealth else merged }
+        client(both).merge(plan, "two", "Merged question")
+        client(both).merge(pdfPlan, "two", "Merged question")
+        assertEquals(2, both.requests.count { it.method == "POST" })
+    }
+
+    @Test fun aPdfMergeIsAskedOnce() {
+        val fake = server {
+            if (it.path == "/v1/health") bothHealth
+            else Reply(409, """{"accepted":false,"error_code":"source_conflict","detail":"The source changed.","current_source_sha256":"$current"}""")
+        }
+        try {
+            client(fake).merge(pdfPlan, "two", "Merged question")
+            fail("The merge should be refused")
+        } catch (refused: ReviewCardMergeException) {
+            assertEquals(409, refused.status)
+            assertEquals("source_conflict", refused.code)
+        }
+        assertEquals(1, fake.requests.count { it.method == "POST" })
     }
 }

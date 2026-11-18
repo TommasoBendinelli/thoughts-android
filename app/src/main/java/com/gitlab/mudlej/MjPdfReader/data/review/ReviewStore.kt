@@ -141,7 +141,33 @@ data class ReviewCard(
      * source markers (thoughts-html-attachment-cards-SPEC.md); it reviews inside the page.
      */
     val htmlAttachment: com.gitlab.mudlej.MjPdfReader.data.html.HtmlAttachmentCards.Anchor? = null,
+    /**
+     * The schedule the knowledge fold gives (protocol/review-card-kinds.md): [schedule] is this one
+     * for a knowledge card and its capped copy for a project card ([withReviewKind]).
+     */
+    val knowledgeSchedule: ReviewSchedule? = null,
+    /** The card's own kind from its kind events or record ([ReviewKindFacts.ownKind]); null when it follows its Projects. */
+    val ownReviewKind: String? = null,
+    /** When its latest answer was given ([ReviewKindFacts.latestAnswerAt]). */
+    val latestAnswerAt: Instant? = null,
+    /** Its passage changed since its latest answer ([ReviewKindFacts.passageChanged]); shown for project cards only. */
+    val passageChanged: Boolean = false,
+    /** The moment of that change ([ReviewKindFacts.passageChangedAt]). */
+    val passageChangedAt: Instant? = null,
+    /** The document its Projects hold it by: primary.pdf_document_id, else primary.document_id (section 4). */
+    val kindDocumentId: String = "",
+    /** Its kind with the Library catalogue applied ([withReviewKind]): `knowledge` or `project`. */
+    val reviewKind: String = ReviewKinds.KNOWLEDGE,
+    val reviewKindSource: ReviewKindSource = ReviewKindSource.DEFAULT,
+    /** The Library Projects that hold it, in catalogue order. */
+    val reviewProjectIds: List<String> = emptyList(),
+    /** The kind its Projects give it ("Follow the Project (Knowledge)"); null when no Project holds it. */
+    val followedKind: String? = null,
 ) {
+    /** A project card: due at most a week after its latest answer, and at once when its passage changed. */
+    val isProjectCard: Boolean get() = reviewKind == ReviewKinds.PROJECT
+    /** "Changed since you last saw it": a project card whose passage changed since its latest answer. */
+    val changedSinceSeen: Boolean get() = isProjectCard && passageChanged
     val approved: Boolean get() = status == "approved"
     /** Retired: never offered for review, but kept with its history, markers and schedule. */
     val retired: Boolean get() = retiredAt != null
@@ -248,6 +274,8 @@ data class ReviewHistoryEntry(
     val undoneEventId: String? = null,
     /** The PDF the answer was given on (its `review_version`), or null when it does not say. */
     val pdfSha256: String? = null,
+    /** A kind event's choice: `knowledge`, `project` or `follow_project` (protocol/review-card-kinds.md). */
+    val reviewKind: String? = null,
 )
 
 data class GeneratedReviewCandidate(
@@ -436,6 +464,20 @@ data class ReviewLibrarySummary(
     val unavailableCount: Int = 0,
     /** Deleted cards whose source markers still wait to be removed. */
     val markerRemovalPendingCount: Int = 0,
+    /** "Study · N due": the knowledge cards' share of [counts] (protocol/review-card-kinds.md section 7). */
+    val knowledgeCounts: ReviewQueueCounts = ReviewQueueCounts(),
+    /** "Projects · M due": the project cards' share of [counts]. */
+    val projectCounts: ReviewQueueCounts = ReviewQueueCounts(),
+    /** The Projects that hold at least one active project card, in catalogue order, each with its due count. */
+    val projects: List<ReviewProjectSummary> = emptyList(),
+)
+
+/** One Project of the "Projects" review entry: its due project cards and its active ones. */
+data class ReviewProjectSummary(
+    val projectId: String,
+    val name: String,
+    val counts: ReviewQueueCounts,
+    val activeCount: Int,
 )
 
 data class PendingReviewChange(
@@ -524,7 +566,8 @@ private object ReviewSnapshotCodec {
     // 8: cards carry a desktop edit of their areas (answer_region_override); 7 was also used for it alone.
     // 9: history entries carry the steps of an answer given in two steps (review_phases).
     // 10: history entries carry the PDF version they were given on (review_version).
-    const val VERSION = 10
+    // 11: cards carry what their records say about their kind and passage (review-card-kinds), history entries kind choices.
+    const val VERSION = 11
     private val gson = com.google.gson.GsonBuilder()
         .registerTypeAdapter(Instant::class.java, object : com.google.gson.TypeAdapter<Instant>() {
             override fun write(out: com.google.gson.stream.JsonWriter, value: Instant?) {
@@ -550,7 +593,8 @@ private object ReviewSnapshotCodec {
     // 4: cards carry Fedora's re-anchor error code and message.
     // 5: cards carry their retirement.
     // 6: a desktop edit of a card's areas can move it to another page; 5 was also used for it alone.
-    const val DASHBOARD_VERSION = 6
+    // 7: cards carry their own kind, latest answer, passage change and document for their Projects.
+    const val DASHBOARD_VERSION = 7
     fun encodeDashboard(snapshot: ReviewSnapshot): String = gson.toJson(ReviewDashboard(
         snapshot.cards.map { card ->
             // Construct explicitly: never copy question, answer regions, note, history or transport data.
@@ -568,7 +612,9 @@ private object ReviewSnapshotCodec {
                         })
                     }
                 }, sourceLocationState = card.sourceLocationState, markerRemovalPending = card.markerRemovalPending,
-                sourceLinkState = card.sourceLinkState, retiredAt = card.retiredAt, retireEventId = card.retireEventId)
+                sourceLinkState = card.sourceLinkState, retiredAt = card.retiredAt, retireEventId = card.retireEventId,
+                knowledgeSchedule = card.knowledgeSchedule, ownReviewKind = card.ownReviewKind, latestAnswerAt = card.latestAnswerAt,
+                passageChanged = card.passageChanged, passageChangedAt = card.passageChangedAt, kindDocumentId = card.kindDocumentId)
         }, snapshot.exclusions,
     ))
     fun decodeDashboard(payload: String): ReviewDashboard? = runCatching {
@@ -580,6 +626,7 @@ private object ReviewSnapshotCodec {
                 require(card.status != null && card.reanchorState != null && card.pdfSha256 != null)
                 // Projections written before these fields existed must be rebuilt from the records.
                 require(card.reanchorErrorCode != null && card.reanchorMessage != null)
+                require(card.kindDocumentId != null && card.reviewKind != null && card.reviewKindSource != null && card.reviewProjectIds != null)
                 card.schedule?.let { schedule -> require(schedule.dueAt != null) }
             }
             require(it.exclusions != null)
@@ -592,7 +639,8 @@ private object ReviewSnapshotCodec {
         gson.fromJson(payload, ReviewSnapshot::class.java).also {
             // Malformed or older projections must fall back to authoritative records.
             require(it.cardsById.keys == it.cards.map { card -> card.id }.toSet())
-            require((it.cards + it.cardsById.values).all { card -> card.reanchorErrorCode != null && card.reanchorMessage != null })
+            require((it.cards + it.cardsById.values).all { card -> card.reanchorErrorCode != null && card.reanchorMessage != null &&
+                card.kindDocumentId != null && card.reviewKind != null && card.reviewKindSource != null && card.reviewProjectIds != null })
             require(it.histories.values.all { history ->
                 history.entries != null && history.suggestedInterval != null && history.entries.all { entry -> entry.reviewTags != null && entry.groupNotes != null && entry.contextNotes != null }
             })
@@ -608,6 +656,8 @@ private data class CachedReviewSnapshot(
     val snapshot: ReviewSnapshot,
     /** Source locations are resolved while building; a newer source scan needs a new build. */
     val locationRevision: Long = 0,
+    /** Card kinds are applied while building; another catalogue ([ReviewKindCatalogue.fingerprint]) needs a new build. */
+    val kindFingerprint: String = "",
 )
 
 /**
@@ -637,6 +687,8 @@ private class ReviewSnapshotSlot {
     var dashboard: ReviewDashboard? = null
     var databaseGeneration = -1L
     var locationRevision = -1L
+    /** The catalogue the card kinds and capped due times of [databaseSnapshot] were applied with. */
+    var kindFingerprint: String? = null
     var databaseSnapshot: ReviewSnapshot? = null
     val databaseCards = linkedMapOf<String, ReviewSnapshot>()
     val stateWriteCount = AtomicLong()
@@ -690,6 +742,17 @@ class ReviewStore(
      * phone's Library by default, none without a context (tests set their own).
      */
     internal var versionStamper: ReviewVersionStamper? = context?.let { ReviewVersionStamper.library() }
+
+    /**
+     * The Library catalogue card kinds are read with (protocol/review-card-kinds.md): the phone's
+     * Project catalogue with its queued changes; none without a context (tests set their own).
+     */
+    internal var kindCatalogueSource: (() -> ReviewKindCatalogue)? =
+        context?.let { appContext -> { LibraryProjectStore(appContext).reviewKindCatalogue() } }
+
+    /** The catalogue now; an unreadable one holds no Project, so every card is a knowledge card. */
+    private fun kindCatalogue(): ReviewKindCatalogue =
+        runCatching { kindCatalogueSource?.invoke() }.getOrNull() ?: ReviewKindCatalogue.EMPTY
 
     /** The stamp for a new event on [cardId], or null (no PDF on the phone, no stamper); never throws. */
     private fun versionStampOf(cardId: String): JsonObject? = runCatching {
@@ -791,6 +854,8 @@ class ReviewStore(
             val stale = canonicalPdfSha256ByFilename != null && (if (cachedCard.isHtmlAttachmentCard) canonical == null
                 // A card inside an HTML attachment page follows its document, not one PDF version.
                 else !canonical.equals(cachedCard.pdfSha256, ignoreCase = true))
+            // The card's schedule: the knowledge one, or for a project card its capped copy (review-card-kinds).
+            val schedule = cachedCard.schedule
             val state = when {
                 history.schedule?.deleted == true -> ReviewBrowserState.DELETED
                 cachedCard.retired -> ReviewBrowserState.RETIRED
@@ -801,20 +866,20 @@ class ReviewStore(
                 cachedCard.reanchorState in REPAIRING_STATES || cachedCard.status == "needs_reanchor" ->
                     ReviewBrowserState.REPAIRING
                 stale -> ReviewBrowserState.STALE
-                history.schedule?.retained == true -> ReviewBrowserState.RETAINED
+                schedule?.retained == true -> ReviewBrowserState.RETAINED
                 excluded -> ReviewBrowserState.EXCLUDED
                 cachedCard.skippedUntil?.isAfter(now) == true -> ReviewBrowserState.SKIPPED
-                history.schedule == null -> ReviewBrowserState.NEW
-                history.schedule.fixedInterval && history.schedule.dueAt.isAfter(now) -> ReviewBrowserState.FUTURE
-                history.schedule.intervalDays == 0 -> ReviewBrowserState.LEARNING
-                history.schedule.dueAt.isAfter(now) -> ReviewBrowserState.FUTURE
+                schedule == null -> ReviewBrowserState.NEW
+                schedule.fixedInterval && schedule.dueAt.isAfter(now) -> ReviewBrowserState.FUTURE
+                schedule.intervalDays == 0 -> ReviewBrowserState.LEARNING
+                schedule.dueAt.isAfter(now) -> ReviewBrowserState.FUTURE
                 else -> ReviewBrowserState.REVIEW
             }
             ReviewBrowserCard(
                 card = detachedCard(cachedCard),
                 state = state,
-                dueAt = if (history.schedule?.retained == true) null else history.schedule?.dueAt ?: cachedCard.initialDueAt,
-                intervalDays = history.schedule?.intervalDays ?: 0,
+                dueAt = if (schedule?.retained == true) null else schedule?.dueAt ?: cachedCard.initialDueAt,
+                intervalDays = schedule?.intervalDays ?: 0,
                 reviewCount = history.reviewCount,
                 lapseCount = history.lapseCount,
                 lastRating = history.lastRating?.wireName,
@@ -919,6 +984,60 @@ class ReviewStore(
         }
     }
 
+    /**
+     * Chooses [cardId]'s kind (protocol/review-card-kinds.md section 2.1): `knowledge` or `project`
+     * as its own kind, or `follow_project` to follow its Projects again. An immutable queue action,
+     * so two devices never conflict over it; Undo is another choice ([ReviewCard.ownReviewKind], or
+     * `follow_project` for a card that followed its Project). Returns the event's id.
+     */
+    fun setReviewKind(cardId: String, kind: String, now: Instant = Instant.now()): Result<String> = runCatching {
+        require(kind in ReviewKinds.EVENT_KINDS) { "Choose a knowledge card, a project card or the Project's kind" }
+        require(runCatching { UUID.fromString(cardId) }.isSuccess) { "Invalid review card UUID" }
+        withSnapshotMutation {
+            val snapshot = snapshotForCard(cardId)
+            snapshot.cardsById[cardId] ?: error("The review card is unavailable")
+            require(snapshot.histories[cardId]?.schedule?.deleted != true) { "The review card is deleted" }
+            val event = reviewKindEvent(cardId, kind, now, originId)
+            versionStampOf(cardId)?.let { event.add(ReviewVersionStamp.FIELD, it) }
+            persistEvent(event)
+            event.string("event_id")
+        }
+    }
+
+    /**
+     * The active (approved, not retired, not deleted) project cards the Project [projectId] holds:
+     * what "Retire project cards…" retires (review-card-kinds section 6.4).
+     */
+    fun activeProjectCards(projectId: String): List<ReviewCard> = snapshot().cards.filter { card ->
+        card.isProjectCard && projectId in card.reviewProjectIds && card.approved && !card.retired && card.schedule?.deleted != true
+    }.map(::detachedCard)
+
+    /**
+     * Retires every card of [cardIds] with one retire event each, all at [now] (section 6.4); each keeps
+     * its history and can be restored to review one at a time. Returns the retire events' ids by card.
+     */
+    fun retireAll(cardIds: Collection<String>, now: Instant = Instant.now()): Result<Map<String, String>> = runCatching {
+        require(cardIds.isNotEmpty()) { "No cards to retire" }
+        cardIds.forEach { require(runCatching { UUID.fromString(it) }.isSuccess) { "Invalid review card UUID" } }
+        withSnapshotMutation {
+            val snapshot = snapshot()
+            val events = cardIds.distinct().associateWith { cardId ->
+                snapshot.cardsById[cardId] ?: error("The review card is unavailable")
+                require(snapshot.histories[cardId]?.schedule?.deleted != true) { "The review card is deleted" }
+                reviewRetireEvent(cardId, ReviewRetire.RETIRE, now, originId).also { event ->
+                    versionStampOf(cardId)?.let { event.add(ReviewVersionStamp.FIELD, it) }
+                }
+            }
+            events.values.forEach(::persistEvent)
+            events.mapValues { (_, event) -> event.string("event_id") }
+        }
+    }
+
+    /** The passage an answer on [cardId] is given on (review-card-kinds section 6.3), or null; never throws. */
+    private fun passageStampOf(cardId: String): JsonObject? = runCatching {
+        reviewPassageStamp(snapshotForCard(cardId).cardsById[cardId]?.sourceAnchor)
+    }.getOrNull()
+
     /** Also called by Sync so old skips migrate even when Review has not been opened. */
     private var legacySkipsMigrated = false
     fun migrateLegacySkips() {
@@ -1002,7 +1121,7 @@ class ReviewStore(
     private fun snapshotForCard(cardId: String): ReviewSnapshot {
         if (database == null) return snapshot(projectIndex.projectForCard(cardId))
         snapshot()
-        return synchronized(snapshotSlot.monitor) { snapshotSlot.databaseCards[cardId]?.let(::withCurrentSourceLocations) ?: emptySnapshot() }
+        return synchronized(snapshotSlot.monitor) { snapshotSlot.databaseCards[cardId]?.let { withCurrentSourceLocations(it) } ?: emptySnapshot() }
     }
 
 
@@ -1015,6 +1134,13 @@ class ReviewStore(
         snapshotForCard(cardId).histories[cardId].let { history ->
             reviewCurrentTags(history?.entries.orEmpty()) to history?.currentInterval
         }
+
+    /**
+     * When the card's answer in effect was given (its last answer, retracted ones left out; skips
+     * and retirements are not answers); null for a card never answered. A kept before step belongs
+     * to this answer: a newer one, recorded here or brought by Sync, makes it obsolete.
+     */
+    fun lastAnsweredAt(cardId: String): Instant? = snapshotForCard(cardId).histories[cardId]?.lastReviewedAt
 
     /**
      * What the agent recall prediction is told besides the card itself ([ReviewRecallPrediction]):
@@ -1055,10 +1181,18 @@ class ReviewStore(
         )
     }
 
+    /**
+     * The due cards, oldest due first. [kind] and [projectId] narrow a Library-wide session to one
+     * review entry (protocol/review-card-kinds.md section 7): `knowledge` for Study, `project` for
+     * Projects, optionally only the project cards one Project holds. A document's session keeps
+     * every card of its scope, whatever its kind.
+     */
     fun dueCards(
         now: Instant = Instant.now(),
         pdfStem: String? = null,
         canonicalPdfSha256ByFilename: Map<String, String>? = null,
+        kind: String? = null,
+        projectId: String? = null,
     ): List<ReviewCard> {
         val snapshot = snapshot(pdfStem)
         val dueIds = database?.dueIds(now.toEpochMilli(), pdfStem)
@@ -1071,6 +1205,8 @@ class ReviewStore(
         val candidates = if (dueIds == null) snapshot else snapshot.copy(cards = dueIds.mapNotNull(snapshot.cardsById::get))
         return activeCards(candidates, pdfStem, canonicalPdfSha256ByFilename)
             .filter { dueIds == null || it.id in dueIds }
+            .filter { kind == null || it.reviewKind == kind }
+            .filter { projectId == null || projectId in it.reviewProjectIds }
             .filter { it.skippedUntil?.isAfter(now) != true }
             .filter { card ->
                 (card.schedule == null && card.initialDueAt?.isAfter(now) != true) ||
@@ -1182,10 +1318,22 @@ class ReviewStore(
                 compareByDescending<ReviewDeckSummary> { it.counts.total }
                     .thenBy { it.pdfStem.lowercase() },
             )
+        // The two review entries (review-card-kinds section 7) and the Projects the second can be narrowed to.
+        val (projectCards, knowledgeCards) = activeCards.partition(ReviewCard::isProjectCard)
+        val kinds = kindCatalogue()
+        val projects = projectCards.flatMap(ReviewCard::reviewProjectIds).distinct().let { held ->
+            kinds.projects.filter { it.id in held }.distinctBy { it.id }
+        }.map { project ->
+            val cards = projectCards.filter { project.id in it.reviewProjectIds }
+            ReviewProjectSummary(project.id, project.name.ifBlank { project.id }, dueCounts(cards, now), cards.size)
+        }
         return ReviewLibrarySummary(
             counts = dueCounts(activeCards, now),
             activeCount = activeCards.size,
             nextDueAt = nextDueAt(activeCards, now),
+            knowledgeCounts = dueCounts(knowledgeCards, now),
+            projectCounts = dueCounts(projectCards, now),
+            projects = projects,
             decks = decks,
             repairingCount = placedCards.count { card ->
                 card.reanchorState in setOf("queued", "retry", "running") ||
@@ -1317,6 +1465,9 @@ class ReviewStore(
             reviewEntry?.let { addProperty(ReviewEntry.FIELD, it) }
             // Which version of the PDF the answer was given on; deletions need none.
             if (rating != ReviewRating.DELETE) versionStampOf(cardId)?.let { add(ReviewVersionStamp.FIELD, it) }
+            // And which passage (review-card-kinds section 6.3), on a card of either kind: a project
+            // card whose passage changes after this answer is due at once.
+            if (rating != ReviewRating.DELETE) passageStampOf(cardId)?.let { add(ReviewKinds.PASSAGE, it) }
             if (rating == ReviewRating.CUSTOM_INTERVAL) addProperty("scheduled_due_at", scheduledDueAt.toString())
             addProperty("scheduler_version", CURRENT_SCHEDULER_VERSION)
             addProperty("reviewed_at", reviewedAt.toString())
@@ -2061,6 +2212,9 @@ class ReviewStore(
                                 .takeIf(String::isNotBlank),
                             undoneEventId = event.string("undone_event_id").takeIf(String::isNotBlank),
                             pdfSha256 = ReviewVersionStamp.of(event)?.pdfSha256,
+                            reviewKind = event.string(ReviewKinds.FIELD).takeIf {
+                                it.isNotBlank() && event.string("queue_action") == ReviewKinds.SET_REVIEW_KIND
+                            },
                             retracted = eventId in retractedEventIds,
                             effective = eventId in appliedEventIds || eventId in effectiveRetractionIds,
                             pendingSync = eventId in pendingEventIds,
@@ -2084,21 +2238,23 @@ class ReviewStore(
         val snapshotSlot = snapshotSlot(pdfStem)
         var inventory = snapshotInventory(pdfStem)
         var locationRevision = annotationIndex?.revision ?: 0
-        snapshotSlot.cached?.takeIf { it.inventory == inventory && it.locationRevision == locationRevision }?.let { return it.snapshot }
+        val kinds = kindCatalogue()
+        snapshotSlot.cached?.takeIf { it.inventory == inventory && it.locationRevision == locationRevision &&
+            it.kindFingerprint == kinds.fingerprint }?.let { return it.snapshot }
 
         return synchronized(snapshotSlot.monitor) {
             while (true) {
                 snapshotSlot.cached
-                    ?.takeIf { it.inventory == inventory && it.locationRevision == locationRevision }
+                    ?.takeIf { it.inventory == inventory && it.locationRevision == locationRevision && it.kindFingerprint == kinds.fingerprint }
                     ?.let { return@synchronized it.snapshot }
 
                 snapshotSlot.buildCount.incrementAndGet()
-                val built = buildSnapshot(inventory)
+                val built = buildSnapshot(inventory, kinds)
                 projectIndex.persist()
                 val verifiedInventory = snapshotInventory(pdfStem)
                 val verifiedRevision = annotationIndex?.revision ?: 0
                 if (verifiedInventory == inventory && verifiedRevision == locationRevision) {
-                    snapshotSlot.cached = CachedReviewSnapshot(inventory, built, locationRevision)
+                    snapshotSlot.cached = CachedReviewSnapshot(inventory, built, locationRevision, kinds.fingerprint)
                     return@synchronized built
                 }
                 locationRevision = verifiedRevision
@@ -2108,7 +2264,7 @@ class ReviewStore(
         }
     }
 
-    private fun buildSnapshot(inventory: ReviewSnapshotInventory): ReviewSnapshot {
+    private fun buildSnapshot(inventory: ReviewSnapshotInventory, kinds: ReviewKindCatalogue): ReviewSnapshot {
         val legacyCards = loadReviewObjects(inventory.legacyCards.files, ReviewRecordSource.LEGACY)
         val incomingCards = loadReviewObjects(inventory.incomingCards.files, ReviewRecordSource.SERVER)
         val outgoingCards = loadReviewObjects(inventory.outgoingCards.files, ReviewRecordSource.OUTGOING)
@@ -2119,7 +2275,8 @@ class ReviewStore(
             loadReviewObjects(inventory.legacyExclusions.files, ReviewRecordSource.LEGACY) +
                 loadReviewObjects(inventory.incomingExclusions.files, ReviewRecordSource.SERVER)
             ).map(LoadedReviewObject::payload)
-        return buildSnapshotRecords(legacyCards, incomingCards, outgoingCards, legacyEvents, incomingEvents, outgoingEvents, exclusions)
+        return buildSnapshotRecords(legacyCards, incomingCards, outgoingCards, legacyEvents, incomingEvents, outgoingEvents, exclusions,
+            kinds = kinds)
     }
 
     private fun buildSnapshotRecords(
@@ -2127,6 +2284,8 @@ class ReviewStore(
         legacyEvents: List<LoadedReviewObject>, incomingEvents: List<LoadedReviewObject>, outgoingEvents: List<LoadedReviewObject>,
         exclusions: List<JsonObject>,
         resolveLocations: Boolean = true,
+        /** Applied with the source locations; parts cached in the database are built without either. */
+        kinds: ReviewKindCatalogue = ReviewKindCatalogue.EMPTY,
     ): ReviewSnapshot {
         val outgoingEventIds = outgoingEvents
             .mapTo(hashSetOf()) { it.payload.string("event_id") }
@@ -2145,11 +2304,16 @@ class ReviewStore(
         val pendingMarkerRemovals = (legacyEvents + incomingEvents + outgoingEvents).map(LoadedReviewObject::payload)
             .filter { it.string("rating") == "delete" && it.string("marker_removal") == "pending" }
             .mapTo(hashSetOf()) { it.string("card_id") }
-        val retired = reviewRetiredCards((legacyEvents + incomingEvents + outgoingEvents).map(LoadedReviewObject::payload))
+        val eventPayloads = (legacyEvents + incomingEvents + outgoingEvents).map(LoadedReviewObject::payload)
+        val retired = reviewRetiredCards(eventPayloads)
+        val eventsByCard = eventPayloads.groupBy { it.string("card_id") }
         val cards = selectedCardRecords.values.mapNotNull { record ->
             val cardId = record.payload.string("card_id")
+            val facts = reviewKindFacts(record.payload, eventsByCard[cardId].orEmpty())
             parseCard(record.payload, histories[cardId]?.schedule)?.copy(skippedUntil = skippedUntilByCardId[cardId], markerRemovalPending = cardId in pendingMarkerRemovals,
-                retiredAt = retired[cardId]?.retiredAt, retireEventId = retired[cardId]?.retireEventId)?.let { card -> if (resolveLocations) withCurrentSourceLocation(card) else card }
+                retiredAt = retired[cardId]?.retiredAt, retireEventId = retired[cardId]?.retireEventId,
+                ownReviewKind = facts.ownKind, latestAnswerAt = facts.latestAnswerAt, passageChanged = facts.passageChanged,
+                passageChangedAt = facts.passageChangedAt)?.let { card -> if (resolveLocations) withCurrentSourceLocation(card, kinds) else card }
         }
 
         return ReviewSnapshot(
@@ -2166,7 +2330,15 @@ class ReviewStore(
         )
     }
 
-    private fun withCurrentSourceLocation(card: ReviewCard): ReviewCard {
+    /**
+     * [card] as it reads now: located in the checked sources and with its kind applied from [kinds]
+     * (the capped due time of a project card). Cached projections hold neither, so a newer source scan
+     * or catalogue never needs the card's events folded again.
+     */
+    private fun withCurrentSourceLocation(card: ReviewCard, kinds: ReviewKindCatalogue = kindCatalogue()): ReviewCard =
+        locatedInSources(card).withReviewKind(kinds)
+
+    private fun locatedInSources(card: ReviewCard): ReviewCard {
         if (card.sourceAnchor?.get("version")?.asInt != 2) return card
         val location = annotationIndex?.rememberedLocation("review_card", card.id, SourceOwner.of(card.sourceFiles.firstOrNull().orEmpty()).orEmpty(), card.sourceFiles.firstOrNull())
         return when (location?.get("state")?.asString) {
@@ -2187,8 +2359,8 @@ class ReviewStore(
         }
     }
 
-    private fun withCurrentSourceLocations(snapshot: ReviewSnapshot): ReviewSnapshot {
-        val cards = snapshot.cards.map(::withCurrentSourceLocation)
+    private fun withCurrentSourceLocations(snapshot: ReviewSnapshot, kinds: ReviewKindCatalogue = kindCatalogue()): ReviewSnapshot {
+        val cards = snapshot.cards.map { withCurrentSourceLocation(it, kinds) }
         return snapshot.copy(cards = cards, cardsById = cards.associateBy { it.id })
     }
 
@@ -2223,9 +2395,10 @@ class ReviewStore(
                 val current = checkNotNull(dashboard)
                 var cards: List<ReviewCard>
                 var revision: Long
+                val kinds = kindCatalogue()
                 do {
                     revision = annotationIndex?.revision ?: 0
-                    cards = current.cards.map(::withCurrentSourceLocation)
+                    cards = current.cards.map { withCurrentSourceLocation(it, kinds) }
                 } while ((annotationIndex?.revision ?: 0) != revision)
                 emptySnapshot().copy(cards = cards, exclusions = current.exclusions)
             }
@@ -2236,8 +2409,10 @@ class ReviewStore(
         db.transaction {
             val generation = db.generation()
             val locationRevision = annotationIndex?.revision ?: 0
+            val kinds = kindCatalogue()
             val cached = snapshotSlot.databaseSnapshot
-            if (cached != null && snapshotSlot.databaseGeneration == generation && snapshotSlot.locationRevision == locationRevision) return@transaction cached
+            if (cached != null && snapshotSlot.databaseGeneration == generation && snapshotSlot.locationRevision == locationRevision &&
+                snapshotSlot.kindFingerprint == kinds.fingerprint) return@transaction cached
             val full = cached == null || generation < snapshotSlot.databaseGeneration
             if (full) {
                 snapshotSlot.databaseCards.clear()
@@ -2257,11 +2432,13 @@ class ReviewStore(
                 snapshotSlot.databaseCards[id] = part
             }
             // Location changes affect eligibility, not history; never replay every event for a source scan.
-            val stateIds = if (full || snapshotSlot.locationRevision != locationRevision) snapshotSlot.databaseCards.keys else ids
+            // A Project's kind changes due times (a project card's are capped), so it is the same.
+            val stateIds = if (full || snapshotSlot.locationRevision != locationRevision || snapshotSlot.kindFingerprint != kinds.fingerprint)
+                snapshotSlot.databaseCards.keys else ids
             val everyCard = stateIds.size > ids.size
             val rows = linkedMapOf<String, ReviewStateRow>()
             for (id in stateIds) {
-                val part = withCurrentSourceLocations(snapshotSlot.databaseCards.getValue(id))
+                val part = withCurrentSourceLocations(snapshotSlot.databaseCards.getValue(id), kinds)
                 val card = part.cardsById[id]
                 val active = card != null && activeCards(part).any { it.id == id }
                 val due = card?.schedule?.let { schedule ->
@@ -2281,7 +2458,7 @@ class ReviewStore(
             snapshotSlot.stateWriteCount.addAndGet(toWrite.size.toLong())
             snapshotSlot.stateWritesSkipped.addAndGet((rows.size - toWrite.size).toLong())
             val parts = snapshotSlot.databaseCards.values
-            val cards = parts.flatMap { it.cards }.map(::withCurrentSourceLocation)
+            val cards = parts.flatMap { it.cards }.map { withCurrentSourceLocation(it, kinds) }
             val result = ReviewSnapshot(parts.flatMap { it.queueEvents }, parts.flatMap { it.selectedCardRecords.entries }.associate { it.toPair() },
                 parts.flatMap { it.histories.entries }.associate { it.toPair() }, cards, cards.associateBy { it.id },
                 parts.firstOrNull()?.exclusions.orEmpty(), parts.flatMap { it.outgoingCardPayloads }, parts.flatMap { it.outgoingEventPayloads },
@@ -2293,6 +2470,7 @@ class ReviewStore(
             }
             snapshotSlot.databaseGeneration = generation
             snapshotSlot.locationRevision = locationRevision
+            snapshotSlot.kindFingerprint = kinds.fingerprint
             snapshotSlot.databaseSnapshot = result
             result
         }
@@ -2544,6 +2722,9 @@ class ReviewStore(
         // The phone cannot tell whether the PDF has source (sourceAvailable null) and an area could not be
         // linked: the person chose to save the card unmarked; Fedora links it, or keeps it PDF-only.
         linkAtNextSync: Boolean = false,
+        // A section card on a document built from source: the source edit marking the section's body
+        // for the new card's ID (ReviewSectionPlanner), instead of linking the areas.
+        sectionPlacement: com.gitlab.mudlej.MjPdfReader.data.source.SectionPlacement? = null,
     ): Result<ReviewCard> = runCatching {
         require(!linkAtNextSync || sourceAvailable == null) { "Only a document whose source is unknown can be linked at the next Sync." }
         require(firstDueDays in 0..3650) { "The first review time is invalid" }
@@ -2649,7 +2830,8 @@ class ReviewStore(
         } else runCatching {
             // A document built from source: the card is linked, one segment per area, or not saved.
             val sources = checkNotNull(sourcePlacer) { "Verified local source is unavailable." }
-            sources.placement(cardId, "$normalizedStem.pdf", normalizedPdfSha256, placementAreas, previous = null)
+            sectionPlacement?.edit?.invoke(cardId)
+                ?: sources.placement(cardId, "$normalizedStem.pdf", normalizedPdfSha256, placementAreas, previous = null)
         }.fold(onSuccess = { result ->
             link.addProperty("state", "linked")
             primary.add("source_anchor", result.anchor)
@@ -3279,6 +3461,8 @@ class ReviewStore(
                 answerRegions = answerRegions,
                 answerRegionOverride = override != null,
                 schedule = schedule,
+                knowledgeSchedule = schedule,
+                kindDocumentId = reviewKindDocumentId(record),
                 reanchorState = reanchor?.string("state").orEmpty(),
                 revision = record.intOrNull("revision"),
                 originId = record.string("origin_id"),

@@ -79,6 +79,8 @@ internal class CommentsSheetController(
     private var sortByDate = false
     private var selectedId: String? = null
     private var showingDetail = false
+    /** The open item's place in the list as shown; kept when a decision takes it off the list, so › goes on from there. */
+    private var detailIndex = -1
     private var scrollPosition = 0
     private var scrollOffset = 0
     private var reopenAfterLoad = false
@@ -181,6 +183,12 @@ internal class CommentsSheetController(
                 BottomSheetBehavior.STATE_HALF_EXPANDED else BottomSheetBehavior.STATE_EXPANDED
         }
         content.commentsBack.setOnClickListener { showList() }
+        content.commentsPrevious.setOnClickListener { stepDetail(-1) }
+        content.commentsNext.setOnClickListener { stepDetail(1) }
+        content.commentsPrevious.contentDescription = activity.getString(if (agentEdits) R.string.previous_agent_edit else R.string.previous_comment)
+        content.commentsNext.contentDescription = activity.getString(if (agentEdits) R.string.next_agent_edit else R.string.next_comment)
+        androidx.appcompat.widget.TooltipCompat.setTooltipText(content.commentsPrevious, content.commentsPrevious.contentDescription)
+        androidx.appcompat.widget.TooltipCompat.setTooltipText(content.commentsNext, content.commentsNext.contentDescription)
         content.commentsSelectAll.setOnClickListener { selectAllShown() }
         content.commentsCancelSelection.setOnClickListener { endSelection() }
         content.commentsAcceptSelected.setOnClickListener { decideSelected("accept") }
@@ -342,6 +350,39 @@ internal class CommentsSheetController(
         })
         content.commentsMessage.visibility = if (displayed.isEmpty()) View.VISIBLE else View.GONE
         renderSelection()
+        if (showingDetail) renderDetailPosition()
+    }
+
+    private fun isSelected(item: DocumentCommentItem): Boolean =
+        selectedId != null && item.comment.id.removePrefix("agent-remove-") == selectedId?.removePrefix("agent-remove-")
+
+    /** The title says which item of the list is open ("Agent edit 1/3"); ‹ › are off at the ends. */
+    private fun renderDetailPosition() {
+        val content = sheet ?: return
+        val items = displayedComments()
+        val index = items.indexOfFirst(::isSelected)
+        if (index >= 0) detailIndex = index
+        content.commentsTitle.text = if (index >= 0) {
+            activity.getString(if (items[index].isAgentProposal) R.string.agent_edit_position else R.string.comment_detail_position, index + 1, items.size)
+        } else activity.getString(if (agentEdits) R.string.comments_row_agent else R.string.comments_title)
+        // An item no longer listed (decided, or outside the search) steps to its neighbours from where it was.
+        val canGoBack = if (index >= 0) index > 0 else detailIndex - 1 in items.indices
+        val canGoOn = if (index >= 0) index < items.lastIndex else detailIndex in items.indices
+        listOf(content.commentsPrevious to canGoBack, content.commentsNext to canGoOn).forEach { (button, enabled) ->
+            button.isEnabled = enabled
+            button.alpha = if (enabled) 1f else 0.38f
+        }
+    }
+
+    private fun stepDetail(delta: Int) {
+        val items = displayedComments()
+        val index = items.indexOfFirst(::isSelected)
+        val target = when {
+            index >= 0 -> index + delta
+            delta > 0 -> detailIndex
+            else -> detailIndex - 1
+        }
+        items.getOrNull(target)?.let(::selectComment)
     }
 
     /** The open agent edits of this document (whatever the search), by proposal ID. */
@@ -577,7 +618,7 @@ internal class CommentsSheetController(
         sourceChecked = false
         sourceDraftChanged = false
         showingDetail = true
-        content.commentsTitle.setText(if (item.isAgentProposal) R.string.comments_row_agent else R.string.comments_title)
+        renderDetailPosition()
         content.commentsBrowser.visibility = View.GONE
         content.commentsSearchLayout.visibility = View.GONE
         content.commentsDetailScroll.visibility = View.VISIBLE

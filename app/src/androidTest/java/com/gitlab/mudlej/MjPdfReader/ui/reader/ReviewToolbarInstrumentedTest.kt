@@ -206,7 +206,7 @@ class ReviewToolbarInstrumentedTest {
                 assertEquals(0, maskPage())
                 assertFalse(framed())
                 assertEquals(View.VISIBLE, binding.reviewRevealButton.visibility)
-                binding.reviewSetKnowledgeButton.performClick()
+                binding.reviewRevealButton.performClick()
                 toggle()
                 toggle()
                 assertEquals(0, maskPage())

@@ -518,10 +518,16 @@ class ReviewCardBrowserActivity : AppCompatActivity() {
             .show()
     }
 
-    /** Retires (or restores) the selected cards at once; no confirmation, since either can be undone. */
+    /**
+     * Retires (or restores) the selected cards at once; no confirmation, since either can be undone:
+     * after a retire the bar offers Undo for a few seconds.
+     */
     private fun retireSelection(retire: Boolean) {
         val (retireIds, restoreIds) = reviewRetireSelection(shownCards, selectedIds)
-        val ids = if (retire) retireIds else restoreIds
+        changeRetirement(if (retire) retireIds else restoreIds, retire)
+    }
+
+    private fun changeRetirement(ids: List<String>, retire: Boolean) {
         if (ids.isEmpty() || deleting) return
         deleting = true
         updateSelection()
@@ -540,7 +546,12 @@ class ReviewCardBrowserActivity : AppCompatActivity() {
                 } else {
                     AppSnackbar.make(binding.root, getString(
                         if (retire) R.string.review_card_browser_retired_count else R.string.review_card_browser_restored_count,
-                        ids.size), Snackbar.LENGTH_LONG).show()
+                        ids.size), Snackbar.LENGTH_LONG).apply {
+                        if (retire) {
+                            setAction(R.string.review_undo) { changeRetirement(ids, retire = false) }
+                            duration = REVIEW_RETIRE_UNDO_MILLIS
+                        }
+                    }.show()
                 }
                 loadCards(showProgress = false)
             } finally {

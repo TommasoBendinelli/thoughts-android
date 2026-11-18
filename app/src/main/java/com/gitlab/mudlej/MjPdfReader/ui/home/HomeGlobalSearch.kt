@@ -212,7 +212,7 @@ internal class HomeGlobalSearch(
         val matchedCards = cards.filter { q.matches(cardText(it)) }
             .sortedByDescending { q.matchedStemCount(it.card.question) }
         section(rows, R.string.global_search_cards, matchedCards) { item ->
-            val answer = listOf(item.answerText, item.card.note).firstOrNull { q.matchedStemCount(it) > 0 }
+            val answer = listOf(item.answerText).firstOrNull { q.matchedStemCount(it) > 0 }
             GlobalSearchRow.Result(
                 key = "card:${item.card.id}",
                 title = item.card.question.ifBlank { context.getString(R.string.global_search_untitled_card) },
@@ -271,7 +271,7 @@ internal class HomeGlobalSearch(
     }
 
     private fun cardText(item: ReviewBrowserCard) =
-        listOf(item.card.question, item.answerText, item.card.note, item.documentDisplayName).joinToString("\n")
+        listOf(item.card.question, item.answerText, item.documentDisplayName).joinToString("\n")
 
     private fun displayName(item: HomeItem) = item.libraryDisplayName.ifBlank { item.title }.ifBlank { item.fileName }
 

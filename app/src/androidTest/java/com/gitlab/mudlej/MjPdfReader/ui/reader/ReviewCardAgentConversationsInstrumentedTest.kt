@@ -178,10 +178,10 @@ class ReviewCardAgentConversationsInstrumentedTest {
                     assertTrue(line.parent === details && details.indexOfChild(line) == details.childCount - 1)
                     val parent = details.parent as android.view.ViewGroup
                     val buttons = parent.getChildAt(parent.indexOfChild(details) + 1) as android.view.ViewGroup
-                    assertTrue(buttons.indexOfChild(binding.reviewSetKnowledgeButton) >= 0)
+                    assertTrue(buttons.indexOfChild(binding.reviewRevealButton) >= 0)
                     assertTrue(details.bottom <= buttons.top)
-                    // Set knowledge: a Sync that unlinks everything does not make the line vanish under the finger.
-                    binding.reviewSetKnowledgeButton.performClick()
+                    // Reveal: a Sync that unlinks everything does not make the line vanish under the finger.
+                    binding.reviewRevealButton.performClick()
                 }
                 install(emptyList())
                 scenario.onActivity { controller.onSyncFinished() }

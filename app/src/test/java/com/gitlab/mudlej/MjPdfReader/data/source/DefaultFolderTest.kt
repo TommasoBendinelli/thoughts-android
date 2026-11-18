@@ -26,7 +26,7 @@ class DefaultFolderTest {
     @Test fun `Rule R rewrites relative, absolute, parent-relative and quoted paths`() {
         assertEquals("$canonical/notes.md", r("$legacy/notes.md"))
         assertEquals(canonical, r(legacy))
-        assertEquals("/Users/alex/docs/$canonical/x.pdf", r("/Users/alex/docs/$legacy/x.pdf"))
+        assertEquals("/Users/example/docs/$canonical/x.pdf", r("/Users/example/docs/$legacy/x.pdf"))
         assertEquals("../$canonical/x.pdf", r("../$legacy/x.pdf"))
         assertEquals("""{"path":"$canonical","file":"$canonical/a.tex"}""", r("""{"path":"$legacy","file":"$legacy/a.tex"}"""))
         assertEquals("'$canonical'", r("'$legacy'"))

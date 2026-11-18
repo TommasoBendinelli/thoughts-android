@@ -24,19 +24,51 @@ import java.util.UUID
  * records the Mac would send and applies them in one transaction; the next Sync brings them here.
  * The kept card keeps its ID, schedule and history and takes every card's passage; the others are
  * deleted with their history.
+ *
+ * Cards of an imported PDF (no source behind them, the answer is only highlighted on the PDF) merge
+ * the same way without a source (capability review_card_merge_pdf_v1): the kept card takes every
+ * card's areas on the PDF, and nothing in the PDF changes. Cards of a note and cards of a PDF are
+ * never merged together.
  */
 object ReviewCardMerge {
     const val CAPABILITY = "review_card_merge_v1"
+    /** The server merges cards of an imported PDF: a request without source and expected_source_sha256. */
+    const val PDF_CAPABILITY = "review_card_merge_pdf_v1"
     const val PATH = "/v1/review-card-merges"
     const val MIN_CARDS = 2
     const val MAX_CARDS = 20
     const val MAX_QUESTION_LENGTH = 500
 
     /** Why the selected cards cannot be merged here; nothing is sent. */
-    enum class Refusal { TOO_FEW, TOO_MANY, RETIRED, NOT_IN_SOURCE, SEVERAL_SOURCES }
+    enum class Refusal {
+        TOO_FEW,
+        TOO_MANY,
+        RETIRED,
+        /** A card has neither source markers nor its own areas on the PDF (a whole-document card, a card of an HTML page). */
+        NOT_IN_SOURCE,
+        SEVERAL_SOURCES,
+        /** Some cards are marked in their note and some only on the PDF. */
+        MIXED,
+        /** Cards of a PDF from more than one document. */
+        SEVERAL_DOCUMENTS,
+    }
 
-    /** What the server needs: the cards, the one source file holding their markers, the version read. */
-    data class Plan(val cardIds: List<String>, val source: String, val expectedSourceSha256: String)
+    /**
+     * What the server needs: the cards and, for cards marked in a source, the one source file holding
+     * their markers and the version read. A merge of cards of an imported PDF has neither ([onPdf]).
+     */
+    data class Plan(val cardIds: List<String>, val source: String?, val expectedSourceSha256: String?) {
+        init {
+            require((source == null) == (expectedSourceSha256 == null)) { "A source merge names both the source and its version" }
+        }
+
+        /** Cards of an imported PDF: their areas on the PDF are merged, no source is read or changed. */
+        val onPdf: Boolean get() = source == null
+
+        companion object {
+            fun pdf(cardIds: List<String>) = Plan(cardIds, null, null)
+        }
+    }
 
     sealed class Check {
         data class Ready(val plan: Plan) : Check()
@@ -45,19 +77,28 @@ object ReviewCardMerge {
 
     /**
      * Whether [cards] can be merged, from what the phone knows of them: two to twenty cards, none
-     * retired, each with its answer marked in the source, all in one source file. The server checks
-     * the markers themselves.
+     * retired, none whole-document, and either each with its answer marked in the source, all in one
+     * source file, or none marked in a source, all on one document's PDF (a PDF merge). The server
+     * checks the markers, the PDF version and the areas themselves.
      */
     fun check(cards: List<ReviewCard>): Check {
         if (cards.map { it.id }.distinct().size < MIN_CARDS) return Check.Refused(Refusal.TOO_FEW)
         if (cards.size > MAX_CARDS) return Check.Refused(Refusal.TOO_MANY)
         if (cards.any { it.retired }) return Check.Refused(Refusal.RETIRED)
+        if (cards.any { it.wholeDocument }) return Check.Refused(Refusal.NOT_IN_SOURCE)
+        val (marked, onPdf) = cards.partition { segments(it).isNotEmpty() }
+        // Without markers a card needs its own place on the PDF; a card of an HTML page has none.
+        if (onPdf.any { it.isHtmlAttachmentCard || !it.hasPdfPlacement }) return Check.Refused(Refusal.NOT_IN_SOURCE)
+        if (marked.isNotEmpty() && onPdf.isNotEmpty()) return Check.Refused(Refusal.MIXED)
+        if (marked.isEmpty()) {
+            val documents = cards.map { it.pdfStem }.toSet()
+            if (documents.size != 1 || documents.single().isBlank()) return Check.Refused(Refusal.SEVERAL_DOCUMENTS)
+            return Check.Ready(Plan.pdf(cards.map { it.id }))
+        }
         val files = linkedSetOf<String>()
         val versions = mutableListOf<String>()
         for (card in cards) {
-            val segments = segments(card)
-            if (card.wholeDocument || segments.isEmpty()) return Check.Refused(Refusal.NOT_IN_SOURCE)
-            for (segment in segments) {
+            for (segment in segments(card)) {
                 val file = segment.string("source_file") ?: return Check.Refused(Refusal.NOT_IN_SOURCE)
                 files += file
                 segment.string("source_sha256")?.takeIf { SHA256.matches(it) }?.let(versions::add)
@@ -89,9 +130,14 @@ data class ReviewCardMergeResult(
     val keptCardId: String,
     val deletedCardIds: List<String>,
     val question: String,
+    /** The merged card's passages in its source, or for a PDF merge its areas on the PDF. */
     val passages: Int,
     val replayed: Boolean,
-)
+    /** The server's "kind": "source" or "pdf"; null from a server that does not say. */
+    val kind: String? = null,
+) {
+    val onPdf: Boolean get() = kind == "pdf"
+}
 
 /** A merge the server refused or could not take; nothing was changed. [code] is the server's error_code. */
 class ReviewCardMergeException(
@@ -102,8 +148,13 @@ class ReviewCardMergeException(
     val currentSourceSha256: String? = null,
 ) : IOException(message)
 
-/** The server cannot merge cards yet (no review_card_merge_v1): nothing was sent. */
-class ReviewCardMergeUnsupportedException : IOException("The server cannot merge review cards yet")
+/**
+ * The server cannot merge these cards yet (no review_card_merge_v1, or for cards of a PDF no
+ * review_card_merge_pdf_v1): nothing was sent.
+ */
+class ReviewCardMergeUnsupportedException(val onPdf: Boolean = false) : IOException(
+    if (onPdf) "The server cannot merge review cards of a PDF yet" else "The server cannot merge review cards yet",
+)
 
 /**
  * HTTP client for POST /v1/review-card-merges with the device token the app uses for every /v1
@@ -118,15 +169,18 @@ class ReviewCardMergeClient(
     /**
      * Asks the server to merge [plan]'s cards into [keepCardId] with [question]. When the source
      * moved on since the phone read it, the server names its current version: the merge is asked
-     * once more on that version (the server checks every card's markers there again).
+     * once more on that version (the server checks every card's markers there again). A merge of
+     * cards of a PDF names no source, needs review_card_merge_pdf_v1 and is asked once.
      */
     fun merge(plan: ReviewCardMerge.Plan, keepCardId: String, question: String): ReviewCardMergeResult {
         val capabilities = requestJson("GET", "/v1/health", null, "capabilities").get("capabilities")
             ?.takeIf(JsonElement::isJsonArray)?.asJsonArray?.mapNotNull { it.takeIf { e -> e.isJsonPrimitive }?.asString }
             .orEmpty()
-        if (ReviewCardMerge.CAPABILITY !in capabilities) throw ReviewCardMergeUnsupportedException()
+        val needed = if (plan.onPdf) ReviewCardMerge.PDF_CAPABILITY else ReviewCardMerge.CAPABILITY
+        if (needed !in capabilities) throw ReviewCardMergeUnsupportedException(plan.onPdf)
+        val read = plan.expectedSourceSha256 ?: return post(plan, keepCardId, question, null)
         return try {
-            post(plan, keepCardId, question, plan.expectedSourceSha256)
+            post(plan, keepCardId, question, read)
         } catch (error: SourceMovedOn) {
             post(plan, keepCardId, question, error.current)
         }
@@ -134,20 +188,23 @@ class ReviewCardMergeClient(
 
     private class SourceMovedOn(val current: String) : Exception()
 
-    private fun post(plan: ReviewCardMerge.Plan, keepCardId: String, question: String, sha256: String): ReviewCardMergeResult {
+    /** [sha256] is the source version to merge on; null for a merge of cards of a PDF (no source fields). */
+    private fun post(plan: ReviewCardMerge.Plan, keepCardId: String, question: String, sha256: String?): ReviewCardMergeResult {
         val body = JsonObject().apply {
             addProperty("request_id", newRequestId())
             add("card_ids", JsonArray().apply { plan.cardIds.forEach(::add) })
             addProperty("keep_card_id", keepCardId)
             addProperty("question", question.trim().take(ReviewCardMerge.MAX_QUESTION_LENGTH))
-            addProperty("source", plan.source)
-            addProperty("expected_source_sha256", sha256)
+            if (plan.source != null && sha256 != null) {
+                addProperty("source", plan.source)
+                addProperty("expected_source_sha256", sha256)
+            }
         }
         val json = try {
             requestJson("POST", ReviewCardMerge.PATH, body.toString().toByteArray(StandardCharsets.UTF_8), "merge")
         } catch (error: ReviewCardMergeException) {
             val current = error.currentSourceSha256
-            if (error.code == "source_conflict" && current != null && current != sha256) throw SourceMovedOn(current)
+            if (sha256 != null && error.code == "source_conflict" && current != null && current != sha256) throw SourceMovedOn(current)
             throw error
         }
         if (json.get("accepted")?.takeIf { it.isJsonPrimitive }?.asBoolean != true) {
@@ -160,6 +217,7 @@ class ReviewCardMergeClient(
             question = json.string("question") ?: question,
             passages = json.get("passages")?.takeIf { it.isJsonPrimitive }?.asInt ?: 0,
             replayed = json.get("replayed")?.takeIf { it.isJsonPrimitive }?.asBoolean == true,
+            kind = json.string("kind"),
         )
     }
 

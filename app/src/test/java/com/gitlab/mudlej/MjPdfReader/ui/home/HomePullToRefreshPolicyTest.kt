@@ -51,27 +51,10 @@ class HomePullToRefreshPolicyTest {
     }
 
     @Test
-    fun pullSyncsEveryTabButReloadsTheAbTestingPage() {
+    fun everyTabPullPerformsTheSameSync() {
         HomeTab.entries.forEach { tab ->
-            val expected = if (tab == HomeTab.AB_TESTING) PullToRefreshAction.RELOAD_PAGE else PullToRefreshAction.SYNC
-            assertEquals(expected, pullToRefreshAction(tab))
+            assertEquals(PullToRefreshAction.SYNC, pullToRefreshAction(tab))
         }
-    }
-
-    @Test
-    fun theAbTestingTabIsShownOnlyWhenTheBuildNamesItsPage() {
-        assertEquals(HomeTab.entries, visibleHomeTabs(abTestingConfigured = true))
-        val withoutPage = visibleHomeTabs(abTestingConfigured = false)
-        assertEquals(listOf(HomeTab.DIARY, HomeTab.NOTES, HomeTab.LIBRARY, HomeTab.REVIEW), withoutPage)
-        // Pager positions are ordinals, so only the last tab may be left out.
-        withoutPage.forEachIndexed { position, tab -> assertEquals(position, tab.ordinal) }
-        // A saved A/B tab opens Diary in a build without the page; any shown tab is kept.
-        assertEquals(HomeTab.DIARY, initialHomeTab(HomeTab.AB_TESTING, withoutPage))
-        assertEquals(HomeTab.REVIEW, initialHomeTab(HomeTab.REVIEW, withoutPage))
-        assertEquals(HomeTab.AB_TESTING, initialHomeTab(HomeTab.AB_TESTING, HomeTab.entries))
-        assertNull(AbTestingTabController.pageHost(""))
-        assertNull(AbTestingTabController.pageHost("http://pilot.example.org:8445/"))
-        assertEquals("pilot.example.org", AbTestingTabController.pageHost("https://Pilot.Example.org:8445/"))
     }
 
     @Test

@@ -74,6 +74,8 @@ internal class ReviewBeforePanel(
     private val originId: () -> String,
     /** The summary line ("Before: …") was tapped: open the before step again on its picks. */
     private val onSummaryTapped: () -> Unit = {},
+    /** A pick or the note changed: the draft is kept until the card's answer is recorded ([ReviewBeforeDrafts]). */
+    private val onDraftChanged: () -> Unit = {},
     private val onLayoutChanged: () -> Unit,
 ) {
     private var draft: ReviewAnswerDraft? = null
@@ -87,7 +89,10 @@ internal class ReviewBeforePanel(
 
     init {
         binding.reviewBeforeNote.doAfterTextChanged { text ->
-            if (!filling) draft?.setNote(ReviewGroupNotes.BEFORE_NOTE_KEY, text?.toString().orEmpty())
+            if (filling) return@doAfterTextChanged
+            val draft = draft?.takeUnless { it.beforeLocked } ?: return@doAfterTextChanged
+            draft.setNote(ReviewGroupNotes.BEFORE_NOTE_KEY, text?.toString().orEmpty())
+            onDraftChanged()
         }
         // Once the answer was shown the picks fold into one line; tapping it reopens them, as
         // "Back to before step" in the card menu does.
@@ -190,6 +195,7 @@ internal class ReviewBeforePanel(
         draft.beforeTags = if (toggle) ReviewTagScales.toggle(draft.beforeTags, steps, step, mapping)
             else ReviewTagScales.select(draft.beforeTags, steps, step, mapping)
         refresh()
+        onDraftChanged()
     }
 
     private fun refresh() {

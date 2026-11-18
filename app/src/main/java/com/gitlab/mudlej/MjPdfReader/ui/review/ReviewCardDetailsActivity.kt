@@ -94,9 +94,6 @@ class ReviewCardDetailsActivity : AppCompatActivity() {
                 ReviewStore.defaultOutgoingCardsRoot(),
             ),
         )
-        binding.reviewCardDetailsEditNote.setOnClickListener {
-            if (!actionInFlight) item?.let(::showEditNote)
-        }
         binding.reviewCardDetailsRetry.setOnClickListener { loadCard(showProgress = true) }
         binding.reviewCardDetailsLinking.setOnClickListener {
             val current = item
@@ -188,6 +185,11 @@ class ReviewCardDetailsActivity : AppCompatActivity() {
     override fun onCreateOptionsMenu(menu: Menu): Boolean {
         menu.add(0, MENU_TECHNICAL, 0, R.string.review_card_details_technical)
             .setShowAsAction(MenuItem.SHOW_AS_ACTION_NEVER)
+        // Make project card / Make knowledge card, and Follow the Project (protocol/review-card-kinds.md section 5).
+        menu.add(0, MENU_KIND, 1, R.string.review_kind_make_project)
+            .setShowAsAction(MenuItem.SHOW_AS_ACTION_NEVER)
+        menu.add(0, MENU_FOLLOW_PROJECT, 1, R.string.review_kind_follow_project)
+            .setShowAsAction(MenuItem.SHOW_AS_ACTION_NEVER)
         // Retire card (Restore to review on a retired card) sits next to Delete, its permanent alternative.
         menu.add(0, MENU_RETIRE, 1, R.string.review_card_retire_menu)
             .setShowAsAction(MenuItem.SHOW_AS_ACTION_NEVER)
@@ -202,6 +204,17 @@ class ReviewCardDetailsActivity : AppCompatActivity() {
             isEnabled = item != null && !actionInFlight
         }
         menu.findItem(MENU_DELETE)?.isEnabled = item != null && !actionInFlight
+        val card = item?.takeIf { it.state != ReviewBrowserState.DELETED }?.card
+        menu.findItem(MENU_KIND)?.apply {
+            isVisible = card != null
+            card?.let { setTitle(reviewKindMenuTitle(it)) }
+            isEnabled = !actionInFlight
+        }
+        menu.findItem(MENU_FOLLOW_PROJECT)?.apply {
+            isVisible = card != null && reviewCanFollowProject(card)
+            card?.let { title = reviewFollowProjectTitle(this@ReviewCardDetailsActivity, it) }
+            isEnabled = !actionInFlight
+        }
         return super.onPrepareOptionsMenu(menu)
     }
 
@@ -214,6 +227,14 @@ class ReviewCardDetailsActivity : AppCompatActivity() {
         }
         MENU_RETIRE -> {
             item?.let(::retireOrRestore)
+            true
+        }
+        MENU_KIND -> {
+            item?.let { changeKind(it, reviewSwappedKind(it.card)) }
+            true
+        }
+        MENU_FOLLOW_PROJECT -> {
+            item?.let { changeKind(it, com.gitlab.mudlej.MjPdfReader.data.review.ReviewKinds.FOLLOW_PROJECT) }
             true
         }
         MENU_DELETE -> {
@@ -250,9 +271,11 @@ class ReviewCardDetailsActivity : AppCompatActivity() {
                     )
                     val projects = LibraryProjectStore(applicationContext)
                         .projects()
+                    // The Projects that hold the card (review-card-kinds section 4: its document too, published or not).
+                    val holding = card.card.reviewProjectIds.toSet()
                     projectNames = projects.mapNotNull { value ->
                         val project = value.asJsonObject
-                        val belongs = project.get("target")?.asString == filename ||
+                        val belongs = project.get("id")?.asString in holding || project.get("target")?.asString == filename ||
                             project.getAsJsonArray("documents")?.any {
                                 it.asJsonObject.get("filename")?.asString == filename
                             } == true
@@ -304,8 +327,6 @@ class ReviewCardDetailsActivity : AppCompatActivity() {
         binding.reviewCardDetailsPending.visibility = if (browserCard.pendingSync) View.VISIBLE else View.GONE
         binding.reviewCardDetailsQuestion.text = browserCard.card.question
         binding.reviewCardDetailsCardId.text = browserCard.card.id
-        binding.reviewCardDetailsNote.visibility = if (browserCard.card.note.isBlank()) View.GONE else View.VISIBLE
-        binding.reviewCardDetailsNote.text = getString(R.string.review_card_note_preview, browserCard.card.note)
         binding.reviewCardDetailsProject.text = projectNames.ifBlank {
             getString(R.string.review_card_details_none)
         }
@@ -343,6 +364,9 @@ class ReviewCardDetailsActivity : AppCompatActivity() {
         binding.reviewCardDetailsSchedule.text = listOfNotNull(
             // Retired cards keep their schedule; it applies again after Restore to review.
             browserCard.retiredLabel(this),
+            // Knowledge or project card (review-card-kinds), and a project card's changed passage.
+            reviewKindDetails(this, browserCard.card),
+            getString(R.string.review_kind_changed).takeIf { browserCard.card.changedSinceSeen },
             getString(R.string.review_card_details_due, dueText(browserCard)),
             getString(R.string.review_card_details_interval, intervalText(browserCard)),
         ).joinToString("\n")
@@ -411,8 +435,6 @@ class ReviewCardDetailsActivity : AppCompatActivity() {
         val canReview = browserCard.canReview() && pdfAvailable
         binding.reviewCardDetailsReview.isEnabled = canReview && !actionInFlight
         binding.reviewCardDetailsReview.visibility = View.VISIBLE
-        binding.reviewCardDetailsEditNote.isEnabled = !actionInFlight
-        binding.reviewCardDetailsEditNote.setText(if (browserCard.card.note.isBlank()) R.string.review_card_add_note else R.string.review_card_edit_note)
         binding.reviewCardDetailsEdit.isEnabled = !actionInFlight
         binding.reviewCardDetailsCheckSourceEdits.visibility = if (
             browserCard.card.sourceAnchor != null && browserCard.card.sourceLinkState != "linking_failed"
@@ -564,52 +586,6 @@ class ReviewCardDetailsActivity : AppCompatActivity() {
         startActivity(ReviewCardReaderContract.placeAgain(ReviewCardReaderContract.openPage(readerIntent, ((browserCard.card.pdfPage ?: 1) - 1))))
     }
 
-    private fun showEditNote(browserCard: ReviewBrowserCard) {
-        val editor = DialogReviewCardEditBinding.inflate(layoutInflater)
-        editor.reviewCardEditLayout.hint = getString(R.string.review_card_note_hint)
-        editor.reviewCardEditLayout.helperText = getString(R.string.review_card_note_help)
-        editor.reviewCardEditLayout.counterMaxLength = ReviewStore.MAX_NOTE_LENGTH
-        editor.reviewCardEditQuestion.filters = emptyArray()
-        editor.reviewCardEditQuestion.setText(browserCard.card.note)
-        val dialog = MaterialAlertDialogBuilder(this)
-            .setTitle(if (browserCard.card.note.isBlank()) R.string.review_card_add_note else R.string.review_card_edit_note)
-            .setView(editor.root)
-            .setPositiveButton(R.string.review_card_edit_save, null)
-            .setNegativeButton(R.string.cancel, null)
-            .create()
-        dialog.setOnShowListener {
-            val save = dialog.getButton(androidx.appcompat.app.AlertDialog.BUTTON_POSITIVE)
-            save.setOnClickListener {
-                val text = editor.reviewCardEditQuestion.text?.toString().orEmpty()
-                if (text.trim().length > ReviewStore.MAX_NOTE_LENGTH) {
-                    editor.reviewCardEditLayout.error = getString(R.string.review_card_note_too_long)
-                    return@setOnClickListener
-                }
-                if (actionInFlight) return@setOnClickListener
-                actionInFlight = true
-                save.isEnabled = false
-                dialog.setCancelable(false)
-                dialog.getButton(androidx.appcompat.app.AlertDialog.BUTTON_NEGATIVE).isEnabled = false
-                lifecycleScope.launch {
-                    val result = withContext(Dispatchers.IO) {
-                        reviewStore.updateNote(browserCard.card.id, text, expectedNote = browserCard.card.note)
-                    }
-                    actionInFlight = false
-                    result.onSuccess {
-                        dialog.dismiss()
-                        loadCard(showProgress = false)
-                    }.onFailure {
-                        editor.reviewCardEditLayout.error = it.message
-                        save.isEnabled = true
-                        dialog.setCancelable(true)
-                        dialog.getButton(androidx.appcompat.app.AlertDialog.BUTTON_NEGATIVE).isEnabled = true
-                    }
-                }
-            }
-        }
-        dialog.show()
-    }
-
     private fun showEditQuestion(browserCard: ReviewBrowserCard) {
         val editBinding = DialogReviewCardEditBinding.inflate(layoutInflater)
         editBinding.reviewCardEditQuestion.setText(browserCard.card.question)
@@ -679,6 +655,29 @@ class ReviewCardDetailsActivity : AppCompatActivity() {
         ) else runAction(
             operation = { reviewStore.retire(cardId).withoutValue() },
             successMessage = getString(R.string.review_card_retired),
+            // One tap retires it: Undo for a few seconds.
+            undo = {
+                runAction(
+                    operation = { reviewStore.restore(cardId).withoutValue() },
+                    successMessage = getString(R.string.review_card_restored_to_review),
+                )
+            },
+        )
+    }
+
+    /** A kind event; Undo writes the card's previous choice (its own kind, or follow_project). */
+    private fun changeKind(browserCard: ReviewBrowserCard, kind: String) {
+        val cardId = browserCard.card.id
+        val previous = browserCard.card.ownReviewKind ?: com.gitlab.mudlej.MjPdfReader.data.review.ReviewKinds.FOLLOW_PROJECT
+        runAction(
+            operation = { reviewStore.setReviewKind(cardId, kind).withoutValue() },
+            successMessage = getString(reviewKindChoiceText(kind)),
+            undo = {
+                runAction(
+                    operation = { reviewStore.setReviewKind(cardId, previous).withoutValue() },
+                    successMessage = getString(reviewKindChoiceText(previous)),
+                )
+            },
         )
     }
 
@@ -699,6 +698,7 @@ class ReviewCardDetailsActivity : AppCompatActivity() {
     private fun runAction(
         operation: () -> Result<Unit>,
         successMessage: String,
+        undo: (() -> Unit)? = null,
     ) {
         if (actionInFlight) return
         actionInFlight = true
@@ -707,7 +707,12 @@ class ReviewCardDetailsActivity : AppCompatActivity() {
             val result = withContext(Dispatchers.IO) { operation() }
             actionInFlight = false
             result.onSuccess {
-                AppSnackbar.make(binding.root, successMessage, Snackbar.LENGTH_LONG).show()
+                AppSnackbar.make(binding.root, successMessage, Snackbar.LENGTH_LONG).apply {
+                    if (undo != null) {
+                        setAction(R.string.review_undo) { undo() }
+                        duration = REVIEW_RETIRE_UNDO_MILLIS
+                    }
+                }.show()
                 loadCard(showProgress = false)
             }.onFailure { error ->
                 item?.let(::render)
@@ -758,6 +763,8 @@ class ReviewCardDetailsActivity : AppCompatActivity() {
         private const val MENU_TECHNICAL = 1
         private const val MENU_DELETE = 2
         private const val MENU_RETIRE = 3
+        private const val MENU_KIND = 4
+        private const val MENU_FOLLOW_PROJECT = 5
         private val DATE_FORMATTER = DateTimeFormatter.ISO_LOCAL_DATE
 
         fun intent(context: Context, cardId: String): Intent =

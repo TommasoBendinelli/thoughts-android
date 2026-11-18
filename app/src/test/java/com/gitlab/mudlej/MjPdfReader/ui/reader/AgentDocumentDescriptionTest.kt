@@ -255,8 +255,18 @@ class AgentDocumentDescriptionTest {
             "Text feedback on this PDF version:\n" +
                 "- Liked (page 3): \"nice derivation\"\n" +
                 "- Disliked (page 5): \"beta is set to 0.1\" — Should be 0.05\n" +
-                "- Question (page 6): \"the learning rate\" — Why 0.1? (resolved)\n",
+                "- Question (page 6): \"the learning rate\" — Why 0.1? (resolved)\n" +
+                "Liked and Disliked passages say what to keep and what to change; a change goes in a proposal.\n",
             agentTextFeedbackSection(records, current),
+        )
+        // An open question asks for an answer, not an edit.
+        val open = record(9, "neutral", "the learning rate", "Why 0.1?", current, 6, kind = "question")
+        assertEquals(
+            "Text feedback on this PDF version:\n" +
+                "- Question (page 6): \"the learning rate\" — Why 0.1?\n" +
+                "Answer each Question in your reply. A question asks you something; it is not a request to change the text, so " +
+                "make no proposal for it unless I ask for one.\n",
+            agentTextFeedbackSection(listOf(open), current),
         )
         // Nothing given on the version on screen, or no version known: nothing is added.
         assertEquals("", agentTextFeedbackSection(records.filter { it.exact == "older version" }, current))
@@ -267,7 +277,8 @@ class AgentDocumentDescriptionTest {
             agentTextFeedbackSection(listOf(drawing), current))
         // A long quote is cut at 300 characters, as on the desktop.
         val long = record(7, "positive", "x".repeat(320), "", current, 1)
-        assertEquals("Text feedback on this PDF version:\n- Liked (page 1): \"${"x".repeat(300)}…\"\n",
+        assertEquals("Text feedback on this PDF version:\n- Liked (page 1): \"${"x".repeat(300)}…\"\n" +
+            "Liked and Disliked passages say what to keep and what to change; a change goes in a proposal.\n",
             agentTextFeedbackSection(listOf(long), current))
     }
 

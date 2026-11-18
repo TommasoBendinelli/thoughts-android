@@ -52,7 +52,8 @@ class ReviewCardBrowserAdapter(
 
     /** The text a column shows for [item]; the browser also measures it to size the column. */
     fun cellText(context: android.content.Context, item: ReviewBrowserCard, column: ReviewCardBrowserColumn): String = when (column) {
-        ReviewCardBrowserColumn.QUESTION -> item.card.question
+        // A project card is marked as such under its question, with its changed passage (review-card-kinds).
+        ReviewCardBrowserColumn.QUESTION -> reviewKindMark(context, item.card)?.let { "${item.card.question}\n$it" } ?: item.card.question
         ReviewCardBrowserColumn.DUE -> dueText(item)
         ReviewCardBrowserColumn.DECK -> item.projectDisplayName.ifBlank { "—" }
         ReviewCardBrowserColumn.DOCUMENT -> item.documentDisplayName
@@ -115,7 +116,7 @@ class ReviewCardBrowserAdapter(
             val created = binding.reviewCardCreated.text.toString()
             binding.root.contentDescription = context.getString(
                 R.string.review_card_browser_row_description,
-                item.card.question,
+                binding.reviewCardQuestion.text.toString(),
                 due,
                 project,
                 state,

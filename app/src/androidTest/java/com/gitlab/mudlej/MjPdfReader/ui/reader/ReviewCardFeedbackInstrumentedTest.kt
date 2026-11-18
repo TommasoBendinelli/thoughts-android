@@ -223,14 +223,16 @@ class ReviewCardFeedbackInstrumentedTest {
                 screenshot("3-revealed-dark")
                 scenario.onActivity { binding.pdfView.setNightMode(false); binding.pdfView.invalidate() }
 
-                // Hide → masked again, nothing drawn.
-                scenario.onActivity { binding.reviewRevealButton.performClick() }
+                // Hide again (⋮) → masked again, nothing drawn.
+                scenario.onActivity {
+                    ReviewSessionController::class.java.getDeclaredMethod("hideAgain").apply { isAccessible = true }.invoke(controller)
+                }
                 awaitUi("Feedback hidden with the answer") { drawn().isEmpty() }
                 scenario.onActivity { assertEquals(View.GONE, binding.reviewFeedbackSummary.visibility) }
 
-                // Set knowledge reveals the answer, and the feedback with it.
-                scenario.onActivity { binding.reviewSetKnowledgeButton.performClick() }
-                awaitUi("Feedback drawn after Set knowledge") { drawn().size == 2 }
+                // Reveal again shows the answer, and the feedback with it.
+                scenario.onActivity { binding.reviewRevealButton.performClick() }
+                awaitUi("Feedback drawn after Reveal again") { drawn().size == 2 }
 
                 // C8: the list shows the passage not found under its heading; delete it from its editor.
                 scenario.onActivity { binding.reviewFeedbackSummary.performClick() }
@@ -710,9 +712,11 @@ class ReviewCardFeedbackInstrumentedTest {
                 assertEquals(listOf(narrow.id), live().map { it.id })
                 assertEquals(firstLine.take(17), live().single().exact)
 
-                // Masking the answer ends a change in progress.
+                // Masking the answer (Hide again, ⋮) ends a change in progress.
                 changePassage(narrow.id)
-                scenario.onActivity { binding.reviewRevealButton.performClick() }
+                scenario.onActivity {
+                    ReviewSessionController::class.java.getDeclaredMethod("hideAgain").apply { isAccessible = true }.invoke(controller)
+                }
                 awaitUi("Mode ended with the answer") { !controller.feedbackActions.isChangingPassage() && !binding.pdfView.hasTextSelection() }
                 assertEquals(listOf(narrow.id), live().map { it.id })
             }

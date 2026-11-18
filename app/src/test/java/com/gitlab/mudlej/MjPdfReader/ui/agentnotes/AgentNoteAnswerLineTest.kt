@@ -41,6 +41,8 @@ class AgentNoteAnswerLineTest {
         R.string.agent_note_wake_busy to "%1\$s answers when it finishes its current task",
         R.string.agent_note_wake_offline to "%1\$s is offline; the study session answers at %2\$s if it is still offline",
         R.string.agent_note_wake_offline_later to "%1\$s is offline; the study session answers later if it is still offline",
+        R.string.agent_note_answered_by to "Answered by: %1\$s",
+        R.string.agent_note_answered_by_nobody to "nobody is listening",
     )
     private val string: (Int, Array<out Any>) -> String = { id, args -> String.format(strings.getValue(id), *args) }
 
@@ -62,6 +64,37 @@ class AgentNoteAnswerLineTest {
     private val onTheServer = onTheMac.copy(machine = "example-server", title = "Figure review", sessionState = "idle")
     private val fallback = AgentNoteWake(AgentNoteWake.WILL_BE_WOKEN, AgentNoteCoverer.RESPONDER, "example-server", "The study session", "idle")
     private val macAsleep = onTheMac.copy(state = AgentNoteWake.WAKER_OFFLINE, fallbackAt = "2026-11-15T02:14:00.123456Z")
+
+    @Test
+    fun theChipOverTheCommentSaysWhoAnswers() {
+        fun chip(answer: AgentNoteListeningAnswer?) = agentNoteAnsweredByChipText(answer, string)
+        // Automatic: whoever listens now, else the session a waker wakes.
+        assertEquals("Answered by: the agent that sent it",
+            chip(AgentNoteListeningAnswer(AgentNoteListening.LISTENING, sender.coverer)))
+        assertEquals("Answered by: Chapter draft", chip(AgentNoteListeningAnswer(AgentNoteListening.NOT_LISTENING, wake = onTheMac)))
+        assertEquals("Answered by: The study session", chip(AgentNoteListeningAnswer(AgentNoteListening.NOT_LISTENING, wake = fallback)))
+        // A chosen agent is named as chosen, listening or not.
+        assertEquals("Answered by: Course notes agent",
+            chip(AgentNoteListeningAnswer(AgentNoteListening.LISTENING, sender.coverer, answerBy = owner)))
+        assertEquals("Answered by: Course notes agent",
+            chip(AgentNoteListeningAnswer(AgentNoteListening.NOT_LISTENING, answerBy = owner.copy(live = false))))
+        assertEquals("Answered by: nobody is listening", chip(AgentNoteListeningAnswer(AgentNoteListening.NOT_LISTENING)))
+        // Nothing to say yet, or a server that cannot tell: no chip.
+        assertNull(chip(null))
+        assertNull(chip(AgentNoteListeningAnswer.UNKNOWN))
+    }
+
+    @Test
+    fun onlyALineThatNeedsAttentionShowsUnderTheTitle() {
+        // The usual: an agent listens, or one will be woken (the note's own session, or the study session).
+        assertTrue(line(AgentNoteListeningAnswer(AgentNoteListening.LISTENING, replyAgent.coverer))!!.usual)
+        assertTrue(line(AgentNoteListeningAnswer(AgentNoteListening.NOT_LISTENING, wake = fallback))!!.usual)
+        assertTrue(line(AgentNoteListeningAnswer(AgentNoteListening.NOT_LISTENING, wake = onTheMac))!!.usual)
+        // Worth a line: nobody acts on a reply, or the answer comes late because a machine is offline.
+        assertFalse(line(AgentNoteListeningAnswer(AgentNoteListening.NOT_LISTENING))!!.usual)
+        assertFalse(line(AgentNoteListeningAnswer(AgentNoteListening.NOT_LISTENING, wake = macAsleep))!!.usual)
+        assertFalse(line(AgentNoteListeningAnswer(AgentNoteListening.NOT_LISTENING, answerBy = owner.copy(live = false)))!!.usual)
+    }
 
     @Test
     fun theLineNamesTheAgentThatListens() {

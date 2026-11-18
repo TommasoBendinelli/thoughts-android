@@ -50,6 +50,14 @@ import com.gitlab.mudlej.MjPdfReader.data.review.basicPdfSha256
 import com.gitlab.mudlej.MjPdfReader.data.source.OfflineSourceBundleStore
 import com.gitlab.mudlej.MjPdfReader.data.source.ReviewAreaLinkingException
 import com.gitlab.mudlej.MjPdfReader.ui.review.finishAfterReviewBrowserRating
+import com.gitlab.mudlej.MjPdfReader.ui.review.reviewCanFollowProject
+import com.gitlab.mudlej.MjPdfReader.ui.review.reviewFollowProjectTitle
+import com.gitlab.mudlej.MjPdfReader.ui.review.reviewIntervalExceedsProjectCap
+import com.gitlab.mudlej.MjPdfReader.ui.review.reviewKindChoiceText
+import com.gitlab.mudlej.MjPdfReader.ui.review.reviewKindMark
+import com.gitlab.mudlej.MjPdfReader.ui.review.reviewKindMenuTitle
+import com.gitlab.mudlej.MjPdfReader.ui.review.reviewSwappedKind
+import com.gitlab.mudlej.MjPdfReader.ui.review.withKindOf
 import com.google.android.material.color.MaterialColors
 import com.google.android.material.snackbar.Snackbar
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
@@ -119,23 +127,33 @@ internal class ReviewSessionHistory {
 /** The review card's ⋮ menu, in order; [id] is the menu item id. */
 internal enum class ReviewSessionMenuAction(val id: Int) {
     FOCUS(7), MORE_INFO(5), COPY_FOR_AGENT(13), EDIT(1), AGENT_CONVERSATIONS(14),
-    SKIP(12), UNDO(3), HIDE_AGAIN(6), BACK_TO_BEFORE(16), RETIRE(15), DELETE(4), END(10),
+    /** "Make project card" or "Make knowledge card" (protocol/review-card-kinds.md section 5). */
+    KIND(18),
+    /** "Follow the Project (Knowledge)": only for a card with a kind of its own that a Project holds. */
+    FOLLOW_PROJECT(19),
+    SKIP(12), FLIP(17), UNDO(3), HIDE_AGAIN(6), BACK_TO_BEFORE(16), RETIRE(15), DELETE(4), END(10),
 }
 
 /**
  * The ⋮ menu's items: the card's actions while a card is shown, Undo and End review always.
- * Retire card sits directly above Delete card, its permanent alternative. [beforeLocked]: the before
- * step was answered and locked, so it can be gone back to.
+ * Flip (cover the rest, show the answer, to test the other way round) only while the answer is
+ * covered; the review bar has a single Reveal. Retire card sits directly above Delete card, its
+ * permanent alternative. [beforeLocked]: the before step was answered and locked, so it can be gone back to.
  */
 internal fun reviewSessionMenuActions(
     hasCard: Boolean,
     answerVisible: Boolean,
     beforeLocked: Boolean = false,
+    /** The card has a kind of its own and a Project holds it ([com.gitlab.mudlej.MjPdfReader.ui.review.reviewCanFollowProject]). */
+    followProject: Boolean = false,
 ): List<ReviewSessionMenuAction> = buildList {
     if (hasCard) addAll(listOf(ReviewSessionMenuAction.FOCUS, ReviewSessionMenuAction.MORE_INFO,
         ReviewSessionMenuAction.COPY_FOR_AGENT, ReviewSessionMenuAction.EDIT, ReviewSessionMenuAction.AGENT_CONVERSATIONS,
-        // Skip postpones (interval and scope) and keeps the card's tags, so it needs no revealed answer.
-        ReviewSessionMenuAction.SKIP))
+        ReviewSessionMenuAction.KIND))
+    if (hasCard && followProject) add(ReviewSessionMenuAction.FOLLOW_PROJECT)
+    // Skip postpones (interval and scope) and keeps the card's tags, so it needs no revealed answer.
+    if (hasCard) add(ReviewSessionMenuAction.SKIP)
+    if (hasCard && !answerVisible) add(ReviewSessionMenuAction.FLIP)
     add(ReviewSessionMenuAction.UNDO)
     if (hasCard && answerVisible) add(ReviewSessionMenuAction.HIDE_AGAIN)
     if (hasCard && beforeLocked) add(ReviewSessionMenuAction.BACK_TO_BEFORE)
@@ -160,7 +178,11 @@ private data class ReviewCardOpenState(
     val installedPdfSha256: String? = null,
     val currentTags: List<String>? = null,
     val currentInterval: ReviewInterval? = null,
+    val before: KeptBeforeStep? = null,
 )
+
+/** As the card was opened: its last answer ([ReviewStore.lastAnsweredAt]) and the before step kept since ([ReviewBeforeDrafts]). */
+private data class KeptBeforeStep(val answeredAt: Instant?, val draft: ReviewBeforeDrafts.Draft?)
 
 class ReviewSessionController(
     private val activity: MainActivity,
@@ -181,8 +203,16 @@ class ReviewSessionController(
      * review in two steps also the before panel's picks; then [selectedTags] are the after step's.
      */
     private var answerDraft = ReviewAnswerDraft()
+    /**
+     * The before step of each card, kept until its answer is recorded, so that it survives the card
+     * dropping out of the review and the reader or app restarting ([ReviewBeforeDrafts]).
+     */
+    private val beforeDrafts = ReviewBeforeDrafts(activity)
+    /** The card shown and its last answer when it was shown: the answer its kept before step belongs to. */
+    private var beforeDraftAnswer: Pair<String, Instant?>? = null
     /** Review in two steps: the groups asked before the answer, under the question. */
-    private val beforePanel = ReviewBeforePanel(activity, binding, { store.originIdentity() }, { reopenBeforeStep() }) { onTagPhasesChanged() }
+    private val beforePanel = ReviewBeforePanel(activity, binding, { store.originIdentity() }, { reopenBeforeStep() },
+        onDraftChanged = ::keepBeforeStep) { onTagPhasesChanged() }
     /** The agent recall prediction service; null when this build has none (nothing is asked). */
     private val recallPredictor by lazy { ReviewRecallPrediction.Config.fromBuild() }
     /** The agent's recall prediction per card: asked once per card shown in the session. */
@@ -270,9 +300,6 @@ class ReviewSessionController(
         binding.reviewOptionsButton.setOnClickListener(::showOptions)
         binding.reviewDetailsToggle.setOnClickListener { toggleDetails() }
         binding.reviewQuestion.setOnClickListener { if (!editingRegion) toggleDetails() }
-        binding.reviewNote.setOnClickListener {
-            if (!operationInFlight && !editingRegion) currentCard?.let { editCard(it, showText = true) }
-        }
         binding.reviewRegionCancelButton.setOnClickListener { cancelRegionEdit() }
         binding.reviewRegionSaveButton.setOnClickListener { saveRegion() }
         binding.reviewAddAreaButton.setOnClickListener { addArea() }
@@ -287,23 +314,13 @@ class ReviewSessionController(
             if (expanded) hideKeyboard()
             showTextFields(!expanded)
         }
-        binding.reviewNoteEdit.filters = arrayOf(InputFilter.LengthFilter(ReviewStore.MAX_NOTE_LENGTH))
         binding.reviewQuestionEdit.doAfterTextChanged { text ->
             if (!text.isNullOrBlank()) binding.reviewQuestionEditLayout.error = null
         }
-        // Reveal and Flip toggle: Reveal becomes Hide, Flip becomes Unflip.
-        binding.reviewRevealButton.setOnClickListener { if (answerShown) hideAgain() else showAnswer() }
-        binding.reviewSetKnowledgeButton.setOnClickListener(::reveal)
+        // One Reveal: the answer and the bar to say how well it was known (Hide again and Flip are in ⋮).
+        binding.reviewRevealButton.setOnClickListener(::reveal)
         binding.reviewPreviousAnswerButton.setOnClickListener { focusAnswerArea(-1) }
         binding.reviewNextAnswerButton.setOnClickListener { focusAnswerArea(1) }
-        binding.reviewFlipButton.isCheckable = true
-        binding.reviewFlipButton.setOnClickListener {
-            if (currentCard == null || operationInFlight || editingRegion || answerVisible) return@setOnClickListener
-            maskFlipped = !maskFlipped
-            presenter.setInverted(maskFlipped)
-            binding.reviewFlipButton.isChecked = maskFlipped
-            binding.reviewFlipButton.setText(if (maskFlipped) R.string.review_unflip else R.string.review_flip)
-        }
         binding.reviewDoneButton.setOnClickListener { if (sessionInPlace) endReview() else activity.finish() }
         // The HTML view reports its answer blocks later (‹ ›), or that it cannot show the card.
         activity.htmlReaderOrNull?.let { html ->
@@ -372,15 +389,13 @@ class ReviewSessionController(
         (activity.getSystemService(Context.INPUT_METHOD_SERVICE) as InputMethodManager)
             .hideSoftInputFromWindow(binding.root.windowToken, 0)
         binding.reviewQuestionEdit.clearFocus()
-        binding.reviewNoteEdit.clearFocus()
         binding.reviewBeforeNote.clearFocus()
     }
 
-    /** Edit card's question and note fields, shown or hidden together, and the button that toggles them. */
+    /** Edit card's question field and the button that shows or hides it. */
     private fun showTextFields(visible: Boolean) {
         val visibility = if (visible) View.VISIBLE else View.GONE
         binding.reviewQuestionEditLayout.visibility = visibility
-        binding.reviewNoteEditLayout.visibility = visibility
         binding.reviewQuestionToggleButton.setText(if (visible) R.string.review_hide_question else R.string.review_edit_question)
     }
 
@@ -421,8 +436,6 @@ class ReviewSessionController(
         clearMasks()
         binding.reviewCard.visibility = View.GONE
         binding.reviewQuestion.text = ""
-        binding.reviewNote.text = ""
-        binding.reviewNote.visibility = View.GONE
         beforePanel.hide()
         currentCard = null
         shownForDocument = null
@@ -484,7 +497,9 @@ class ReviewSessionController(
                     sourceIndex.snapshot().let { it.libraryPdfSha256ByFilename[file.name] ?: it.pdfSha256ByFilename[file.name] }
                 }
                 val (currentTags, currentInterval) = store.currentReviewState(cardId)
-                ReviewCardOpenState(card, store.suggestedInterval(cardId), tagUsage, installed, currentTags, currentInterval)
+                val answeredAt = store.lastAnsweredAt(cardId)
+                ReviewCardOpenState(card, store.suggestedInterval(cardId), tagUsage, installed, currentTags, currentInterval,
+                    KeptBeforeStep(answeredAt, beforeDrafts.get(cardId, answeredAt)))
             }
             if (
                 !requestGate.isCurrent(requestToken) ||
@@ -579,7 +594,7 @@ class ReviewSessionController(
             }
             documentWaitFor = null
             currentReviewState = state.currentTags to state.currentInterval
-            showCard(card, state.interval, state.tagUsage)
+            showCard(card, state.interval, state.tagUsage, state.before)
             if (placeAgain) {
                 activity.intent.removeExtra(ReviewCardReaderContract.EXTRA_PLACE_AGAIN)
                 editRegion(card)
@@ -589,7 +604,15 @@ class ReviewSessionController(
         }
     }
 
-    private fun showCard(card: ReviewCard, interval: ReviewInterval, tagUsage: Map<String, Int>) {
+    /** A card shown without looking up its kept before step (tests show cards so): nothing is kept for it either. */
+    private fun showCard(card: ReviewCard, interval: ReviewInterval, tagUsage: Map<String, Int>) =
+        showCard(card, interval, tagUsage, null)
+
+    /**
+     * [kept]: the card's last answer, which its before step is kept for from now on, and the step kept
+     * since that answer ([ReviewBeforeDrafts]); null when they were not looked up.
+     */
+    private fun showCard(card: ReviewCard, interval: ReviewInterval, tagUsage: Map<String, Int>, kept: KeptBeforeStep?) {
         editingRegion = false
         areaSession = null
         binding.reviewAreaActions.visibility = View.GONE
@@ -626,11 +649,20 @@ class ReviewSessionController(
             sessionTagOrder = tagOrder
         }
         // Notes typed for this card stay while it is shown again (e.g. after a reload).
+        beforeDraftAnswer = kept?.let { card.id to it.answeredAt }
+        var keptLocked = false
         if (restored != null) answerDraft = ReviewAnswerDraft.restored(card.id, restored.draft)
-        else if (answerDraft.cardId != card.id) answerDraft = ReviewAnswerDraft(card.id)
+        else if (answerDraft.cardId != card.id) answerDraft = ReviewAnswerDraft(card.id).also { draft ->
+            // The card left the review before its answer was recorded (unavailable for a while, skipped,
+            // the reader or app closed): its before step comes back as it was left.
+            kept?.draft?.let { draft.restoreBefore(it); keptLocked = draft.beforeLocked }
+        }
         // An answer already on screen (saved before answers were given in two steps) locks the before step.
         if ((answerRevealed || answerShown) && !answerDraft.beforeLocked) answerDraft.answerShownAt = Instant.now()
+        // Kept locked (its answer had been shown): the after step starts where Reveal started it then.
+        if (keptLocked) selectedTags = ReviewAnswerPhases.startAtPrediction(selectedTags, answerDraft.beforeTags, groups, mapping)
         beforePanel.show(answerDraft)
+        keepBeforeStep()
         requestRecallPrediction(card)
         showRecallPrediction()
         updateIntervalButton()
@@ -638,6 +670,7 @@ class ReviewSessionController(
         showTextFields(false)
         binding.reviewQuestion.text = card.question
         binding.reviewQuestion.visibility = View.VISIBLE
+        showKindMark(card)
         binding.reviewRelatedContext.visibility = View.GONE
         showPagesProgress(card)
         binding.reviewRevealButton.visibility = if (answerRevealed) View.GONE else View.VISIBLE
@@ -883,7 +916,14 @@ class ReviewSessionController(
         updateNavigationActions()
     }
 
-    /** Set knowledge: frame the answer and show the tag/interval/Next bar. */
+    /** Flip: cover the rest and show the answer (test the other way round); Unflip puts it back. Before the answer only. */
+    private fun flip() {
+        if (currentCard == null || operationInFlight || editingRegion || answerVisible) return
+        maskFlipped = !maskFlipped
+        presenter.setInverted(maskFlipped)
+    }
+
+    /** Reveal: frame the answer and show the tag/interval/Next bar. */
     private fun reveal(@Suppress("UNUSED_PARAMETER") view: View) {
         currentCard ?: return
         if (operationInFlight || editingRegion) return
@@ -917,6 +957,19 @@ class ReviewSessionController(
         }
         beforePanel.show(draft)
         showRecallPrediction()
+        keepBeforeStep()
+    }
+
+    /**
+     * Keeps the before step of the card shown as it is now ([ReviewBeforeDrafts]): after each pick,
+     * each change of the note, Reveal and "Back to before step". Kept for the answer the card had
+     * when it was shown; nothing for a step with no pick and no note.
+     */
+    private fun keepBeforeStep() {
+        val draft = answerDraft
+        val (cardId, answeredAt) = beforeDraftAnswer ?: return
+        if (draft.cardId != cardId || !draft.beforeShown) return
+        beforeDrafts.put(cardId, ReviewBeforeDrafts.of(draft, answeredAt))
     }
 
     /** "Ask" changed in the before panel: it shows the new layout, and a new recall group is asked for. */
@@ -1034,6 +1087,7 @@ class ReviewSessionController(
         if (answerVisible) return
         answerDraft.beforeReopened = true
         beforePanel.show(answerDraft)
+        keepBeforeStep()
     }
 
     private fun canReopenBeforeStep() =
@@ -1045,9 +1099,12 @@ class ReviewSessionController(
         PopupMenu(activity, anchor).apply {
             val conversationCount = agentConversations.conversations.size
             // Items are added in menu order ([reviewSessionMenuActions]).
-            reviewSessionMenuActions(card != null, answerVisible, canReopenBeforeStep()).forEach { action ->
+            reviewSessionMenuActions(card != null, answerVisible, canReopenBeforeStep(),
+                followProject = card != null && reviewCanFollowProject(card)).forEach { action ->
                 val item = when (action) {
                     ReviewSessionMenuAction.FOCUS -> menu.add(0, action.id, 0, R.string.review_action_focus)
+                    ReviewSessionMenuAction.KIND -> menu.add(0, action.id, 0, reviewKindMenuTitle(card!!))
+                    ReviewSessionMenuAction.FOLLOW_PROJECT -> menu.add(0, action.id, 0, reviewFollowProjectTitle(activity, card!!))
                     ReviewSessionMenuAction.MORE_INFO -> menu.add(0, action.id, 0, R.string.review_card_more_info)
                     // Paste into Codex or Claude: the document and the card, not its answer (Settings > Agent notes and prompts).
                     // Physical studying (Mentra photos) is study mode's prompt now: Home ⋮ > Study mode.
@@ -1056,6 +1113,7 @@ class ReviewSessionController(
                     ReviewSessionMenuAction.AGENT_CONVERSATIONS -> menu.add(0, action.id, 0,
                         activity.getString(R.string.agent_conversations_group, conversationCount))
                     ReviewSessionMenuAction.SKIP -> menu.add(0, action.id, 0, R.string.review_skip)
+                    ReviewSessionMenuAction.FLIP -> menu.add(0, action.id, 0, if (maskFlipped) R.string.review_unflip else R.string.review_flip)
                     ReviewSessionMenuAction.UNDO -> menu.add(0, action.id, 0, R.string.review_undo)
                     ReviewSessionMenuAction.HIDE_AGAIN -> menu.add(0, action.id, 0, R.string.review_hide_again)
                     ReviewSessionMenuAction.BACK_TO_BEFORE -> menu.add(0, action.id, 0, R.string.review_back_to_before)
@@ -1075,10 +1133,13 @@ class ReviewSessionController(
                     14 -> agentConversations.showList()
                     1 -> card?.let { editCard(it) }
                     12 -> showSkipMenu()
+                    17 -> flip()
                     3 -> undoPrevious()
                     6 -> hideAgain()
                     16 -> reopenBeforeStep()
                     15 -> card?.let { retire(it) }
+                    18 -> card?.let { changeKind(it, reviewSwappedKind(it)) }
+                    19 -> card?.let { changeKind(it, com.gitlab.mudlej.MjPdfReader.data.review.ReviewKinds.FOLLOW_PROJECT) }
                     4 -> card?.let { confirmDelete(it) }
                     10 -> endReview()
                 }
@@ -1113,7 +1174,7 @@ class ReviewSessionController(
                 val answerFeedback = runCatching { feedback.agentSection(card, displayed) }
                     .onFailure { android.util.Log.w("ReviewSession", "Could not read the card's feedback", it) }
                     .getOrDefault("")
-                val fields = reviewCardPromptFields(documentFields, card.id, card.question, card.note,
+                val fields = reviewCardPromptFields(documentFields, card.id, card.question, "",
                     pages.ifEmpty { listOfNotNull(card.pdfPage) }, passages, pdfText, answerFeedback)
                 AgentPromptTemplates.renderForCard(fields, agentTemplate)
             }
@@ -1132,7 +1193,7 @@ class ReviewSessionController(
     /** The card's answer as Copy for agent gives it: its source passages, else the PDF text in its areas. Blocking. */
     private fun cardAnswerText(card: ReviewCard, readerPdf: File?): String {
         val passages = runCatching { cardSourcePassages(card) }.getOrDefault(emptyList())
-        return reviewCardPromptFields(emptyMap(), card.id, card.question, card.note, emptyList(), passages,
+        return reviewCardPromptFields(emptyMap(), card.id, card.question, "", emptyList(), passages,
             if (passages.isEmpty()) runCatching { cardPdfAnswerText(card, readerPdf) }.getOrNull() else null)
             .getValue("answer_text")
     }
@@ -1164,13 +1225,11 @@ class ReviewSessionController(
 
     private val ReviewCard.placedInSource get() = !wholeDocument && sourceAnchor != null
 
-    /** Edit card without areas: its question and note in one dialog, and Edit placement for a source-marked card. */
+    /** Edit card without areas: its question in a dialog, and Edit placement for a source-marked card. */
     private fun editCardText(card: ReviewCard) {
         val editor = DialogReviewCardTextEditBinding.inflate(activity.layoutInflater)
         editor.reviewCardTextQuestion.setText(card.question)
         editor.reviewCardTextQuestion.setSelection(card.question.length)
-        editor.reviewCardTextNote.filters = arrayOf(InputFilter.LengthFilter(ReviewStore.MAX_NOTE_LENGTH))
-        editor.reviewCardTextNote.setText(card.note)
         val dialog = MaterialAlertDialogBuilder(activity)
             .setTitle(R.string.review_card_edit_text_title)
             .setView(editor.root)
@@ -1186,7 +1245,6 @@ class ReviewSessionController(
             }
             dialog.getButton(androidx.appcompat.app.AlertDialog.BUTTON_POSITIVE).setOnClickListener {
                 val question = editor.reviewCardTextQuestion.text?.toString()?.trim().orEmpty()
-                val note = editor.reviewCardTextNote.text?.toString()?.trim().orEmpty()
                 if (question.isEmpty() || question.length > 500) {
                     editor.reviewCardTextQuestionLayout.error = activity.getString(
                         if (question.isEmpty()) R.string.review_card_edit_empty else R.string.review_card_edit_too_long,
@@ -1198,7 +1256,7 @@ class ReviewSessionController(
                 dialog.getButton(androidx.appcompat.app.AlertDialog.BUTTON_NEGATIVE).isEnabled = false
                 dialog.setCancelable(false)
                 saveEdit(card, R.string.review_card_saved,
-                    operation = { store.updateQuestion(card.id, question).mapCatching { saveNote(card, it, note) } },
+                    operation = { store.updateQuestion(card.id, question) },
                     onSuccess = { dialog.dismiss() },
                     onFailure = { _ ->
                         editor.reviewCardTextQuestionLayout.error = activity.getString(R.string.review_card_text_save_retry)
@@ -1212,10 +1270,41 @@ class ReviewSessionController(
         dialog.show()
     }
 
-    /** After the rest of an edit is saved: the note too, if it changed. A note edited elsewhere meanwhile fails it. */
-    private fun saveNote(card: ReviewCard, updated: ReviewCard, note: String): ReviewCard =
-        if (note == card.note.trim()) updated
-        else store.updateNote(updated.id, note, expectedNote = card.note).getOrThrow()
+    /**
+     * Make project card, Make knowledge card or Follow the Project: a kind event; the card stays on
+     * screen with its new mark, and the bar's Undo writes its previous choice. The next card of a
+     * Study or Projects session is of that entry's kind again.
+     */
+    private fun changeKind(card: ReviewCard, kind: String, undo: Boolean = false) {
+        if (operationInFlight || editingRegion) return
+        val previous = card.ownReviewKind ?: com.gitlab.mudlej.MjPdfReader.data.review.ReviewKinds.FOLLOW_PROJECT
+        operationInFlight = true
+        updateNavigationActions()
+        activity.lifecycleScope.launch {
+            val result = withContext(Dispatchers.IO) { store.setReviewKind(card.id, kind).map { store.card(card.id) } }
+            operationInFlight = false
+            result.onSuccess { updated ->
+                ThoughtsSyncScheduler.enqueueBackground(activity.applicationContext)
+                val shown = currentCard
+                if (updated != null && shown?.id == card.id) currentCard = shown.withKindOf(updated)
+                currentCard?.let(::showKindMark)
+                if (!undo && updated != null) AppSnackbar.make(binding.root, reviewKindChoiceText(kind), Snackbar.LENGTH_LONG).apply {
+                    setAction(R.string.review_undo) { currentCard?.takeIf { it.id == card.id }?.let { changeKind(it, previous, undo = true) } }
+                }.show()
+            }.onFailure { error ->
+                AppSnackbar.make(binding.root, error.message.orEmpty(), Snackbar.LENGTH_LONG).show()
+            }
+            updateNavigationActions()
+        }
+    }
+
+    /** "Project card · Changed since you last saw it" under the question; nothing on a knowledge card. */
+    private fun showKindMark(card: ReviewCard) {
+        val mark = reviewKindMark(activity, card)
+        binding.reviewKindMark.text = mark
+        binding.reviewKindMark.visibility = if (mark == null) View.GONE else View.VISIBLE
+        updateIntervalButton()
+    }
 
     /** Retire card: like Delete it leaves the session, but keeps the card and its history; Undo restores it. */
     private fun retire(card: ReviewCard) {
@@ -1274,7 +1363,6 @@ class ReviewSessionController(
         binding.reviewQuestion.setText(R.string.review_edit_card)
         binding.reviewQuestionEdit.setText(card.question)
         binding.reviewQuestionEditLayout.error = null
-        binding.reviewNoteEdit.setText(card.note)
         showTextFields(showText)
         binding.reviewRelatedContext.visibility = View.VISIBLE
         binding.reviewRevealButton.visibility = View.GONE
@@ -1287,13 +1375,6 @@ class ReviewSessionController(
         updateAreaControls()
         // Scroll to the selected area once the taller editing panel is laid out.
         binding.reviewCard.post { if (editingRegion && currentCard?.id == card.id) focusSelectedEditArea() }
-        if (showText) binding.reviewNoteEdit.post {
-            if (!editingRegion || currentCard?.id != card.id) return@post
-            binding.reviewNoteEdit.requestFocus()
-            binding.reviewNoteEdit.setSelection(binding.reviewNoteEdit.length())
-            (activity.getSystemService(Context.INPUT_METHOD_SERVICE) as InputMethodManager)
-                .showSoftInput(binding.reviewNoteEdit, InputMethodManager.SHOW_IMPLICIT)
-        }
     }
 
     /** The area label, Remove area, the ‹ › buttons and the instructions, for the boxes being edited. */
@@ -1418,7 +1499,6 @@ class ReviewSessionController(
             )
             return
         }
-        val note = binding.reviewNoteEdit.text?.toString()?.trim().orEmpty()
         val displayedPdf = document.annotationPdfSha256.orEmpty().lowercase()
         binding.reviewQuestionEditLayout.error = null
         hideKeyboard()
@@ -1439,7 +1519,7 @@ class ReviewSessionController(
                     store.replaceCardAreas(card.id, card.pdfSha256, card.page, displayedPdf, areas, question,
                         replacementSupported = com.gitlab.mudlej.MjPdfReader.data.sync.ReviewSourceCapabilityStore(context).replacementSupported())
                 }
-                saved.mapCatching { saveNote(card, it, note) }
+                saved
             },
             onSuccess = { finishRegionEdit() },
             onFailure = { error ->
@@ -1508,14 +1588,19 @@ class ReviewSessionController(
     }
 
     private fun updateIntervalButton() {
-        val interval = suggestedInterval
+        val chosen = suggestedInterval
+        // A project card comes back within a week, whatever the interval (review-card-kinds section 6.2):
+        // the cell shows that time, and the interval chosen is still recorded for its knowledge schedule.
+        val capped = currentCard?.isProjectCard == true && reviewIntervalExceedsProjectCap(chosen)
+        val interval = if (capped) ReviewInterval(1, ReviewIntervalUnit.WEEKS) else chosen
         binding.reviewIntervalButton.showField(activity.getString(R.string.review_field_interval), when (interval.unit) {
             ReviewIntervalUnit.MINUTES -> activity.getString(R.string.review_action_minutes_short, interval.amountText())
             ReviewIntervalUnit.HOURS -> activity.getString(R.string.review_action_hours_short, interval.amountText())
             else -> interval.label(activity)
         })
         binding.reviewIntervalButton.contentDescription =
-            activity.getString(R.string.review_tags_change_interval, interval.label(activity))
+            activity.getString(R.string.review_tags_change_interval, if (capped)
+                activity.getString(R.string.review_kind_interval_capped, chosen.label(activity)) else interval.label(activity))
     }
 
     private fun updateTagButton() {
@@ -1729,6 +1814,9 @@ class ReviewSessionController(
             val ratingEvent = result.getOrThrow()
             // The next card starts without notes, even if this one comes back.
             answerDraft = ReviewAnswerDraft()
+            // Its answer is recorded (or the card deleted): the before step kept for it is done with. A
+            // skip or a retirement records no answer, so the card comes back with its before step.
+            if (!skip && !retire) beforeDrafts.remove(card.id)
             ThoughtsSyncScheduler.enqueueBackground(activity.applicationContext)
             if (rating == ReviewRating.DELETE) history.discardDeletedCard(card.id)
             else if (retire) {
@@ -1744,10 +1832,14 @@ class ReviewSessionController(
                 return@launch
             }
             val queuePdfStem = activity.intent.getStringExtra(HomeActivity.EXTRA_REVIEW_PDF_STEM)
+            // A session started from Study or Projects offers only that entry's cards (review-card-kinds section 7).
+            val queueKind = activity.intent.getStringExtra(HomeActivity.EXTRA_REVIEW_KIND).takeIf { queuePdfStem == null }
+            val queueProject = activity.intent.getStringExtra(HomeActivity.EXTRA_REVIEW_PROJECT_ID).takeIf { queuePdfStem == null }
             val next = withContext(Dispatchers.IO) {
                 val index = sourceIndex.snapshot()
                 val canonical = if (index.libraryAvailable && index.generationCurrent) index.libraryPdfSha256ByFilename else null
-                store.dueCards(pdfStem = queuePdfStem, canonicalPdfSha256ByFilename = canonical).firstOrNull()
+                store.dueCards(pdfStem = queuePdfStem, canonicalPdfSha256ByFilename = canonical, kind = queueKind,
+                    projectId = queueProject).firstOrNull()
                     ?.let { card -> card to store.reviewPdfFile(card)?.takeIf { it.isFile } }
             }
             if (!requestGate.isCurrent(requestToken) || document.uri != requestedDocumentUri) {
@@ -1827,8 +1919,9 @@ class ReviewSessionController(
     /** "Card retired", with Undo while the retire is still the session's last action. */
     private fun showRetired(entry: ReviewSessionHistoryEntry?) {
         AppSnackbar.make(binding.root, R.string.review_card_retired, Snackbar.LENGTH_LONG).apply {
-            if (entry is ReviewSessionHistoryEntry.Retire) setAction(R.string.review_undo) {
-                if (history.previous() === entry) undoPrevious()
+            if (entry is ReviewSessionHistoryEntry.Retire) {
+                setAction(R.string.review_undo) { if (history.previous() === entry) undoPrevious() }
+                duration = com.gitlab.mudlej.MjPdfReader.ui.review.REVIEW_RETIRE_UNDO_MILLIS
             }
         }.show()
     }
@@ -1841,6 +1934,7 @@ class ReviewSessionController(
         clearReviewRequest()
         binding.reviewQuestion.setText(R.string.review_session_complete)
         binding.reviewQuestion.visibility = View.VISIBLE
+        binding.reviewKindMark.visibility = View.GONE
         beforePanel.hide()
         binding.reviewRelatedContext.visibility = View.GONE
         binding.reviewProgress.visibility = View.GONE
@@ -1886,10 +1980,6 @@ class ReviewSessionController(
 
     private fun updateNavigationActions() {
         applyDetails()
-        val note = currentCard?.note.orEmpty()
-        binding.reviewNote.visibility = if (note.isNotBlank() && !editingRegion) View.VISIBLE else View.GONE
-        binding.reviewNote.text = activity.getString(R.string.review_card_note_preview, note)
-        binding.reviewNote.isEnabled = !operationInFlight
         binding.reviewOptionsButton.visibility = if ((currentCard != null || history.canUndo) && !editingRegion) View.VISIBLE else View.GONE
         binding.reviewOptionsButton.isEnabled = !operationInFlight
         binding.reviewRegionSaveButton.isEnabled = !operationInFlight
@@ -1897,20 +1987,9 @@ class ReviewSessionController(
         binding.reviewAddAreaButton.isEnabled = !operationInFlight
         binding.reviewRemoveAreaButton.isEnabled = !operationInFlight && (areaSession?.canRemove == true)
         binding.reviewRevealButton.isEnabled = !operationInFlight
-        binding.reviewRevealButton.setText(if (answerShown) R.string.review_hide_answer else R.string.review_reveal)
-        binding.reviewFlipButton.visibility =
-            if (currentCard != null && !editingRegion && !answerRevealed) View.VISIBLE else View.GONE
-        // Flipping changes which part is covered, so it waits until the answer is hidden again.
-        binding.reviewFlipButton.isEnabled = !operationInFlight && !answerShown
-        binding.reviewFlipButton.isChecked = maskFlipped
-        binding.reviewFlipButton.setText(if (maskFlipped) R.string.review_unflip else R.string.review_flip)
         binding.reviewQuestionEdit.isEnabled = !operationInFlight
-        binding.reviewNoteEdit.isEnabled = !operationInFlight
         binding.reviewQuestionToggleButton.visibility = if (editingRegion) View.VISIBLE else View.GONE
         binding.reviewQuestionToggleButton.isEnabled = !operationInFlight
-        binding.reviewSetKnowledgeButton.visibility =
-            if (currentCard != null && !editingRegion && !answerRevealed) View.VISIBLE else View.GONE
-        binding.reviewSetKnowledgeButton.isEnabled = !operationInFlight
         val severalAreas = currentCard != null && answerAreasCardId == currentCard?.id && answerAreaCount() > 1 && !editingRegion
         if (!editingRegion) {
             binding.reviewPreviousAnswerButton.visibility = if (severalAreas) View.VISIBLE else View.GONE

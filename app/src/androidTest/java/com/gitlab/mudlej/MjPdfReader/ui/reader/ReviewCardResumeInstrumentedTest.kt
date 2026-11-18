@@ -226,7 +226,7 @@ class ReviewCardResumeInstrumentedTest {
             // Set knowledge, then choose two tags, an interval and a group note, as the user did.
             instrumentation.runOnMainSync {
                 val activity = resumedMainOnMainThread()!!
-                bindingOf(activity).reviewSetKnowledgeButton.performClick()
+                bindingOf(activity).reviewRevealButton.performClick()
                 val controller = controllerOf(activity)
                 field(controller, "selectedTags").set(controller, listOf(ReviewTags.WRONG, "plus-one"))
                 field(controller, "suggestedInterval").set(controller, ReviewInterval(BigDecimal("1.5"), ReviewIntervalUnit.WEEKS))

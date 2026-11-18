@@ -5,13 +5,6 @@
     <string name="review_edit_answer_box">Edit answer box</string>
     <string name="review_edit_box_instructions">Drag the box to move it, or drag a corner to resize it.</string>
     <string name="review_edit_box_saved">Answer box saved</string>
-    <string name="review_card_add_note">Add note</string>
-    <string name="review_card_edit_note">Edit note</string>
-    <string name="review_card_note_hint">Note</string>
-    <string name="review_card_note_help">Shown below the question. Clear the text to remove the note.</string>
-    <string name="review_card_note_saved">Note saved</string>
-    <string name="review_card_note_too_long">Keep the note to 5,000 characters or fewer.</string>
-    <string name="review_card_note_preview">Note: %1$s</string>
     <string name="review_card_text_save_retry">Could not save. Please try again.</string>
     <string name="review_card_delete_menu">Delete card</string>
     <string name="review_card_delete_now_message">Permanently delete this card? It cannot be restored. Its source markers will be removed on the next Sync; the enclosed text will be kept. Retire card instead keeps its history and can be undone.</string>

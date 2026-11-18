@@ -71,6 +71,7 @@ class WhatsNewActivity : AppCompatActivity() {
         Section(
             R.string.whats_new_thoughts_section_comments,
             listOf(
+                Change(R.drawable.ic_comment, R.string.whats_new_thoughts_comments_tab_title, R.string.whats_new_thoughts_comments_tab_body),
                 Change(R.drawable.ic_comment, R.string.whats_new_thoughts_comment_load_title, R.string.whats_new_thoughts_comment_load_body),
             ),
         ),

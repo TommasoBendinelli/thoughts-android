@@ -257,8 +257,8 @@
 
     <string name="features_topic_home">Home and Library</string>
     <string name="features_topic_home_subtitle">Tabs, statuses, scanning, search and stats</string>
-    <string name="features_home_tabs_title">Four tabs</string>
-    <string name="features_home_tabs_body">Diary, To-dos, Library and Review. Swipe between them; the app remembers the tab you were on.</string>
+    <string name="features_home_tabs_title">Five tabs</string>
+    <string name="features_home_tabs_body">Diary, To-dos, Library, Review and Comments. Swipe between them; the app remembers the tab you were on.</string>
     <string name="features_home_continue_title">Diary</string>
     <string name="features_home_continue_body">Type a thought at the top of the Diary tab and press Enter. It is saved with the exact date and time and appears under Today; tap an entry to change its text, long-press it to delete it.</string>
     <string name="features_home_statuses_title">Reading statuses</string>
@@ -1419,7 +1419,7 @@
     <string name="home_search_hint">Search your library</string>
     <string name="home_tab_library">Library</string>
     <string name="home_tab_review" translatable="false">Review</string>
-    <string name="home_tab_ab_testing" translatable="false">A/B testing</string>
+    <string name="home_tab_annotations">Comments</string>
     <string name="overview_all_comments">All (%1$d)</string>
     <string name="overview_document_comments">%1$s (%2$d)</string>
     <plurals name="overview_summary">
@@ -1960,6 +1960,8 @@
     <string name="read_aloud_unavailable" translatable="false">Can\'t read aloud right now</string>
     <!-- Agent notes (protocol/agent-notes.md). -->
     <string name="agent_notes" translatable="false">Agent notes</string>
+    <string name="agent_notes_with_new" translatable="false">%1$s, new agent notes</string>
+    <string name="agent_note_new_prefix" translatable="false">New: %1$s</string>
     <string name="agent_note" translatable="false">Agent note</string>
     <string name="agent_note_notification_title" translatable="false">Agent note: %1$s</string>
     <string name="agent_notes_listening_channel" translatable="false">Listening for agent notes</string>
@@ -1973,12 +1975,13 @@
     <string name="agent_notes_study_mode_ready_listening" translatable="false">Listening for notes from your agent until you turn instant notes off; it pauses after an hour without use and resumes when you open Thoughts</string>
     <string name="agent_notes_study_mode_ready_notifications" translatable="false">Notifications are allowed</string>
     <string name="agent_notes_study_mode_missing_notifications" translatable="false">Notifications are off, so notes arrive silently when Thoughts is not on screen</string>
-    <string name="agent_notes_study_mode_prompt_copied" translatable="false">The prompt is on the clipboard: paste it into a new Claude session. Replies and glasses captures already reach an agent without it.</string>
+    <string name="agent_notes_study_mode_prompt_copied" translatable="false">The prompt is on the clipboard. Paste it into a new Claude session on the computer where your glasses captures arrive: in the Claude app, Code, then that computer, then a new session. You do not need a new session to reply to a note: replies and glasses captures already reach an agent.</string>
     <string name="agent_notes_study_mode_copy_again" translatable="false">Copy again</string>
     <string name="agent_notes_study_mode_open_notification_settings" translatable="false">Notification settings</string>
     <!-- Push for agent notes (server capability push_fcm_v1). -->
     <string name="agent_notes_study_session" translatable="false">Study session</string>
     <string name="agent_notes_start_study_session" translatable="false">Start a new study session</string>
+    <string name="agent_notes_new_session" translatable="false">New session</string>
     <string name="agent_notes_push_arrives" translatable="false">Notes arrive instantly</string>
     <string name="agent_notes_page_tools" translatable="false">Agent tools under the page</string>
     <string name="agent_notes_page_tools_detail" translatable="false">Send the page on screen to your agent, or draw on it first</string>
@@ -2030,6 +2033,12 @@
     <string name="agent_note_sent_answered_by" translatable="false">Sent ✓ · answered by %1$s</string>
     <string name="agent_note_sent_will_be_woken" translatable="false">Sent ✓ · %1$s will be woken</string>
     <string name="agent_note_answered_by" translatable="false">Answered by: %1$s</string>
+    <string name="agent_note_answered_by_nobody" translatable="false">nobody is listening</string>
+    <string name="agent_note_answered_by_chip_description" translatable="false">%1$s. Choose who answers your reply</string>
+    <string name="agent_notes_session_sources_hint" translatable="false">What the new session may use. It keeps this until it ends; start another session to change it.</string>
+    <string name="agent_notes_session_sources_linked" translatable="false">Studied document only</string>
+    <string name="agent_notes_session_sources_linked_detail" translatable="false">Only the document the session studies with you</string>
+    <string name="agent_notes_session_sources_none_detail" translatable="false">Only your captures, your replies and the agent\'s own knowledge</string>
     <string name="agent_note_coverer_reply_agent" translatable="false">Thoughts reply agent</string>
     <string name="agent_note_coverer_sender" translatable="false">the agent that sent it</string>
     <string name="agent_note_coverer_topic" translatable="false">%1$s agent</string>
@@ -2043,6 +2052,7 @@
     <string name="agent_note_answer_change" translatable="false">Change</string>
     <string name="agent_note_answer_change_needs_server" translatable="false">Change (needs the server)</string>
     <string name="agent_note_answer_choice_title" translatable="false">Who answers your reply</string>
+    <string name="agent_note_answer_menu" translatable="false">Who answers your reply…</string>
     <string name="agent_note_answer_automatic" translatable="false">Automatic</string>
     <string name="agent_note_answer_automatic_detail" translatable="false">The agent that sent the note answers first, then the Thoughts reply agent</string>
     <string name="agent_note_answer_choice_not_listening" translatable="false">%1$s (not listening)</string>
@@ -2069,6 +2079,7 @@
     <string name="agent_note_message_expanded" translatable="false">Whole message shown</string>
     <string name="agent_note_send_with_picture" translatable="false">Send with picture</string>
     <string name="agent_note_taking_picture" translatable="false">Taking a picture with the glasses…</string>
+    <string name="agent_note_sending" translatable="false">Sending…</string>
     <string name="agent_note_send_without_picture" translatable="false">Send without</string>
     <string name="agent_note_picture_not_set_up" translatable="false">Not sent: set the glasses camera address in Settings first</string>
     <string name="agent_note_picture_not_connected" translatable="false">Not sent: glasses not connected</string>

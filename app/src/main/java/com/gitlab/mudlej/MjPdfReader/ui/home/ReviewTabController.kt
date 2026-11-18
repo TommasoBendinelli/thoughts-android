@@ -12,6 +12,7 @@ import com.gitlab.mudlej.MjPdfReader.R
 import com.gitlab.mudlej.MjPdfReader.ui.review.MentalModelActivity
 import com.gitlab.mudlej.MjPdfReader.data.review.ReviewDeckSummary
 import com.gitlab.mudlej.MjPdfReader.data.review.ReviewLibrarySummary
+import com.gitlab.mudlej.MjPdfReader.data.review.ReviewKinds
 import com.gitlab.mudlej.MjPdfReader.data.review.ReviewQueueCounts
 import com.gitlab.mudlej.MjPdfReader.databinding.PageHomeReviewBinding
 import java.text.NumberFormat
@@ -44,7 +45,10 @@ internal fun ReviewTabLoadState.failRefresh(): ReviewTabLoadState =
     ReviewTabLoadState.Failed(summary)
 
 class ReviewTabController(
+    /** Starts the session of one PDF (every kind of card). */
     private val onStartReview: (String?) -> Unit,
+    /** Starts a Library-wide session from one review entry: `knowledge` (Study) or `project` (Projects, null: all Projects). */
+    private val onStartEntry: (kind: String, projectId: String?) -> Unit = { _, _ -> onStartReview(null) },
     private val onBrowseCards: (String?) -> Unit,
     private val onExportQaPdf: (String) -> Unit,
     private val onNavigationChanged: () -> Unit,
@@ -54,6 +58,8 @@ class ReviewTabController(
     private var binding: PageHomeReviewBinding? = null
     private var loadState: ReviewTabLoadState = ReviewTabLoadState.Loading
     private var selectedPdfStem: String? = null
+    /** The one Project the Projects entry is narrowed to; null for All Projects. */
+    private var projectScope: String? = null
     private var searchQuery = ""
 
     private val searchAdapter = ReviewDeckAdapter { deck ->
@@ -71,9 +77,11 @@ class ReviewTabController(
                 pageBinding.reviewDeckOverview.canScrollVertically(-1)
             }
         }
-        pageBinding.reviewStartAllButton.setOnClickListener { onStartReview(null) }
+        pageBinding.reviewStartStudyButton.setOnClickListener { onStartEntry(ReviewKinds.KNOWLEDGE, null) }
+        pageBinding.reviewStartProjectsButton.setOnClickListener { onStartEntry(ReviewKinds.PROJECT, projectScope) }
+        pageBinding.reviewProjectsScopeButton.setOnClickListener { chooseProjectScope() }
         pageBinding.reviewBrowseAllButton.setOnClickListener { onBrowseCards(null) }
-        // The Mental Model page is served next to the A/B testing page; a build without one has neither.
+        // The Mental Model page is served by the card-pilot site the build names; a build without one has no button.
         pageBinding.reviewMentalModelButton.isVisible = MentalModelActivity.isAvailable
         pageBinding.reviewMentalModelButton.setOnClickListener {
             it.context.startActivity(MentalModelActivity.intent(it.context))
@@ -140,7 +148,7 @@ class ReviewTabController(
         // Learning cards are due cards like any other; they count under Review.
         page.reviewReviewCount.text = numberFormat.format(newSummary.counts.learningCount + newSummary.counts.reviewCount)
         page.reviewTodaySummary.text = quantityText(R.plurals.review_cards_due, newSummary.counts.total)
-        page.reviewStartAllButton.isEnabled = newSummary.counts.total > 0
+        renderEntries(page, newSummary)
         val unavailableCount = newSummary.unavailableCount
         page.reviewRepairStatus.isVisible = unavailableCount > 0
         page.reviewRepairStatus.text = quantityText(R.plurals.review_cards_unavailable, unavailableCount)
@@ -156,6 +164,43 @@ class ReviewTabController(
         }
     }
 
+    /** "Study · N due" and "Projects · M due", M for the Project chosen (or all of them). */
+    private fun renderEntries(page: PageHomeReviewBinding, summary: ReviewLibrarySummary) {
+        val context = page.root.context
+        val scoped = projectScope?.let { id -> summary.projects.firstOrNull { it.projectId == id } }
+        if (scoped == null) projectScope = null
+        page.reviewStartStudyButton.text = context.getString(R.string.review_entry_study, summary.knowledgeCounts.total)
+        page.reviewStartStudyButton.isEnabled = summary.knowledgeCounts.total > 0
+        val projectsDue = scoped?.counts?.total ?: summary.projectCounts.total
+        page.reviewStartProjectsButton.text = context.getString(R.string.review_entry_projects, projectsDue)
+        page.reviewStartProjectsButton.isEnabled = projectsDue > 0
+        // The choice lists only Projects holding active project cards; without any there is nothing to narrow.
+        page.reviewProjectsScopeButton.isVisible = summary.projects.isNotEmpty()
+        val scopeName = scoped?.name ?: context.getString(R.string.review_entry_all_projects)
+        page.reviewProjectsScopeButton.text = context.getString(R.string.review_entry_projects_scope, scopeName)
+        page.reviewProjectsScopeButton.contentDescription = context.getString(R.string.review_entry_projects_scope_description, scopeName)
+    }
+
+    /** All Projects, then each Project holding active project cards, each with its due count. */
+    private fun chooseProjectScope() {
+        val page = binding ?: return
+        val summary = loadState.summary ?: return
+        val context = page.root.context
+        val choices = listOf<String?>(null) + summary.projects.map { it.projectId }
+        val labels = listOf(context.getString(R.string.review_entry_project_due,
+            context.getString(R.string.review_entry_all_projects), summary.projectCounts.total)) +
+            summary.projects.map { context.getString(R.string.review_entry_project_due, it.name, it.counts.total) }
+        com.google.android.material.dialog.MaterialAlertDialogBuilder(context)
+            .setTitle(R.string.review_entry_choose_project)
+            .setSingleChoiceItems(labels.toTypedArray(), choices.indexOf(projectScope).coerceAtLeast(0)) { dialog, which ->
+                projectScope = choices[which]
+                dialog.dismiss()
+                renderCurrentState()
+            }
+            .setNegativeButton(R.string.cancel, null)
+            .show()
+    }
+
     private fun renderWithoutSummary(page: PageHomeReviewBinding) {
         page.reviewNewCount.setText(R.string.review_count_pending)
         page.reviewReviewCount.setText(R.string.review_count_pending)
@@ -168,7 +213,11 @@ class ReviewTabController(
         )
         page.reviewLoadStatus.visibility = View.GONE
         page.reviewDeckLoadStatus.visibility = View.GONE
-        page.reviewStartAllButton.isEnabled = false
+        page.reviewStartStudyButton.text = page.root.context.getString(R.string.review_entry_study, 0)
+        page.reviewStartProjectsButton.text = page.root.context.getString(R.string.review_entry_projects, 0)
+        page.reviewStartStudyButton.isEnabled = false
+        page.reviewStartProjectsButton.isEnabled = false
+        page.reviewProjectsScopeButton.visibility = View.GONE
         page.reviewRepairStatus.visibility = View.GONE
         page.reviewEmptyState.visibility = View.GONE
     }

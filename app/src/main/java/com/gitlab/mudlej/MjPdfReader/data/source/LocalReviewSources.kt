@@ -589,14 +589,30 @@ internal object ReviewSourceMarkup {
     private val texMarkerLine = Regex("^\\s*\\\\ReviewCardMask(Start|End)\\s*\\{([^}]*)\\}\\s*\\{[^}]*\\}\\s*%?\\s*$")
     private val markdownMarkerLine = Regex("^\\s*<!--\\s*thoughts:v1:(start|end)\\s+review:([^:\\s]+):\\S*\\s*-->\\s*$")
 
-    /** Whole source lines named by the verified PDF-to-source map, with markers on their own lines. */
-    private fun createByMappedLines(path: String, source: String, id: String, mappedLines: List<Int>, segmentId: String): LocalReviewSources.Edit {
+    /**
+     * Marks lines [first]..[last] of [source] (a section's body, [ReviewSections.sourceSection]) as
+     * the one passage of card [id]: whole lines, the markers on lines of their own. Other cards'
+     * passages inside stay whole (the cards nest), never cut.
+     */
+    fun placeSection(path: String, source: String, id: String, first: Int, last: Int): LocalReviewSources.Edit {
+        UUID.fromString(id)
+        require(!source.contains(id)) { "The source selection or card identity is invalid." }
+        require(first in 1..last) { "The section has no text below its heading." }
+        return createByMappedLines(path, source, id, listOf(first, last), "0", wholeLines = true)
+    }
+
+    /**
+     * Whole source lines named by the verified PDF-to-source map, with markers on their own lines.
+     * A Markdown passage grows to its whole paragraphs, unless [wholeLines] (a section's body).
+     */
+    private fun createByMappedLines(path: String, source: String, id: String, mappedLines: List<Int>, segmentId: String,
+                                    wholeLines: Boolean = false): LocalReviewSources.Edit {
         val markdown = !path.endsWith(".tex")
         val lines = source.split('\n')
         require(mappedLines.all { it in 1..lines.size }) { "The highlighted passage does not match its verified source location." }
         var lo = mappedLines.min()
         var hi = mappedLines.max()
-        if (markdown) {
+        if (markdown && !wholeLines) {
             while (lo > 1 && lines[lo - 2].isNotBlank()) lo--
             while (hi < lines.size && lines[hi].isNotBlank()) hi++
         }
@@ -617,7 +633,11 @@ internal object ReviewSourceMarkup {
                 else -> break
             }
         }
-        require((lo..hi).mapNotNull(::marker).groupBy({ it.second }, { it.first }).values.all { it.sorted() == listOf("end", "start") }) {
+        // Every other card's passages inside are whole: each start has its end after it, inside.
+        require((lo..hi).mapNotNull(::marker).groupBy({ it.second }, { it.first }).values.all { kinds ->
+            var open = 0
+            kinds.all { kind -> open += if (kind == "start") 1 else -1; open >= 0 } && open == 0
+        }) {
             "The highlight partly overlaps another card's passage. Place the markers manually."
         }
         val prefix = lines.subList(0, lo - 1).joinToString("\n")

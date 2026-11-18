@@ -33,14 +33,19 @@
     <string name="review_cards_sheet_merge_action">Merge</string>
     <string name="review_cards_sheet_merging">Merging cards…</string>
     <string name="review_cards_sheet_merged">Merged %1$d cards into one. Syncing…</string>
+    <!-- Cards of an imported PDF: the merged card holds every card's areas on the PDF. -->
+    <string name="review_cards_sheet_merged_pdf">Merged %1$d cards into one with %2$d areas on the PDF. Syncing…</string>
     <string name="review_cards_sheet_merge_failed_title">Cards not merged</string>
     <string name="review_cards_sheet_merge_failed">Nothing was changed. %1$s</string>
     <string name="review_cards_sheet_merge_too_few">Select at least two cards.</string>
     <string name="review_cards_sheet_merge_too_many">Select at most 20 cards.</string>
     <string name="review_cards_sheet_merge_retired">Retired cards cannot be merged.</string>
-    <string name="review_cards_sheet_merge_not_in_source">Only cards whose answers are marked in the source can be merged.</string>
+    <string name="review_cards_sheet_merge_not_in_source">Only cards whose answers are marked in a note or as areas on the PDF can be merged.</string>
     <string name="review_cards_sheet_merge_several_sources">Only cards whose answers are in the same source file can be merged.</string>
+    <string name="review_cards_sheet_merge_mixed">Cards of a note and cards of a PDF can\'t be merged together. Merge cards of a note with each other, and cards of a PDF with each other.</string>
+    <string name="review_cards_sheet_merge_several_documents">Only cards of the same PDF can be merged.</string>
     <string name="review_cards_sheet_merge_unsupported">The server cannot merge cards yet.</string>
+    <string name="review_cards_sheet_merge_pdf_unsupported">The server cannot merge cards of a PDF yet.</string>
     <string name="review_cards_sheet_merge_not_configured">No Thoughts server is set up on this phone.</string>
     <string name="review_cards_sheet_merge_offline">The server could not be reached. Try again when the phone is online.</string>
     <string name="review_cards_sheet_merge_question_empty">Write the merged card\'s question.</string>

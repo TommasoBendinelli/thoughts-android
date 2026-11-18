@@ -329,8 +329,8 @@ class AgentNotesPushTest {
         assertEquals(listOf("a"), fromPing.map { it.noteId })
         assertEquals(0, api.inboxCalls.single().second)
         assertEquals(listOf("a" to "delivered"), api.receipts)
-        // The notes the ping fetched go where the live loop's go: announced outside the note screen.
-        assertEquals(listOf("a"), agentNoteArrival(fromPing, onNoteScreen = false).notify.map { it.noteId })
+        // The notes the ping fetched go where the live loop's go: announced while Thoughts is not open.
+        assertEquals(listOf("a"), agentNoteArrival(fromPing, appOpen = false).notify.map { it.noteId })
 
         assertTrue(sync.pollInbox(wait = 25).isEmpty())
         assertEquals(1, api.receipts.size)

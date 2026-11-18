@@ -38,10 +38,10 @@ class AgentPromptTemplatesTest {
     @Test fun theStudyModePromptNamesTheMentraFolder() {
         assertEquals("Photos in /m/photos\n", AgentPromptTemplates.studyModePrompt("Photos in {mentra_folder}/photos\n", "/m"))
         val prompt = AgentPromptTemplates.studyModePrompt(AgentPromptTemplates.DEFAULT_STUDY_MODE_TEMPLATE,
-            "/home/alex/glasses")
+            "/home/example/glasses")
         assertTrue(prompt, prompt.startsWith("Agent study mode is on in Thoughts on my phone.\n"))
-        assertTrue(prompt, prompt.contains("photos in /home/alex/glasses/photos as IMG_YYYYMMDD_HHMMSS_*.jpg, videos in " +
-            "/home/alex/glasses/videos as VID_YYYYMMDD_HHMMSS_*.mp4."))
+        assertTrue(prompt, prompt.contains("photos in /home/example/glasses/photos as IMG_YYYYMMDD_HHMMSS_*.jpg, videos in " +
+            "/home/example/glasses/videos as VID_YYYYMMDD_HHMMSS_*.mp4."))
         val byDefault = AgentPromptTemplates.studyModePrompt(AgentPromptTemplates.DEFAULT_STUDY_MODE_TEMPLATE,
             AgentPromptTemplates.DEFAULT_MENTRA_FOLDER)
         assertTrue(byDefault, byDefault.contains("photos in ${AgentPromptTemplates.DEFAULT_MENTRA_FOLDER}/photos as "))

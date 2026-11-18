@@ -203,15 +203,17 @@ private const val MIN_EMPTY_CYCLE_MILLIS = 1_000L
 
 /**
  * Where notes that just arrived go. A new note never takes over the screen: it [waiting]s for the
- * note screen's New note button, and outside that screen it also notifies, so it can be tapped from anywhere.
+ * note screen's New note button and gets the unseen dot ([AgentNoteUnseen]). Only while no Thoughts
+ * screen is open does it also notify, so it can be tapped from anywhere; with Thoughts open the dot
+ * on the Agent notes icon is all it shows.
  * The user's own pages ([AgentNote.isPhonePage]) that another device sent, such as the Mac's Send
  * Page to Agent, are stored and listed but never announced, like the pages this phone sends.
  */
 data class AgentNoteArrival(val waiting: List<AgentNote>, val notify: List<AgentNote>)
 
-fun agentNoteArrival(notes: List<AgentNote>, onNoteScreen: Boolean, shownNoteId: String? = null): AgentNoteArrival {
+fun agentNoteArrival(notes: List<AgentNote>, appOpen: Boolean, shownNoteId: String? = null): AgentNoteArrival {
     val fresh = notes.filter { it.noteId != shownNoteId && !it.isPhonePage }
-    return AgentNoteArrival(fresh, if (onNoteScreen) emptyList() else fresh)
+    return AgentNoteArrival(fresh, if (appOpen) emptyList() else fresh)
 }
 
 /** A draft in progress: the strokes plus the comment and tool, so it survives process death. */

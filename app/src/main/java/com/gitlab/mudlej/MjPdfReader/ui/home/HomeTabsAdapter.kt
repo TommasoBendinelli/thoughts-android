@@ -10,8 +10,6 @@ import com.gitlab.mudlej.MjPdfReader.databinding.PageHomeLibraryBinding
 import com.gitlab.mudlej.MjPdfReader.databinding.PageHomeReviewBinding
 
 class HomeTabsAdapter(
-    /** The tabs shown; positions are ordinals, so only trailing tabs may be left out. */
-    private val tabs: List<HomeTab> = HomeTab.entries,
     private val onPageAttached: (HomeTab, SwipeRefreshLayout) -> Unit,
 ) : RecyclerView.Adapter<HomeTabsAdapter.PageViewHolder>() {
 
@@ -19,7 +17,7 @@ class HomeTabsAdapter(
         val swipeRefresh: SwipeRefreshLayout,
     ) : RecyclerView.ViewHolder(swipeRefresh)
 
-    override fun getItemCount() = tabs.size
+    override fun getItemCount() = HomeTab.entries.size
 
     override fun getItemViewType(position: Int) = position
 
@@ -38,8 +36,8 @@ class HomeTabsAdapter(
             ) as SwipeRefreshLayout
             HomeTab.LIBRARY -> PageHomeLibraryBinding.inflate(inflater, parent, false).pageSwipeRefresh
             HomeTab.REVIEW -> PageHomeReviewBinding.inflate(inflater, parent, false).pageSwipeRefresh
-            HomeTab.AB_TESTING -> inflater.inflate(
-                com.gitlab.mudlej.MjPdfReader.R.layout.page_home_ab_testing,
+            HomeTab.ANNOTATIONS -> inflater.inflate(
+                com.gitlab.mudlej.MjPdfReader.R.layout.page_home_overview,
                 parent,
                 false,
             ) as SwipeRefreshLayout

@@ -93,7 +93,7 @@ class ReviewSessionEditingInstrumentedTest {
                 activity.window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
                 controller = ReviewSessionController(activity, binding, DocumentState(uri = Uri.fromFile(pdf)))
                 show(first)
-                assertEquals(View.VISIBLE, binding.reviewSetKnowledgeButton.visibility)
+                assertEquals(View.VISIBLE, binding.reviewRevealButton.visibility)
             }
             instrumentation.waitForIdleSync()
             scenario.onActivity { binding.reviewOptionsButton.performClick() }
@@ -105,9 +105,11 @@ class ReviewSessionEditingInstrumentedTest {
             capture("review-menu.png")
             assertTrue(menuItems("Edit").any { it.text?.toString() == "Edit" })
             assertTrue(menuItems("Undo").isNotEmpty())
-            // The note is edited in Edit card, next to the question; there is no separate menu item.
+            // Cards have no separate note: nothing in the menu adds or edits one.
             assertTrue(menuItems("Add note").isEmpty() && menuItems("Edit note").isEmpty())
             assertTrue(menuItems("Hide again").isEmpty())
+            // Flip is in the menu while the answer is covered: the bar under the question has only Reveal.
+            assertTrue(menuItems("Flip").any { it.text?.toString() == "Flip" })
             assertTrue(menuItems("Edit answer box").isEmpty())
             var editItem = menuItems("Edit").first { it.text?.toString() == "Edit" }
             while (!editItem.isClickable && editItem.parent != null) editItem = editItem.parent
@@ -116,12 +118,9 @@ class ReviewSessionEditingInstrumentedTest {
             instrumentation.uiAutomation.waitForIdle(500, 5000)
             scenario.onActivity {
                 assertEquals(View.GONE, binding.reviewQuestionEditLayout.visibility)
-                assertEquals(View.GONE, binding.reviewNoteEditLayout.visibility)
                 assertNotNull(binding.pdfView.getReviewRegionSelection())
                 binding.reviewQuestionToggleButton.performClick()
                 assertEquals(View.VISIBLE, binding.reviewQuestionEditLayout.visibility)
-                assertEquals(View.VISIBLE, binding.reviewNoteEditLayout.visibility)
-                assertEquals(first.note, binding.reviewNoteEdit.text.toString())
                 binding.reviewQuestionEdit.setText("")
                 binding.reviewRegionSaveButton.performClick()
                 assertNotNull(binding.reviewQuestionEditLayout.error)
@@ -134,31 +133,20 @@ class ReviewSessionEditingInstrumentedTest {
                 assertEquals(first.question, binding.reviewQuestion.text.toString())
             }
             scenario.onActivity {
-                // Reveal frames the answer and becomes Hide; the buttons stay. Set knowledge adds the bar.
-                binding.reviewFlipButton.performClick()
-                assertEquals("Unflip", binding.reviewFlipButton.text.toString())
-                binding.reviewFlipButton.performClick()
-                assertEquals("Flip", binding.reviewFlipButton.text.toString())
-                binding.reviewRevealButton.performClick()
-                assertEquals("Hide", binding.reviewRevealButton.text.toString())
-                assertEquals(View.VISIBLE, binding.reviewFlipButton.visibility)
-                assertFalse(binding.reviewFlipButton.isEnabled)
-                assertEquals(View.GONE, binding.reviewRatingScroll.visibility)
-                binding.reviewRevealButton.performClick()
+                // One Reveal: the answer and the bar to say how well it was known, at once.
                 assertEquals("Reveal", binding.reviewRevealButton.text.toString())
-                assertTrue(binding.reviewFlipButton.isEnabled)
                 binding.reviewRevealButton.performClick()
-                assertEquals(View.VISIBLE, binding.reviewSetKnowledgeButton.visibility)
-                binding.reviewSetKnowledgeButton.performClick()
                 assertEquals(View.VISIBLE, binding.reviewRatingScroll.visibility)
                 assertEquals(View.VISIBLE, binding.reviewCurrentState.visibility)
-                assertEquals(View.GONE, binding.reviewSetKnowledgeButton.visibility)
+                assertEquals(View.GONE, binding.reviewRevealButton.visibility)
             }
             capture("review-answer-comparison.png")
             scenario.onActivity { binding.reviewOptionsButton.performClick() }
             instrumentation.waitForIdleSync()
             instrumentation.uiAutomation.waitForIdle(500, 5000)
             capture("review-rating-menu.png")
+            // Once the answer shows, Flip leaves the menu and Hide again takes its place.
+            assertTrue(menuItems("Flip").none { it.text?.toString() == "Flip" })
             var hideItem = menuItems("Hide again").first { it.text?.toString() == "Hide again" }
             while (!hideItem.isClickable && hideItem.parent != null) hideItem = hideItem.parent
             assertTrue(hideItem.performAction(AccessibilityNodeInfo.ACTION_CLICK))
@@ -168,7 +156,6 @@ class ReviewSessionEditingInstrumentedTest {
                 assertEquals(View.VISIBLE, binding.reviewRevealButton.visibility)
                 assertEquals(View.GONE, binding.reviewRatingScroll.visibility)
                 assertFalse(binding.reviewIntervalButton.isEnabled)
-                assertEquals(View.VISIBLE, binding.reviewSetKnowledgeButton.visibility)
                 val maskPage = binding.pdfView.javaClass.getDeclaredField("reviewMaskPage")
                     .apply { isAccessible = true }.getInt(binding.pdfView)
                 assertEquals(first.page - 1, maskPage)
@@ -181,7 +168,7 @@ class ReviewSessionEditingInstrumentedTest {
             instrumentation.uiAutomation.performGlobalAction(android.accessibilityservice.AccessibilityService.GLOBAL_ACTION_BACK)
             instrumentation.waitForIdleSync()
             scenario.onActivity {
-                binding.reviewSetKnowledgeButton.performClick()
+                binding.reviewRevealButton.performClick()
                 assertEquals(View.VISIBLE, binding.reviewRatingScroll.visibility)
                 assertEquals(View.GONE, binding.reviewRevealButton.visibility)
                 // The answer stays framed where it was hidden.
@@ -211,8 +198,8 @@ class ReviewSessionEditingInstrumentedTest {
         pdf.delete()
     }
 
-    /** The note is edited in Edit card next to the question; tapping the note opens it there. */
-    @Test fun noteIsEditedInEditCard() {
+    /** A card that still has a note from before shows only its question: the note is not shown or edited. */
+    @Test fun anOldNoteIsNotShown() {
         val instrumentation = InstrumentationRegistry.getInstrumentation()
         val context = instrumentation.targetContext
         val pdf = File(context.cacheDir, "review-session-note-check.pdf")
@@ -250,25 +237,22 @@ class ReviewSessionEditingInstrumentedTest {
                 val controller = ReviewSessionController(activity, binding, DocumentState(uri = Uri.fromFile(pdf)))
                 ReviewSessionController::class.java.getDeclaredMethod("showCard", ReviewCard::class.java, com.gitlab.mudlej.MjPdfReader.data.review.ReviewInterval::class.java, Map::class.java)
                     .apply { isAccessible = true }.invoke(controller, card, com.gitlab.mudlej.MjPdfReader.data.review.ReviewInterval.suggested(null, null), emptyMap<String, Int>())
-                assertEquals(View.VISIBLE, binding.reviewNote.visibility)
-                binding.reviewNote.performClick()
-                // Edit card opens with the question and the note shown, the note filled in.
+                fun texts(view: android.view.View): List<String> = when (view) {
+                    is android.widget.TextView -> listOf(view.text.toString())
+                    is android.view.ViewGroup -> (0 until view.childCount).flatMap { texts(view.getChildAt(it)) }
+                    else -> emptyList()
+                }
+                assertTrue(texts(binding.root).any { it == card.question })
+                assertTrue(texts(binding.root).none { it.contains("Compare with SFT") })
+                // Edit card shows the question only.
+                ReviewSessionController::class.java.getDeclaredMethod("editCard", ReviewCard::class.java, Boolean::class.javaPrimitiveType)
+                    .apply { isAccessible = true }.invoke(controller, card, true)
                 assertNotNull(binding.pdfView.getReviewRegionSelection())
-                assertEquals(View.GONE, binding.reviewNote.visibility)
                 assertEquals(View.VISIBLE, binding.reviewQuestionEditLayout.visibility)
-                assertEquals(View.VISIBLE, binding.reviewNoteEditLayout.visibility)
-                assertEquals("Compare with SFT", binding.reviewNoteEdit.text.toString())
                 assertEquals(card.question, binding.reviewQuestionEdit.text.toString())
-                assertEquals("Hide question & note", binding.reviewQuestionToggleButton.text.toString())
-                binding.reviewQuestionToggleButton.performClick()
-                assertEquals(View.GONE, binding.reviewQuestionEditLayout.visibility)
-                assertEquals(View.GONE, binding.reviewNoteEditLayout.visibility)
-                assertEquals("Edit question & note", binding.reviewQuestionToggleButton.text.toString())
-                binding.reviewNoteEdit.setText("Changed but cancelled")
+                assertEquals("Hide question", binding.reviewQuestionToggleButton.text.toString())
+                assertTrue(texts(binding.root).none { it.contains("Compare with SFT") })
                 binding.reviewRegionCancelButton.performClick()
-                assertEquals(View.VISIBLE, binding.reviewNote.visibility)
-                assertEquals(View.GONE, binding.reviewNoteEditLayout.visibility)
-                assertTrue(binding.reviewNote.text.toString().contains("Compare with SFT"))
             }
         }
         pdf.delete()

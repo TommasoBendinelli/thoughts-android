@@ -232,6 +232,15 @@ internal fun agentTextFeedbackSection(
         if (record.kind != null && record.resolvedAt != null) line += " (resolved)"
         lines += line
     }
+    // What each kind asks of the agent: a question wants an answer, not an
+    // edit; likes and dislikes are what to keep and what to change. As on the desktop.
+    if (given.any { it.kind == com.gitlab.mudlej.MjPdfReader.data.review.ReviewCardFeedback.Kind.QUESTION && it.resolvedAt == null }) {
+        lines += "Answer each Question in your reply. A question asks you something; it is not a request to change the text, so " +
+            "make no proposal for it unless I ask for one."
+    }
+    if (given.any { it.kind == null }) {
+        lines += "Liked and Disliked passages say what to keep and what to change; a change goes in a proposal."
+    }
     return lines.joinToString("\n") + "\n"
 }
 

@@ -158,11 +158,11 @@
         android:paddingHorizontal="8dp"
         android:paddingVertical="4dp">
 
-        <!-- What the agent that answers the reply may use: one slim line over the comment. The whole
-             line is the touch target and opens the choice (the chip shows its pressed state), and the
-             last choice holds for every reply. Not for a page from the reader (a new note, not a reply). -->
+        <!-- Who answers the reply: one slim line over the comment. The whole line is the touch target
+             and opens the choice of agent (the chip shows its pressed state). What an agent may use is
+             chosen when its session starts (New session). Not for a page from the reader. -->
         <FrameLayout
-            android:id="@+id/agentNoteSourcesRow"
+            android:id="@+id/agentNoteAnsweredByRow"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:clickable="true"
@@ -173,7 +173,7 @@
             android:visibility="gone">
 
             <com.google.android.material.chip.Chip
-                android:id="@+id/agentNoteSources"
+                android:id="@+id/agentNoteAnsweredBy"
                 style="@style/Widget.Material3.Chip.Assist"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
@@ -185,7 +185,7 @@
                 android:importantForAccessibility="noHideDescendants"
                 android:maxLines="1"
                 android:textAppearance="?attr/textAppearanceLabelMedium"
-                app:chipIcon="@drawable/ic_library_documents"
+                app:chipIcon="@drawable/ic_agent_conversation"
                 app:chipIconSize="16dp"
                 app:chipIconTint="?attr/colorOnSurfaceVariant"
                 app:chipMinHeight="28dp"

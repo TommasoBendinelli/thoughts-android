@@ -113,8 +113,8 @@ legacyServerHosts.each {
         throw new GradleException("thoughtsLegacyServerHosts must list host names (comma-separated), got ${it}")
     }
 }
-// The card-pilot rating page shown in Home's A/B testing tab (its Mental Model page is next to it).
-// Empty: the tab and Review > Mental Model are hidden.
+// The card-pilot site that serves Review > Mental Model (its page `mental-model`); the name is that of the
+// A/B testing tab it once served too. Empty: Review has no Mental Model button.
 def abTestingUrl = thoughtsBuildInput('thoughtsAbTestingUrl', '')
 if (abTestingUrl) {
     httpsHostOf('thoughtsAbTestingUrl', abTestingUrl)

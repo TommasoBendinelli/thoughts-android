@@ -18,6 +18,11 @@
     <string name="agent_edits_search">Search agent edits</string>
     <string name="agent_edits_options">Agent edits options</string>
     <string name="agent_edits_back_to_list">All agent edits</string>
+    <!-- The open item's place in the list as shown, e.g. "Agent edit 1/3". -->
+    <string name="agent_edit_position">Agent edit %1$d/%2$d</string>
+    <string name="comment_detail_position">Comment %1$d/%2$d</string>
+    <string name="previous_agent_edit">Previous agent edit</string>
+    <string name="next_agent_edit">Next agent edit</string>
     <string name="agent_edit_added">Added %1$s</string>
     <string name="agent_edits_expand_panel">Expand agent edits panel</string>
     <string name="agent_edits_collapse_panel">Collapse agent edits panel</string>

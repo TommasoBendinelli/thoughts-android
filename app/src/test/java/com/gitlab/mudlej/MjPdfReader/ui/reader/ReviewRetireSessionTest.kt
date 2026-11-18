@@ -19,13 +19,16 @@ class ReviewRetireSessionTest {
         val revealed = reviewSessionMenuActions(hasCard = true, answerVisible = true)
         assertEquals(listOf(
             ReviewSessionMenuAction.FOCUS, ReviewSessionMenuAction.MORE_INFO, ReviewSessionMenuAction.COPY_FOR_AGENT,
-            ReviewSessionMenuAction.EDIT, ReviewSessionMenuAction.AGENT_CONVERSATIONS, ReviewSessionMenuAction.SKIP,
-            ReviewSessionMenuAction.UNDO, ReviewSessionMenuAction.HIDE_AGAIN, ReviewSessionMenuAction.RETIRE,
+            ReviewSessionMenuAction.EDIT, ReviewSessionMenuAction.AGENT_CONVERSATIONS, ReviewSessionMenuAction.KIND,
+            ReviewSessionMenuAction.SKIP, ReviewSessionMenuAction.UNDO, ReviewSessionMenuAction.HIDE_AGAIN, ReviewSessionMenuAction.RETIRE,
             ReviewSessionMenuAction.DELETE, ReviewSessionMenuAction.END,
         ), revealed)
         val hidden = reviewSessionMenuActions(hasCard = true, answerVisible = false)
         assertEquals(hidden.indexOf(ReviewSessionMenuAction.DELETE) - 1, hidden.indexOf(ReviewSessionMenuAction.RETIRE))
         assertFalse(ReviewSessionMenuAction.HIDE_AGAIN in hidden)
+        // Flip is in the menu while the answer is covered (the bar has only Reveal), not once it shows.
+        assertEquals(hidden.indexOf(ReviewSessionMenuAction.SKIP) + 1, hidden.indexOf(ReviewSessionMenuAction.FLIP))
+        assertFalse(ReviewSessionMenuAction.FLIP in revealed)
         // Without a card (session finished) only Undo and End review remain.
         assertEquals(listOf(ReviewSessionMenuAction.UNDO, ReviewSessionMenuAction.END),
             reviewSessionMenuActions(hasCard = false, answerVisible = false))

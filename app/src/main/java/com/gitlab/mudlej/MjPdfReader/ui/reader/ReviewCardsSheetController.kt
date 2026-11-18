@@ -95,6 +95,8 @@ internal fun reviewCardsSheetMetadata(
     retiredAt: Instant? = null,
     /** Instead of "Page N": where a card without a PDF place is (an HTML attachment page). */
     place: String? = null,
+    /** A project card's mark, "Project card · Changed since you last saw it" (review-card-kinds). */
+    kindMark: String? = null,
 ): String {
     fun day(at: Instant) = at.atZone(zone).format(DateTimeFormatter.ofPattern(
         if (at.atZone(zone).year == now.atZone(zone).year) "d MMM" else "d MMM yyyy", Locale.getDefault(),
@@ -114,6 +116,7 @@ internal fun reviewCardsSheetMetadata(
         place ?: context.getString(R.string.review_cards_sheet_page, pageIndex + 1),
         tags?.takeIf { it.isNotEmpty() }?.joinToString { reviewTagLabel(context, it) },
         due,
+        kindMark,
     ).joinToString(" · ").let { summary -> (listOf(summary) + groupNotes).joinToString("\n") }
 }
 

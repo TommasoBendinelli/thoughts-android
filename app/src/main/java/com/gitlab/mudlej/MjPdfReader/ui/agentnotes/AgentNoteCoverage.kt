@@ -107,7 +107,14 @@ data class AgentNoteAnswerLine(
     val changeOffered: Boolean,
     /** "Change" can be used now: the server answered the last check. */
     val changeEnabled: Boolean,
-)
+) {
+    /**
+     * The usual case, nothing to act on: an agent listens or will be woken. The note screen then shows
+     * no line under the title (saying the usual on every note took room); who answers is in the note's
+     * menu ("Who answers your reply…"), and Send still says who will answer.
+     */
+    val usual: Boolean get() = mark == AgentNoteAnswerMark.LISTENING || mark == AgentNoteAnswerMark.WOKEN
+}
 
 /**
  * What the line says for [answer], or null for no line (no answer yet, or a server that cannot
@@ -150,6 +157,26 @@ fun agentNoteAnswerLine(
             line(AgentNoteAnswerMark.NOBODY, string(R.string.agent_note_answer_nobody, emptyArray()), warning = true)
         else -> null
     }
+}
+
+/**
+ * The chip over a note's comment: "Answered by: …" with who answers a reply now. A chosen agent is
+ * named as chosen; on Automatic, the agent that listens, else the session a reply waker wakes. Null
+ * while the server has not said, or cannot tell.
+ */
+fun agentNoteAnsweredByChipText(answer: AgentNoteListeningAnswer?, string: (Int, Array<out Any>) -> String): String? {
+    answer ?: return null
+    val chosen = answer.answerBy
+    val wake = answer.wake
+    val named = chosen?.coverer ?: answer.coverer
+    val who = when {
+        namesTheListener(answer.state, named, wake) && named != null -> agentNoteCovererName(named, string)
+        wake != null -> agentNoteWokenName(wake, string)
+        chosen != null -> agentNoteCovererName(chosen.coverer, string)
+        answer.state == AgentNoteListening.NOT_LISTENING -> string(R.string.agent_note_answered_by_nobody, emptyArray())
+        else -> return null
+    }
+    return string(R.string.agent_note_answered_by, arrayOf(who))
 }
 
 /** One entry of the list "Change" opens: [agent] null is Automatic. */

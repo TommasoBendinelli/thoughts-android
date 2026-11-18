@@ -50,6 +50,8 @@ class LibraryProjectPane(
     private val pickPdfs: () -> Unit,
     private val pickHtml: () -> Unit,
     private val store: LibraryProjectStore = LibraryProjectStore(context),
+    /** The review cards a Project's menu retires ("Retire project cards…"); read on [Dispatchers.IO]. Overridable for tests. */
+    private val reviewStore: () -> ReviewStore = { ReviewStore(context) },
     /** Visible agent conversations by Project id; read on [Dispatchers.IO]. Overridable for tests. */
     private val loadConversations: suspend () -> Map<String, List<AgentConversations.Record>> = {
         defaultConversations(context)
@@ -455,19 +457,87 @@ class LibraryProjectPane(
             Toast.makeText(context, "Saved locally. Tap Sync to share changes.", Toast.LENGTH_LONG).show()
         }).show()
     }
-    private fun projectMenu(project: JsonObject) = sheet(project.text("name"), listOf(
-        "Export combined PDF…" to {
-            chooseProjectExportDocuments(context, project.getAsJsonArray("documents")?.mapNotNull { value ->
-                val doc = value.asJsonObject
-                (doc.text("document_id").ifBlank { doc.text("id") }).takeIf(String::isNotBlank)
-                    ?.let { ProjectExportDocument(it, doc.text("name").ifBlank { it }) }
-            }.orEmpty()) { chosen -> exportProject(project, chosen) }
-        },
-        "Rename…" to { nameDialog(project) }, "Remove project…" to {
-            MaterialAlertDialogBuilder(context).setTitle("Remove ${project.text("name")}?")
-                .setMessage("The project, its documents, comments and review cards will leave your Library when you Sync. Original files remain available.")
-                .setNegativeButton("Cancel", null).setPositiveButton("Remove project") { _, _ -> change("remove", project) }.show()
-        }))
+    /**
+     * The Project's menu. Its default card kind (protocol/review-card-kinds.md section 5) is offered
+     * when the catalogue entry has `review_kind` (a server with card kinds), and "Retire project
+     * cards…" while the Project holds an active project card (section 6.4).
+     */
+    private fun projectMenu(project: JsonObject) {
+        scope.launch {
+            val projectCards = withContext(Dispatchers.IO) {
+                runCatching { reviewStore().activeProjectCards(project.text("id")).map { it.id } }.getOrDefault(emptyList())
+            }
+            sheet(project.text("name"), buildList {
+                add("Export combined PDF…" to {
+                    chooseProjectExportDocuments(context, project.getAsJsonArray("documents")?.mapNotNull { value ->
+                        val doc = value.asJsonObject
+                        (doc.text("document_id").ifBlank { doc.text("id") }).takeIf(String::isNotBlank)
+                            ?.let { ProjectExportDocument(it, doc.text("name").ifBlank { it }) }
+                    }.orEmpty()) { chosen -> exportProject(project, chosen) }
+                })
+                if (project.has("review_kind")) add(context.getString(R.string.library_project_card_kind,
+                    context.getString(projectKindLabel(project))) to { cardKindDialog(project) })
+                if (projectCards.isNotEmpty()) add(context.getString(R.string.library_project_retire_cards) to {
+                    confirmRetireProjectCards(project, projectCards)
+                })
+                add("Rename…" to { nameDialog(project) })
+                add("Remove project…" to {
+                    MaterialAlertDialogBuilder(context).setTitle("Remove ${project.text("name")}?")
+                        .setMessage("The project, its documents, comments and review cards will leave your Library when you Sync. Original files remain available.")
+                        .setNegativeButton("Cancel", null).setPositiveButton("Remove project") { _, _ -> change("remove", project) }.show()
+                })
+            })
+        }
+    }
+
+    private fun projectKindLabel(project: JsonObject): Int =
+        if (project.get("review_kind")?.takeIf { it.isJsonPrimitive }?.asString == "project") R.string.library_project_kind_project
+        else R.string.library_project_kind_knowledge
+
+    /** Knowledge cards or Project cards, the current one checked; a change is queued like a rename. */
+    private fun cardKindDialog(project: JsonObject) {
+        val kinds = listOf("knowledge", "project")
+        val current = if (projectKindLabel(project) == R.string.library_project_kind_project) 1 else 0
+        MaterialAlertDialogBuilder(context)
+            .setTitle(context.getString(R.string.library_project_card_kind_title, project.text("name")))
+            .setSingleChoiceItems(arrayOf(context.getString(R.string.library_project_kind_knowledge),
+                context.getString(R.string.library_project_kind_project)), current) { dialog, which ->
+                dialog.dismiss()
+                if (which != current) change(LibraryProjectStore.SET_REVIEW_KIND, project, JsonObject().apply {
+                    addProperty("review_kind", kinds[which])
+                })
+            }
+            .setNegativeButton("Cancel", null)
+            .show()
+    }
+
+    /** One retire event per active project card of the Project, all at one time; knowledge cards stay. */
+    private fun confirmRetireProjectCards(project: JsonObject, cardIds: List<String>) {
+        MaterialAlertDialogBuilder(context)
+            .setTitle(context.resources.getQuantityString(R.plurals.library_project_retire_cards_title, cardIds.size, cardIds.size))
+            .setMessage(context.getString(R.string.library_project_retire_cards_message, project.text("name")))
+            .setNegativeButton("Cancel", null)
+            .setPositiveButton(R.string.library_project_retire_cards_action) { _, _ ->
+                scope.launch {
+                    val result = withContext(Dispatchers.IO) {
+                        runCatching {
+                            val store = reviewStore()
+                            // The cards the confirmation named that are still active project cards.
+                            val still = store.activeProjectCards(project.text("id")).map { it.id }.toSet()
+                            store.retireAll(cardIds.filter { it in still }).getOrThrow()
+                        }
+                    }
+                    result.onSuccess { retired ->
+                        com.gitlab.mudlej.MjPdfReader.data.sync.ThoughtsSyncScheduler.enqueueBackground(context.applicationContext)
+                        Toast.makeText(context, context.resources.getQuantityString(R.plurals.library_project_retired_cards,
+                            retired.size, retired.size), Toast.LENGTH_SHORT).show()
+                    }.onFailure { error ->
+                        Toast.makeText(context, error.message ?: "The cards could not be retired", Toast.LENGTH_LONG).show()
+                    }
+                    redraw()
+                }
+            }.show()
+    }
     private fun exportProject(project: JsonObject, documentIds: List<String>?) {
         val dialog = MaterialAlertDialogBuilder(context).setTitle("Export combined PDF")
             .setMessage("Exporting the project…").setNegativeButton("Close", null).create()

@@ -127,12 +127,43 @@
                     </com.google.android.material.card.MaterialCardView>
                 </LinearLayout>
 
+                <!-- The two review entries (protocol/review-card-kinds.md section 7): knowledge cards
+                     and project cards, each with its own due count; Projects can be narrowed to one. -->
                 <com.google.android.material.button.MaterialButton
-                    android:id="@+id/reviewStartAllButton"
+                    android:id="@+id/reviewStartStudyButton"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="14dp"
-                    android:text="@string/review_start" />
+                    tools:text="Study · 12 due" />
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="6dp"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal">
+
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/reviewStartProjectsButton"
+                        style="@style/Widget.Material3.Button.TonalButton"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        tools:text="Projects · 3 due" />
+
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/reviewProjectsScopeButton"
+                        style="@style/Widget.Material3.Button.TextButton"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="4dp"
+                        android:ellipsize="end"
+                        android:maxLines="1"
+                        android:maxWidth="180dp"
+                        android:visibility="gone"
+                        tools:text="All Projects ▾"
+                        tools:visibility="visible" />
+                </LinearLayout>
 
                 <com.google.android.material.button.MaterialButton
                     android:id="@+id/reviewBrowseAllButton"

@@ -60,6 +60,8 @@ class AgentNoteActivityInstrumentedTest {
         val posted = CopyOnWriteArrayList<Posted>()
         val receipts = CopyOnWriteArrayList<String>()
         val inboxCalls = java.util.concurrent.atomic.AtomicInteger()
+        /** When set, a reply waits for it before it reaches the server: a slow upload. */
+        @Volatile var hold: java.util.concurrent.CountDownLatch? = null
         override fun inbox(after: Long?, wait: Int, reviewCardId: String?, documentId: String?): AgentNoteInboxPage {
             inboxCalls.incrementAndGet()
             // A long-poll that finds nothing.
@@ -75,6 +77,7 @@ class AgentNoteActivityInstrumentedTest {
             return AgentNote(noteId, title = "Receipt")
         }
         override fun postReply(noteId: String, replyId: String, imageBytes: ByteArray, mediaType: String, strokesJson: String?, message: String?): AgentNoteReply {
+            hold?.await(20, java.util.concurrent.TimeUnit.SECONDS)
             posted += Posted(noteId, replyId, imageBytes, strokesJson, message)
             return AgentNoteReply(replyId = replyId, noteId = noteId, sequence = 1)
         }
@@ -197,6 +200,58 @@ class AgentNoteActivityInstrumentedTest {
         assertTrue(reply.sent)
         assertFalse(store.pendingReplies().any { it.noteId == noteId })
         assertTrue("opened" in api.receipts)
+    }
+
+    @Test fun theNoteStaysUsableWhileTheReplyIsOnItsWay() {
+        val release = java.util.concurrent.CountDownLatch(1)
+        api.hold = release
+        ActivityScenario.launch<AgentNoteActivity>(AgentNoteActivity.intent(context, noteId)).use { scenario ->
+            awaitCondition("the note is shown") {
+                var ready = false
+                scenario.onActivity { ready = it.canvas().bitmap != null && it.canvas().width > 0 }
+                ready
+            }
+            scenario.onActivity { activity ->
+                activity.findViewById<EditText>(R.id.agentNoteCommentField).setText("First reply")
+                activity.findViewById<View>(R.id.agentNotePen).performClick()
+                drag(activity.canvas(), 0.2f, 0.3f, 0.8f, 0.35f)
+                activity.findViewById<View>(R.id.agentNoteSend).performClick()
+                // The comment went with the reply: the field is free for the next one at once.
+                assertEquals("", activity.findViewById<EditText>(R.id.agentNoteCommentField).text.toString())
+            }
+            awaitCondition("the reply is on its way") {
+                var subtitle: CharSequence? = null
+                scenario.onActivity { subtitle = it.supportActionBar?.subtitle }
+                subtitle?.toString()?.contains("Sending") == true
+            }
+            scenario.onActivity { activity ->
+                // Only Send waits: no spinner over the note, the drawing and the comment stay usable.
+                assertFalse("Send waits", activity.findViewById<View>(R.id.agentNoteSend).isEnabled)
+                assertEquals(View.GONE, activity.findViewById<View>(R.id.agentNoteProgress).visibility)
+                assertTrue("drawing", activity.canvas().isEnabled)
+                val field = activity.findViewById<EditText>(R.id.agentNoteCommentField)
+                assertTrue("comment", field.isEnabled)
+                field.setText("Next one")
+                drag(activity.canvas(), 0.2f, 0.7f, 0.8f, 0.75f)
+            }
+            release.countDown()
+            awaitCondition("the reply is sent") { api.posted.isNotEmpty() }
+            awaitCondition("Send is back") {
+                var enabled = false
+                scenario.onActivity { enabled = it.findViewById<View>(R.id.agentNoteSend).isEnabled }
+                enabled
+            }
+            scenario.onActivity { activity ->
+                // What was typed and drawn meanwhile stays for the next reply.
+                assertEquals("Next one", activity.findViewById<EditText>(R.id.agentNoteCommentField).text.toString())
+                assertEquals(2, activity.canvas().document!!.strokes.size)
+            }
+        }
+        // The reply is what was there when Send was pressed: its comment and its one stroke.
+        assertEquals(1, api.posted.map { it.replyId }.toSet().size)
+        val posted = api.posted.first()
+        assertEquals("First reply", posted.message)
+        assertEquals(1, JsonParser.parseString(posted.strokes).asJsonObject.getAsJsonArray("strokes").size())
     }
 
     @Test fun numberToolDropsNumberedMarkersThatAreSent() {

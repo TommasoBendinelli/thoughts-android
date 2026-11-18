@@ -45,6 +45,8 @@ class Preferences(private val prefMan: SharedPreferences) {
                 .putString(homeTabKey, HomeTab.REVIEW.name)
                 .remove("homeFolderFlat")
                 .apply()
+            // The A/B testing tab gave its place to Annotations.
+            "AB_TESTING" -> prefMan.edit().putString(homeTabKey, HomeTab.ANNOTATIONS.name).apply()
         }
     }
 

@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Written for Thoughts. License is GPLv3. -->
+<resources>
+    <!-- A review card for a whole section: the selection is a section or subsection heading. -->
+    <string name="section_review_hides" translatable="false">Hides %1$s (%2$s).</string>
+    <string name="section_review_hides_lines" translatable="false">Hides %1$s (%2$s; lines %3$d–%4$d of %5$s).</string>
+    <plurals name="section_review_wrapped" translatable="false">
+        <item quantity="one">The card already inside it stays as it is.</item>
+        <item quantity="other">The %d cards already inside it stay as they are.</item>
+    </plurals>
+    <string name="section_review_page" translatable="false">page %1$d</string>
+    <string name="section_review_pages" translatable="false">pages %1$d–%2$d</string>
+    <string name="section_review_question" translatable="false">Explain “%1$s”.</string>
+    <string name="section_review_only_selection" translatable="false">Hide only the selection</string>
+    <string name="section_review_refused" translatable="false">This heading’s section cannot be a card: %1$s The card hides only the selected text.</string>
+    <string name="section_review_saved" translatable="false">Section card created</string>
+</resources>

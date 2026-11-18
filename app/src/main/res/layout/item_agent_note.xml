@@ -43,4 +43,14 @@
             android:textAppearance="?attr/textAppearanceBodyMedium"
             android:textColor="?attr/colorOnSurfaceVariant" />
     </LinearLayout>
+
+    <!-- A note that arrived and was not opened yet (AgentNoteUnseen). -->
+    <View
+        android:id="@+id/agentNoteUnseenDot"
+        android:layout_width="10dp"
+        android:layout_height="10dp"
+        android:layout_marginStart="12dp"
+        android:background="@drawable/agent_notes_dot"
+        android:importantForAccessibility="no"
+        android:visibility="gone" />
 </LinearLayout>

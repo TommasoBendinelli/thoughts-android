@@ -86,13 +86,11 @@ fun agentNoteSampleSize(width: Int, height: Int, maxPixels: Long): Int {
 }
 
 /**
- * The notes the note screen's arrows step through, oldest first, deleted ones left out: those sent
- * by [current]'s conversation, or, for a note that names none (a chat through the connector sends
- * none), every note that names none.
+ * The notes the note screen's arrows step through: every note on the phone, whichever chat sent it,
+ * in the order they were sent (oldest first, so › goes to the next one sent), deleted ones left out.
  */
-fun conversationNotes(notes: List<AgentNote>, current: AgentNote): List<AgentNote> {
-    val key = current.conversationKey
-    val same = notes.filter { !it.deleted && it.conversationKey == key }
+fun arrowNotes(notes: List<AgentNote>, current: AgentNote): List<AgentNote> {
+    val kept = notes.filter { !it.deleted }
         .let { found -> if (found.any { it.noteId == current.noteId }) found else found + current }
-    return same.sortedWith(compareBy<AgentNote> { it.createdAt }.thenBy { it.sequence })
+    return kept.sortedWith(compareBy<AgentNote> { it.createdAt }.thenBy { it.sequence })
 }

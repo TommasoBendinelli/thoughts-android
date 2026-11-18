@@ -732,7 +732,8 @@ class MainActivity : AppCompatActivity(), ReaderUi, DocumentTabsHost {
                     pageIndex = (item.card.pdfPage ?: 1) - 1 + documentReviewPageOffset(reading, item.card.pdfStem),
                     metadata = reviewCardsSheetMetadata(this@MainActivity, 0, item.currentTags(), item.dueAt,
                         item.reviewCount, retiredAt = item.card.retiredAt,
-                        place = getString(R.string.review_cards_sheet_retired_place)),
+                        place = getString(R.string.review_cards_sheet_retired_place),
+                        kindMark = com.gitlab.mudlej.MjPdfReader.ui.review.reviewKindMark(this@MainActivity, item.card)),
                     reviewable = false,
                     retired = true,
                 )
@@ -758,6 +759,7 @@ class MainActivity : AppCompatActivity(), ReaderUi, DocumentTabsHost {
                             item.dueAt, item.reviewCount,
                             groupNotes = reviewGroupNoteLines(this@MainActivity, item.currentGroupNotes()),
                             retiredAt = item.card.retiredAt,
+                            kindMark = com.gitlab.mudlej.MjPdfReader.ui.review.reviewKindMark(this@MainActivity, item.card),
                             place = attachment?.let { anchor ->
                                 if (attachmentCardStatus.notSent(item.card.id) != null) getString(R.string.html_attachment_card_not_sent)
                                 else if (attachmentCardStatus.isNotFound(item.card.id)) getString(R.string.html_attachment_answer_not_found)
@@ -795,14 +797,17 @@ class MainActivity : AppCompatActivity(), ReaderUi, DocumentTabsHost {
                     ReviewCardMerge.Refusal.RETIRED -> R.string.review_cards_sheet_merge_retired
                     ReviewCardMerge.Refusal.NOT_IN_SOURCE -> R.string.review_cards_sheet_merge_not_in_source
                     ReviewCardMerge.Refusal.SEVERAL_SOURCES -> R.string.review_cards_sheet_merge_several_sources
+                    ReviewCardMerge.Refusal.MIXED -> R.string.review_cards_sheet_merge_mixed
+                    ReviewCardMerge.Refusal.SEVERAL_DOCUMENTS -> R.string.review_cards_sheet_merge_several_documents
                 },
             ))
         }
         val client = ReviewCardMergeClient({ ThoughtsServerSecretStore(applicationContext).config() }, log = { Log.i(TAG, it) })
-        try {
+        val result = try {
             client.merge(plan, keepCardId, question)
         } catch (unsupported: ReviewCardMergeUnsupportedException) {
-            return@withContext ReviewCardsSheetMergeOutcome.Refused(getString(R.string.review_cards_sheet_merge_unsupported))
+            return@withContext ReviewCardsSheetMergeOutcome.Refused(getString(
+                if (unsupported.onPdf) R.string.review_cards_sheet_merge_pdf_unsupported else R.string.review_cards_sheet_merge_unsupported))
         } catch (refused: ReviewCardMergeException) {
             Log.w(TAG, "Review card merge refused: status=${refused.status} code=${refused.code}")
             return@withContext ReviewCardsSheetMergeOutcome.Refused(
@@ -813,10 +818,15 @@ class MainActivity : AppCompatActivity(), ReaderUi, DocumentTabsHost {
             Log.w(TAG, "Review card merge failed", offline)
             return@withContext ReviewCardsSheetMergeOutcome.Refused(getString(R.string.review_cards_sheet_merge_offline))
         }
-        // The merged records are on the server; this Sync brings them (and the rebuilt PDF later).
+        // The merged records are on the server; this Sync brings them (and, for cards of a note, the
+        // rebuilt PDF later; a merge of cards of a PDF changes nothing in the PDF).
         runCatching { SyncCommandCoordinator(applicationContext).start(target = null) }
             .onFailure { Log.w(TAG, "Could not start the Sync after a card merge", it) }
-        ReviewCardsSheetMergeOutcome.Merged(getString(R.string.review_cards_sheet_merged, ids.size))
+        val onPdf = result.kind?.let { it == "pdf" } ?: plan.onPdf
+        ReviewCardsSheetMergeOutcome.Merged(
+            if (onPdf && result.passages > 0) getString(R.string.review_cards_sheet_merged_pdf, ids.size, result.passages)
+            else getString(R.string.review_cards_sheet_merged, ids.size),
+        )
     }
 
     /** A retired card picked in the Review Cards sheet: it has no place on this PDF, so its details. */
@@ -851,6 +861,9 @@ class MainActivity : AppCompatActivity(), ReaderUi, DocumentTabsHost {
             return
         }
         intent.removeExtra(ReviewCardReaderContract.EXTRA_SINGLE_CARD_SESSION)
+        // This PDF's session keeps every card, whatever its kind.
+        intent.removeExtra(HomeActivity.EXTRA_REVIEW_KIND)
+        intent.removeExtra(HomeActivity.EXTRA_REVIEW_PROJECT_ID)
         intent.putExtra(HomeActivity.EXTRA_REVIEW_CARD_ID, item.cardId)
         pdf.name.removeSuffix(".pdf").takeIf { it.isNotEmpty() }?.let { intent.putExtra(HomeActivity.EXTRA_REVIEW_PDF_STEM, it) }
         reviewSessionController.beginReviewSession(inPlace = true)
@@ -1488,10 +1501,14 @@ class MainActivity : AppCompatActivity(), ReaderUi, DocumentTabsHost {
         }
         appTitle.setOnClickListener { titleClickListener() }
         appTitlePageNumber.setOnClickListener { titleClickListener() }
-        customView.findViewById<View>(R.id.actionbarAgentNotes).setOnClickListener {
+        val agentNotesButton = customView.findViewById<View>(R.id.actionbarAgentNotes)
+        agentNotesButton.setOnClickListener {
             dismissPdfCommentSheet()
             startActivity(AgentNotesListActivity.intent(this))
         }
+        // A note that arrives while Thoughts is open shows only this dot, no notification.
+        com.gitlab.mudlej.MjPdfReader.ui.agentnotes.AgentNotesDot.bind(
+            this, customView.findViewById(R.id.actionbarAgentNotesDot), agentNotesButton)
 
         // Apply the custom view
         actionBar?.customView = customView
@@ -1688,6 +1705,124 @@ class MainActivity : AppCompatActivity(), ReaderUi, DocumentTabsHost {
         manualReviewTextSelection = request
         inlineAnnotationActionController.hideActions()
         resetManualReviewFields(R.string.selection_review_instructions)
+        findManualReviewSection(request, regions)
+    }
+
+    // ---- A card for a whole section: the selection is a section or subsection heading ----------
+
+    // The section the selected heading starts, while the editor makes its card; null for a plain selection.
+    private var manualReviewSection: com.gitlab.mudlej.MjPdfReader.data.source.SectionCardPlan? = null
+    private var manualReviewSectionDocument: ManualReviewDocument? = null
+    private var manualReviewSectionQuestion: String? = null
+    private var manualReviewSectionJob: Job? = null
+
+    /**
+     * A short selection on one page may be a heading: the card then hides its whole section (from
+     * below the heading to the next heading of the same or a higher level), with a question
+     * suggested from the heading, unless the person chooses to hide only the selection.
+     */
+    private fun findManualReviewSection(request: com.github.barteksc.pdfviewer.PDFView.HighlightRequest,
+                                        regions: List<com.gitlab.mudlej.MjPdfReader.data.review.ReviewAnswerRegion>) {
+        val text = request.selectedText.trim()
+        if (regions.map { it.page }.distinct().size != 1 || text.length > 150 || text.split(Regex("\\s+")).size > 20) return
+        val document = currentManualReviewDocument(regions.first().page - 1) ?: return
+        val area = com.gitlab.mudlej.MjPdfReader.data.source.SectionArea(regions.first().page - document.firstPage,
+            regions.minOf { it.rect.left }, regions.minOf { it.rect.top }, regions.maxOf { it.rect.right }, regions.maxOf { it.rect.bottom })
+        manualReviewSectionJob?.cancel()
+        manualReviewSectionJob = lifecycleScope.launch {
+            val outcome = withContext(Dispatchers.IO) {
+                runCatching {
+                    com.gitlab.mudlej.MjPdfReader.data.source.ReviewSectionPlanner(applicationContext)
+                        .plan(document.file, "${document.pdfStem}.pdf", document.pdfSha256, area)
+                }.onFailure { Log.w(TAG, "Could not look for the selected heading's section", it) }.getOrNull()
+            }
+            // The editor still makes a card of this one selection.
+            if (binding.manualReviewEditorCard.visibility != View.VISIBLE || manualReviewTextSelection !== request ||
+                manualReviewKeptRegions.isNotEmpty() || manualReviewAreaSession != null) return@launch
+            when (outcome) {
+                is com.gitlab.mudlej.MjPdfReader.data.source.SectionOutcome.Found -> showManualReviewSection(outcome.plan, document)
+                is com.gitlab.mudlej.MjPdfReader.data.source.SectionOutcome.Refused ->
+                    binding.manualReviewInstructions.text = getString(R.string.section_review_refused,
+                        outcome.message.trim().let { if (it.endsWith('.')) it else "$it." })
+                else -> Unit
+            }
+        }
+    }
+
+    private fun showManualReviewSection(plan: com.gitlab.mudlej.MjPdfReader.data.source.SectionCardPlan, document: ManualReviewDocument) {
+        manualReviewSection = plan
+        manualReviewSectionDocument = document
+        val first = plan.firstPage + document.firstPage
+        val last = plan.lastPage + document.firstPage
+        val pages = if (first == last) getString(R.string.section_review_page, first) else getString(R.string.section_review_pages, first, last)
+        val hides = if (plan.sourceFile != null) getString(R.string.section_review_hides_lines, plan.name, pages, plan.firstLine, plan.lastLine,
+            plan.sourceFile.substringAfterLast('/')) else getString(R.string.section_review_hides, plan.name, pages)
+        binding.manualReviewInstructions.text = if (plan.wrappedCards > 0)
+            "$hides ${resources.getQuantityString(R.plurals.section_review_wrapped, plan.wrappedCards, plan.wrappedCards)}" else hides
+        if (binding.manualReviewQuestion.text.isNullOrBlank()) {
+            val question = getString(R.string.section_review_question, plan.title).take(500)
+            binding.manualReviewQuestion.setText(question)
+            binding.manualReviewQuestion.setSelection(question.length)
+            manualReviewSectionQuestion = question
+        }
+        binding.manualReviewOnlySelectionButton.visibility = View.VISIBLE
+        binding.manualReviewAnotherAreaButton.visibility = View.GONE
+    }
+
+    /** "Hide only the selection": back to a card of the selected text. */
+    private fun leaveManualReviewSection() {
+        manualReviewSection = null
+        manualReviewSectionDocument = null
+        binding.manualReviewInstructions.setText(R.string.selection_review_instructions)
+        if (manualReviewSectionQuestion != null && binding.manualReviewQuestion.text?.toString() == manualReviewSectionQuestion)
+            binding.manualReviewQuestion.text?.clear()
+        manualReviewSectionQuestion = null
+        binding.manualReviewOnlySelectionButton.visibility = View.GONE
+        binding.manualReviewAnotherAreaButton.visibility = View.VISIBLE
+    }
+
+    private fun createSectionReviewCard(plan: com.gitlab.mudlej.MjPdfReader.data.source.SectionCardPlan, document: ManualReviewDocument,
+                                        question: String, firstDueDays: Long, firstDueAt: Instant?) {
+        binding.manualReviewQuestionLayout.error = null
+        binding.manualReviewAddButton.isEnabled = false
+        lifecycleScope.launch {
+            val result = withContext(Dispatchers.IO) {
+                runCatching {
+                    if (com.gitlab.mudlej.MjPdfReader.data.sync.verifiedFileCache.sha256(document.file) != document.pdfSha256) {
+                        error(getString(R.string.manual_review_pdf_changed))
+                    }
+                    val regions = plan.areas.map { area ->
+                        com.gitlab.mudlej.MjPdfReader.data.review.ReviewAnswerRegion(area.page, RectF(area.left, area.top, area.right, area.bottom))
+                    }
+                    val card = ReviewStore(applicationContext).createManualCard(
+                        pdfStem = document.pdfStem,
+                        pdfSha256 = document.pdfSha256,
+                        page = regions.first().page,
+                        rect = regions.first().rect,
+                        answerRegions = regions,
+                        sourceAvailable = plan.sourceAvailable,
+                        selectedText = plan.text.take(500_000).ifBlank { null },
+                        question = question,
+                        firstDueDays = firstDueDays,
+                        firstDueAt = firstDueAt,
+                        sectionPlacement = plan.placement,
+                    ).getOrThrow()
+                    runCatching { FedoraRepository(applicationContext).captureReviewCards() }
+                        .onFailure { Log.w(TAG, "Section review card remains durable for the next sync", it) }
+                    card
+                }
+            }
+            result.onSuccess {
+                dismissManualReviewEditor()
+                ThoughtsSyncScheduler.enqueueBackground(applicationContext)
+                AppSnackbar.make(binding.root, R.string.section_review_saved, Snackbar.LENGTH_LONG).show()
+            }.onFailure { error ->
+                binding.manualReviewAddButton.isEnabled = true
+                val reason = (error as? com.gitlab.mudlej.MjPdfReader.data.source.ReviewAreaLinkingException)?.reason ?: error.message
+                AppSnackbar.make(binding.root, getString(R.string.manual_review_failed,
+                    reason.orEmpty().ifBlank { "Unknown error" }), Snackbar.LENGTH_LONG).show()
+            }
+        }
     }
 
     internal fun startManualReviewCard(viewX: Float, viewY: Float) {
@@ -1763,6 +1898,7 @@ class MainActivity : AppCompatActivity(), ReaderUi, DocumentTabsHost {
     private fun wireManualReviewEditor() {
         binding.manualReviewCancelButton.setOnClickListener { dismissManualReviewEditor() }
         binding.manualReviewAnotherAreaButton.setOnClickListener { keepManualReviewAreaAndSelectNext() }
+        binding.manualReviewOnlySelectionButton.setOnClickListener { leaveManualReviewSection() }
         binding.manualReviewAddButton.setOnClickListener { createManualReviewCard() }
         binding.manualReviewRemoveAreaButton.setOnClickListener { removeManualReviewArea() }
         binding.manualReviewPreviousAreaButton.setOnClickListener { stepManualReviewArea(-1) }
@@ -1819,6 +1955,12 @@ class MainActivity : AppCompatActivity(), ReaderUi, DocumentTabsHost {
         }
         if (attachmentCardSelection != null) {
             createAttachmentReviewCard(question, firstDueDays, firstDueAt)
+            return
+        }
+        val section = manualReviewSection
+        val sectionDocument = manualReviewSectionDocument
+        if (section != null && sectionDocument != null && manualReviewAreaSession == null && manualReviewKeptRegions.isEmpty()) {
+            createSectionReviewCard(section, sectionDocument, question, firstDueDays, firstDueAt)
             return
         }
         val boxSession = manualReviewAreaSession
@@ -2134,6 +2276,12 @@ class MainActivity : AppCompatActivity(), ReaderUi, DocumentTabsHost {
         if (!::binding.isInitialized) return
         htmlCardSelection = null
         attachmentCardSelection = null
+        manualReviewSectionJob?.cancel()
+        manualReviewSectionJob = null
+        manualReviewSection = null
+        manualReviewSectionDocument = null
+        manualReviewSectionQuestion = null
+        binding.manualReviewOnlySelectionButton.visibility = View.GONE
         manualReviewAreaSession = null
         manualReviewAreaProblem = null
         binding.manualReviewAreaActions.visibility = View.GONE

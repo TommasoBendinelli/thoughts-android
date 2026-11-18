@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Written for Thoughts. License is GPLv3. -->
+<menu xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto">
+    <!-- Starts a new study session: copies its prompt and says where to paste it. -->
+    <item
+        android:id="@+id/agentNotesNewSession"
+        android:title="@string/agent_notes_new_session"
+        android:contentDescription="@string/agent_notes_start_study_session"
+        app:showAsAction="always" />
+</menu>

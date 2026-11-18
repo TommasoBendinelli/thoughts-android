@@ -16,16 +16,13 @@ import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
 import android.util.Log
-import android.view.View
 import androidx.annotation.VisibleForTesting
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
 import com.gitlab.mudlej.MjPdfReader.R
-import com.gitlab.mudlej.MjPdfReader.core.ui.AppSnackbar
 import com.gitlab.mudlej.MjPdfReader.data.sync.ThoughtsServerSecretStore
 import com.gitlab.mudlej.MjPdfReader.ui.agentnotes.AgentNoteActivity
-import com.google.android.material.snackbar.Snackbar
 import java.lang.ref.WeakReference
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -259,25 +256,19 @@ object AgentNoteInbox : Application.ActivityLifecycleCallbacks {
         client = null
     }
 
-    /** Announces new notes without leaving the screen the user is on. Main thread. */
+    /**
+     * Announces new notes without leaving the screen the user is on. Main thread. With a Thoughts
+     * screen open a note gets only the unseen dot (Agent notes icon, list); otherwise a notification too.
+     */
     fun deliver(context: Context, notes: List<AgentNote>) {
         // A note from the agent shows that Study mode is in use: the listener goes on from here.
         if (notes.isNotEmpty()) AgentStudyListenerService.studyModeUsed(context)
         val activity = resumed?.get()?.takeUnless { it.isFinishing || it.isDestroyed }
         val noteScreen = activity as? AgentNoteActivity
-        val arrival = agentNoteArrival(notes, onNoteScreen = noteScreen != null, shownNoteId = noteScreen?.shownNoteId)
+        val arrival = agentNoteArrival(notes, appOpen = startedActivities > 0, shownNoteId = noteScreen?.shownNoteId)
         waitingNotes.update { waiting -> (waiting + arrival.waiting).distinctBy { it.noteId }.sortedBy { it.sequence } }
-        arrival.notify.forEach { note ->
-            // With notifications off, Thoughts on screen still says so.
-            if (!AgentNoteNotifier.notify(context, note) && activity != null) offer(activity, note)
-        }
-    }
-
-    private fun offer(activity: Activity, note: AgentNote) {
-        val anchor = activity.findViewById<View>(android.R.id.content) ?: return
-        AppSnackbar.make(anchor, activity.getString(R.string.agent_note_notification_title, note.title), Snackbar.LENGTH_LONG)
-            .setAction(R.string.agent_note_open) { activity.startActivity(AgentNoteActivity.intent(activity, note.noteId)) }
-            .show()
+        AgentNoteUnseen.arrived(context, arrival.waiting.map { it.noteId })
+        arrival.notify.forEach { note -> AgentNoteNotifier.notify(context, note) }
     }
 
     override fun onActivityStarted(activity: Activity) {

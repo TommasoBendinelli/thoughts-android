@@ -25,9 +25,11 @@
     <string name="whats_new_thoughts_synced_edits_title">Synced edits appear by themselves</string>
     <string name="whats_new_thoughts_synced_edits_body">The reader and the source editor reload when a synced edit arrives.</string>
     <string name="whats_new_thoughts_section_diary">Diary</string>
-    <string name="whats_new_thoughts_diary_title">A Diary instead of the Comments tab</string>
+    <string name="whats_new_thoughts_diary_title">A Diary tab</string>
     <string name="whats_new_thoughts_diary_body">Type a thought at the top of the Diary and press Enter. It is saved with the exact date and time and syncs like a to-do. Comments with issues still open from the Sync dialog.</string>
     <string name="whats_new_thoughts_section_comments">Comments</string>
+    <string name="whats_new_thoughts_comments_tab_title">The Comments tab is back</string>
+    <string name="whats_new_thoughts_comments_tab_body">Your comments by document, like the Mac\'s Annotations tab. Its ⋯ button adds, sorts and filters them.</string>
     <string name="whats_new_thoughts_comment_load_title">Comments open faster</string>
     <string name="whats_new_thoughts_comment_load_body">A document\'s comments load about three times faster.</string>
     <string name="whats_new_thoughts_section_review">Review</string>

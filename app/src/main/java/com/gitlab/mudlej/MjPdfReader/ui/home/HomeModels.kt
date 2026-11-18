@@ -14,21 +14,13 @@ import com.gitlab.mudlej.MjPdfReader.data.source.SourceMutationState
 import com.gitlab.mudlej.MjPdfReader.data.sync.LibraryMutation
 import com.gitlab.mudlej.MjPdfReader.data.sync.SyncOperationStore
 
-/** DIARY took the place of the Comments tab ("OVERVIEW"), which Preferences migrates to it. */
-enum class HomeTab { DIARY, NOTES, LIBRARY, REVIEW, AB_TESTING }
-
 /**
- * The tabs Home shows, in pager order (a tab's position is its ordinal): AB_TESTING, the last one,
- * only when the build names a rating page (Gradle property `thoughtsAbTestingUrl`).
+ * DIARY took the place of the Comments tab ("OVERVIEW"), which Preferences migrates to it. ANNOTATIONS, the
+ * comments by document as on the Mac's Annotations tab, took the place of the A/B testing tab.
  */
-fun visibleHomeTabs(abTestingConfigured: Boolean): List<HomeTab> =
-    HomeTab.entries.filter { it != HomeTab.AB_TESTING || abTestingConfigured }
+enum class HomeTab { DIARY, NOTES, LIBRARY, REVIEW, ANNOTATIONS }
 
-/** The tab Home opens on: the saved one while it is shown, else DIARY. */
-fun initialHomeTab(saved: HomeTab, visible: List<HomeTab>): HomeTab =
-    saved.takeIf { it in visible } ?: HomeTab.DIARY
-
-enum class PullToRefreshAction { SYNC, RELOAD_PAGE }
+enum class PullToRefreshAction { SYNC }
 
 enum class CachedFedoraStatusCode { SYNC_NEEDED, SYNCING, SYNCED, ERROR }
 
@@ -254,9 +246,8 @@ fun sourceAttentionActions(mutations: List<PendingSourceMutation>): SourceAttent
         retryFailures = mutations.any { it.state == SourceMutationState.FAILED },
     )
 
-/** The A/B testing tab shows a web page that has nothing to sync: pulling loads the page again (a new pilot round). */
-fun pullToRefreshAction(tab: HomeTab): PullToRefreshAction =
-    if (tab == HomeTab.AB_TESTING) PullToRefreshAction.RELOAD_PAGE else PullToRefreshAction.SYNC
+fun pullToRefreshAction(@Suppress("UNUSED_PARAMETER") tab: HomeTab): PullToRefreshAction =
+    PullToRefreshAction.SYNC
 
 enum class DocumentStatusCode(val wireId: String) {
     SYNC_NEEDED("sync_needed"),

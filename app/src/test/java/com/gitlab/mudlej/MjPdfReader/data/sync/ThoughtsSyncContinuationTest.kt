@@ -110,7 +110,7 @@ class ThoughtsSyncContinuationTest {
         assertEquals(
             SyncOperationStore.USER_MESSAGE_TAILSCALE_OFF,
             userFacingSyncFailureMessage(
-                UnknownHostException("fedora.tailnet.ts.net"),
+                UnknownHostException("server.example.ts.net"),
                 requiredVpnConnected = false,
             ),
         )

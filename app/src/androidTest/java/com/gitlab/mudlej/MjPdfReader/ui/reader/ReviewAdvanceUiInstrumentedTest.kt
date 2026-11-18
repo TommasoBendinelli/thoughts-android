@@ -72,7 +72,7 @@ class ReviewAdvanceUiInstrumentedTest {
                 scenario.onActivity { activity ->
                     val binding=ActivityMainBinding.bind(activity.findViewById<ViewGroup>(android.R.id.content).getChildAt(0))
                     previous=binding.reviewQuestion.text.toString()
-                    binding.reviewSetKnowledgeButton.performClick()
+                    binding.reviewRevealButton.performClick()
                 }
                 val started=SystemClock.elapsedRealtime()
                 scenario.onActivity { activity ->

@@ -36,7 +36,7 @@ class CommentAuthorTest {
     fun anyOtherPhoneGetsANeutralName() {
         assertEquals(CommentAuthor.GENERIC_DEFAULT, resolve(null, null))
         assertEquals(CommentAuthor.GENERIC_DEFAULT, resolve(null, "https://my-server.example.net"))
-        assertEquals(CommentAuthor.GENERIC_DEFAULT, resolve(null, "https://other.tail1234.ts.net"))
+        assertEquals(CommentAuthor.GENERIC_DEFAULT, resolve(null, "https://other.example.ts.net"))
         assertEquals(CommentAuthor.GENERIC_DEFAULT, resolve(null, "https://thoughts.example.org.example.net"))
         assertEquals(CommentAuthor.GENERIC_DEFAULT, resolve(null, "not a url"))
     }

@@ -12,21 +12,28 @@ import android.text.format.DateUtils
 import android.util.Log
 import android.util.LruCache
 import android.view.LayoutInflater
+import android.view.Menu
+import android.view.MenuItem
 import android.view.View
 import android.view.ViewGroup
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
+import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
+import androidx.lifecycle.repeatOnLifecycle
+import androidx.preference.PreferenceManager
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.gitlab.mudlej.MjPdfReader.R
 import com.gitlab.mudlej.MjPdfReader.core.ui.AppSnackbar
+import com.gitlab.mudlej.MjPdfReader.data.Preferences
 import com.gitlab.mudlej.MjPdfReader.data.agentnotes.AgentNoteAnswerState
 import com.gitlab.mudlej.MjPdfReader.data.agentnotes.AgentNoteEntry
 import com.gitlab.mudlej.MjPdfReader.data.agentnotes.AgentNoteFilter
 import com.gitlab.mudlej.MjPdfReader.data.agentnotes.AgentNoteReplyEntry
+import com.gitlab.mudlej.MjPdfReader.data.agentnotes.AgentNoteUnseen
 import com.gitlab.mudlej.MjPdfReader.data.agentnotes.AgentNotes
 import com.gitlab.mudlej.MjPdfReader.data.agentnotes.AgentNotesHttpException
 import com.gitlab.mudlej.MjPdfReader.data.agentnotes.agentNoteSampleSize
@@ -76,6 +83,11 @@ class AgentNotesListActivity : AppCompatActivity() {
         supportActionBar?.subtitle = intent.getStringExtra(EXTRA_SUBTITLE)?.takeIf(String::isNotBlank)
         binding.agentNotesList.layoutManager = LinearLayoutManager(this)
         binding.agentNotesList.adapter = adapter
+        // New notes (arrived, not opened yet) carry a dot; it goes once the note is opened.
+        AgentNoteUnseen.load(this)
+        lifecycleScope.launch {
+            repeatOnLifecycle(Lifecycle.State.STARTED) { AgentNoteUnseen.ids.collect(adapter::setUnseen) }
+        }
     }
 
     override fun onStart() {
@@ -85,6 +97,18 @@ class AgentNotesListActivity : AppCompatActivity() {
 
     override fun onSupportNavigateUp(): Boolean {
         finish()
+        return true
+    }
+
+    // New session (top right): a new study session starts where its notes will appear.
+    override fun onCreateOptionsMenu(menu: Menu): Boolean {
+        menuInflater.inflate(R.menu.agent_notes_list_menu, menu)
+        return true
+    }
+
+    override fun onOptionsItemSelected(item: MenuItem): Boolean {
+        if (item.itemId != R.id.agentNotesNewSession) return super.onOptionsItemSelected(item)
+        StudyModeControls.startStudySession(this, Preferences(PreferenceManager.getDefaultSharedPreferences(this)))
         return true
     }
 
@@ -114,6 +138,10 @@ class AgentNotesListActivity : AppCompatActivity() {
                     val listed = server.map { it.noteId }.toSet()
                     notes.filter { filter.matches(it) && it.noteId !in listed && replies[it.noteId].orEmpty().none { r -> r.pending } }
                         .forEach { store.deleteNote(it.noteId) }
+                    // A deleted note's dot goes with it.
+                    if (filter.documentId == null && filter.reviewCardId == null) {
+                        AgentNoteUnseen.keepOnly(this@AgentNotesListActivity, listed + store.notes().map { it.noteId })
+                    }
                 }
                 mergeAgentNotes(notes, server, replies, filter, complete)
             }
@@ -240,6 +268,14 @@ class AgentNotesListActivity : AppCompatActivity() {
 
     private inner class Adapter : RecyclerView.Adapter<Holder>() {
         private var rows: List<Row> = emptyList()
+        private var unseen: Set<String> = emptySet()
+
+        fun setUnseen(ids: Set<String>) {
+            if (ids == unseen) return
+            unseen = ids
+            @Suppress("NotifyDataSetChanged")
+            notifyDataSetChanged()
+        }
 
         fun submit(entries: List<AgentNoteEntry>) {
             rows = entries.flatMap { entry ->
@@ -271,6 +307,11 @@ class AgentNotesListActivity : AppCompatActivity() {
                     })
                     holder.binding.agentNoteSubtitle.text = listOf(relativeTime(note.createdAt, null), state)
                         .filter(String::isNotBlank).joinToString(" · ")
+                    val new = note.noteId in unseen
+                    holder.binding.agentNoteUnseenDot.visibility = if (new) View.VISIBLE else View.GONE
+                    holder.itemView.contentDescription = if (new) {
+                        context.getString(R.string.agent_note_new_prefix, holder.binding.agentNoteTitle.text)
+                    } else null
                     holder.itemView.setOnClickListener {
                         startActivity(AgentNoteActivity.intent(this@AgentNotesListActivity, note.noteId))
                     }
@@ -293,6 +334,8 @@ class AgentNotesListActivity : AppCompatActivity() {
                     }
                     holder.itemView.setOnLongClickListener(null)
                     holder.itemView.isLongClickable = false
+                    holder.binding.agentNoteUnseenDot.visibility = View.GONE
+                    holder.itemView.contentDescription = null
                 }
             }
             bindThumbnail(holder, row)
